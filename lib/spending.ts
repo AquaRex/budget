@@ -47,6 +47,22 @@ type TxLike = {
   to_account: string | null
 }
 
+/**
+ * Whether a description matches a stored pattern. Checks both the raw normalized
+ * text and the digit-stripped stem, so a pattern like "compass hi" matches
+ * "COMPASS 5105 HI" (interior store numbers) as well as trailing-number cases.
+ */
+export function descMatches(
+  description: string | null,
+  pattern: string,
+): boolean {
+  if (!pattern) return false
+  return (
+    normalizeText(description).includes(pattern) ||
+    deriveStem(description).includes(pattern)
+  )
+}
+
 export type SourceKey = { matchType: "description" | "account"; pattern: string }
 
 /**
@@ -68,18 +84,16 @@ export function txMatchesSource(
   matchType: "description" | "account",
   pattern: string,
 ): boolean {
-  if (matchType === "description")
-    return normalizeText(tx.description).includes(pattern)
+  if (matchType === "description") return descMatches(tx.description, pattern)
   return pattern === tx.from_account || pattern === tx.to_account
 }
 
 /** First matching rule's category for a transaction, or null. */
 export function ruleCategoryFor(tx: TxLike, rules: TxRule[]): string | null {
-  const desc = normalizeText(tx.description)
   for (const r of rules) {
     if (!r.category_id) continue
     if (r.match_type === "description") {
-      if (r.pattern && desc.includes(r.pattern)) return r.category_id
+      if (descMatches(tx.description, r.pattern)) return r.category_id
     } else {
       if (r.pattern === tx.from_account || r.pattern === tx.to_account)
         return r.category_id

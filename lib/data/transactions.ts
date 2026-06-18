@@ -187,18 +187,21 @@ export async function categorizeBySource(
   }
 
   const { data } = await supabase.from("transactions").select("*")
-  const matches = ((data ?? []) as Transaction[]).filter((t) =>
-    txMatchesSource(t, src.matchType, src.pattern),
+  const ids = new Set(
+    ((data ?? []) as Transaction[])
+      .filter((t) => txMatchesSource(t, src.matchType, src.pattern))
+      .map((t) => t.id),
   )
+  ids.add(tx.id) // always apply to the one the user clicked
   await Promise.all(
-    matches.map((t) =>
+    Array.from(ids).map((id) =>
       supabase
         .from("transactions")
         .update({ category_id: categoryId })
-        .eq("id", t.id),
+        .eq("id", id),
     ),
   )
-  return matches.length
+  return ids.size
 }
 
 export async function setTransactionExcluded(
