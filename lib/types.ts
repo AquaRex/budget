@@ -39,6 +39,52 @@ export type EntryAmount = {
   amount: number
 }
 
+// --- Spending / actual transactions (bank CSV import) ---
+
+export type ImportBatch = {
+  id: string
+  user_id: string
+  label: string | null
+  filename: string | null
+  uploaded_at: string
+  row_count: number
+  created_at: string
+}
+
+export type Transaction = {
+  id: string
+  user_id: string
+  import_id: string | null
+  booked_date: string // ISO date
+  tx_date: string | null
+  type: string | null
+  description: string | null
+  message: string | null
+  amount: number // negative = out (spending), positive = in (income)
+  currency: string
+  from_account: string | null
+  to_account: string | null
+  category_id: string | null
+  is_internal: boolean
+  is_excluded: boolean
+  dedup_key: string
+  identity_key: string
+  pending_amount: number | null
+  pending_booked_date: string | null
+  created_at: string
+}
+
+export type TxMatchType = "description" | "account"
+
+export type TxRule = {
+  id: string
+  user_id: string
+  match_type: TxMatchType
+  pattern: string
+  category_id: string | null
+  created_at: string
+}
+
 // Payload when creating/editing an entry's settings (no amounts/order here).
 export type EntryInput = {
   kind: EntryKind

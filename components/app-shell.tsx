@@ -3,7 +3,15 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useTheme } from "next-themes"
-import { LayoutDashboard, Moon, Receipt, Sun, TrendingUp, LogOut } from "lucide-react"
+import {
+  LayoutDashboard,
+  Moon,
+  Receipt,
+  Sun,
+  TrendingUp,
+  Wallet,
+  LogOut,
+} from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/components/auth/auth-provider"
@@ -13,6 +21,7 @@ const nav = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/bills", label: "Bills", icon: Receipt },
   { href: "/income", label: "Income", icon: TrendingUp },
+  { href: "/spending", label: "Spending", icon: Wallet },
 ]
 
 export function AppShell({ children }: { children: React.ReactNode }) {

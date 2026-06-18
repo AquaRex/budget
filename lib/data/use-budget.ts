@@ -7,6 +7,11 @@ import { fetchEntries, fetchAmounts } from "@/lib/data/entries"
 import { fetchCategories } from "@/lib/data/categories"
 import { fetchMethods } from "@/lib/data/methods"
 import { fetchSalaryProfile } from "@/lib/data/salary"
+import {
+  fetchTransactions,
+  fetchImports,
+  fetchTxRules,
+} from "@/lib/data/transactions"
 import { buildAmountMap, type BudgetContext } from "@/lib/budget"
 import type { SalaryProfile } from "@/lib/salary"
 import type {
@@ -14,7 +19,10 @@ import type {
   Entry,
   EntryAmount,
   EntryKind,
+  ImportBatch,
   PaymentMethod,
+  Transaction,
+  TxRule,
 } from "@/lib/types"
 
 export function useEntries(kind: EntryKind) {
@@ -55,6 +63,30 @@ export function useSalaryProfile() {
     fetchSalaryProfile,
   )
   return { profile: data ?? null, error, isLoading, mutate }
+}
+
+export function useTransactions() {
+  const { data, error, isLoading, mutate } = useSWR<Transaction[]>(
+    "transactions",
+    fetchTransactions,
+  )
+  return { transactions: data ?? [], error, isLoading, mutate }
+}
+
+export function useImports() {
+  const { data, error, isLoading, mutate } = useSWR<ImportBatch[]>(
+    "imports",
+    fetchImports,
+  )
+  return { imports: data ?? [], error, isLoading, mutate }
+}
+
+export function useTxRules() {
+  const { data, error, isLoading, mutate } = useSWR<TxRule[]>(
+    "tx_rules",
+    fetchTxRules,
+  )
+  return { rules: data ?? [], error, isLoading, mutate }
 }
 
 /** Build a BudgetContext from a live amounts array + the salary profile. */
