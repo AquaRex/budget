@@ -1,6 +1,6 @@
 "use client"
 
-import { Fragment, useState } from "react"
+import { Fragment, useEffect, useRef, useState } from "react"
 import { GripVertical, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -86,10 +86,47 @@ export function EntriesGrid({ kind }: { kind: EntryKind }) {
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [renameDraft, setRenameDraft] = useState("")
   const [dropTarget, setDropTarget] = useState<string | null>(null)
+  const [hoverCol, setHoverCol] = useState<number | null>(null)
+
+  // Float the header to the top of the page as the table scrolls past, without
+  // turning the list into its own scroll box. (A horizontal-scroll wrapper can't
+  // do viewport-sticky in pure CSS, so we offset the thead with JS instead.)
+  const wrapperRef = useRef<HTMLDivElement>(null)
+  const theadRef = useRef<HTMLTableSectionElement>(null)
+  const [headOffset, setHeadOffset] = useState(0)
+
+  useEffect(() => {
+    const APP_HEADER = 56 // sticky app header height (h-14)
+    let raf = 0
+    const update = () => {
+      raf = 0
+      const wrap = wrapperRef.current
+      const thead = theadRef.current
+      if (!wrap || !thead) return
+      const rect = wrap.getBoundingClientRect()
+      const max = Math.max(0, rect.height - thead.offsetHeight)
+      const offset =
+        rect.top < APP_HEADER ? Math.min(APP_HEADER - rect.top, max) : 0
+      setHeadOffset((prev) => (prev === offset ? prev : offset))
+    }
+    const onScroll = () => {
+      if (!raf) raf = requestAnimationFrame(update)
+    }
+    raf = requestAnimationFrame(update)
+    window.addEventListener("scroll", onScroll, { passive: true })
+    window.addEventListener("resize", onScroll)
+    return () => {
+      window.removeEventListener("scroll", onScroll)
+      window.removeEventListener("resize", onScroll)
+      if (raf) cancelAnimationFrame(raf)
+    }
+  }, [])
 
   const loading = le || la
   const methodName = (id: string | null) =>
     methods.find((m) => m.id === id)?.name ?? ""
+  // Weak column tint on hover; the hovered cell itself stays stronger.
+  const colBg = (m: number) => (hoverCol === m ? "bg-primary/5" : "")
 
   function openAdd(category: string) {
     setEditing(null)
@@ -267,7 +304,11 @@ export function EntriesGrid({ kind }: { kind: EntryKind }) {
           {dayLabel(entry.due_day)}
         </td>
         {values.map((v, i) => (
-          <td key={i} className="px-0.5 py-1">
+          <td
+            key={i}
+            onMouseEnter={() => setHoverCol(i + 1)}
+            className={cn("px-0.5 py-1", colBg(i + 1))}
+          >
             <EditableCell
               value={v}
               isOverride={hasOverride(ctx.amounts, entry.id, i + 1)}
@@ -422,7 +463,11 @@ export function EntriesGrid({ kind }: { kind: EntryKind }) {
         {subtotals.map((t, i) => (
           <td
             key={i}
-            className="px-1 py-2 text-right font-medium tabular-nums whitespace-nowrap"
+            onMouseEnter={() => setHoverCol(i + 1)}
+            className={cn(
+              "px-1 py-2 text-right font-medium tabular-nums whitespace-nowrap",
+              colBg(i + 1),
+            )}
           >
             {t ? formatNumber(t) : ""}
           </td>
@@ -465,10 +510,17 @@ export function EntriesGrid({ kind }: { kind: EntryKind }) {
 
       {!isBill && <SalaryCalculator onChanged={refresh} />}
 
-      <div className="overflow-x-auto rounded-lg border">
-        <table className="w-full border-collapse text-sm">
-          <thead>
-            <tr className="bg-muted/50 border-b">
+      <div ref={wrapperRef} className="overflow-x-auto rounded-lg border">
+        <table
+          className="w-full border-collapse text-sm"
+          onMouseLeave={() => setHoverCol(null)}
+        >
+          <thead
+            ref={theadRef}
+            className="relative z-[11]"
+            style={{ top: headOffset || undefined }}
+          >
+            <tr className="bg-muted border-b">
               <th className={cn(sticky, "bg-muted px-3 py-2 text-left font-medium")}>
                 Name
               </th>
@@ -478,8 +530,15 @@ export function EntriesGrid({ kind }: { kind: EntryKind }) {
               <th className="text-muted-foreground px-2 py-2 text-left font-medium">
                 Day
               </th>
-              {MONTHS_SHORT.map((m) => (
-                <th key={m} className="text-muted-foreground px-1 py-2 text-right font-medium">
+              {MONTHS_SHORT.map((m, i) => (
+                <th
+                  key={m}
+                  onMouseEnter={() => setHoverCol(i + 1)}
+                  className={cn(
+                    "text-muted-foreground px-1 py-2 text-right font-medium",
+                    colBg(i + 1),
+                  )}
+                >
                   {m}
                 </th>
               ))}
@@ -541,7 +600,14 @@ export function EntriesGrid({ kind }: { kind: EntryKind }) {
                 <td className={cn(sticky, "bg-muted px-3 py-2")}>Grand total</td>
                 <td colSpan={2} />
                 {grandTotals.map((t, i) => (
-                  <td key={i} className="px-1 py-2 text-right tabular-nums whitespace-nowrap">
+                  <td
+                    key={i}
+                    onMouseEnter={() => setHoverCol(i + 1)}
+                    className={cn(
+                      "px-1 py-2 text-right tabular-nums whitespace-nowrap",
+                      colBg(i + 1),
+                    )}
+                  >
                     {formatNumber(t)}
                   </td>
                 ))}
