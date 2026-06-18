@@ -42,6 +42,9 @@ export function MfaEnroll() {
 
         const { data, error } = await supabase.auth.mfa.enroll({
           factorType: "totp",
+          // Shown as the account name in Google Authenticator (otherwise it
+          // falls back to the Supabase Site URL, e.g. "localhost:3000").
+          issuer: "hetland.dev/budget",
           friendlyName: `Authenticator ${Date.now()}`,
         })
         if (error) throw error
