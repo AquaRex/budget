@@ -192,3 +192,74 @@ export function isSpending(t: Transaction): boolean {
 export function hasConflict(t: Transaction): boolean {
   return t.pending_amount != null
 }
+
+const periodOf = (t: Transaction) => t.booked_date.slice(0, 7) // YYYY-MM
+
+/** Average actual spend per month, across every month that has spending. */
+export function avgMonthlySpend(transactions: Transaction[]): {
+  avg: number
+  months: number
+  total: number
+} {
+  const byPeriod = new Map<string, number>()
+  for (const t of transactions) {
+    if (!isSpending(t)) continue
+    byPeriod.set(periodOf(t), (byPeriod.get(periodOf(t)) ?? 0) - Number(t.amount))
+  }
+  const vals = Array.from(byPeriod.values())
+  const total = vals.reduce((s, v) => s + v, 0)
+  return { avg: vals.length ? total / vals.length : 0, months: vals.length, total }
+}
+
+/** For each calendar month (1-12), the most recent YYYY-MM period with data. */
+export function latestPeriodByMonth(
+  transactions: Transaction[],
+): Map<number, string> {
+  const m = new Map<number, string>()
+  for (const t of transactions) {
+    const p = periodOf(t)
+    const mo = Number(p.slice(5, 7))
+    const cur = m.get(mo)
+    if (!cur || p > cur) m.set(mo, p)
+  }
+  return m
+}
+
+export function spentInPeriod(
+  transactions: Transaction[],
+  period: string | undefined,
+): number {
+  if (!period) return 0
+  let s = 0
+  for (const t of transactions)
+    if (periodOf(t) === period && isSpending(t)) s += -Number(t.amount)
+  return s
+}
+
+export function incomeInPeriod(
+  transactions: Transaction[],
+  period: string | undefined,
+): number {
+  if (!period) return 0
+  let s = 0
+  for (const t of transactions)
+    if (periodOf(t) === period && !isInternalTx(t) && Number(t.amount) > 0)
+      s += Number(t.amount)
+  return s
+}
+
+/** Actual spend per resolved category (null = ungrouped) for one period. */
+export function actualByCategory(
+  transactions: Transaction[],
+  period: string | undefined,
+  typeMap: TypeMap,
+): Map<string | null, number> {
+  const m = new Map<string | null, number>()
+  if (!period) return m
+  for (const t of transactions) {
+    if (periodOf(t) !== period || !isSpending(t)) continue
+    const ec = effectiveCategoryId(t, typeMap)
+    m.set(ec, (m.get(ec) ?? 0) - Number(t.amount))
+  }
+  return m
+}

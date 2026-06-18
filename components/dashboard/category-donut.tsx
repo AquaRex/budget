@@ -26,24 +26,37 @@ export function CategoryDonut({
   bills,
   ctx,
   month,
+  slices,
+  title = "Spending by category",
+  description = "Active bills this month",
 }: {
   bills: Entry[]
   ctx: BudgetContext
   month: number
+  /** Precomputed slices (e.g. actual spend); when given, bills aren't used. */
+  slices?: { category: string; amount: number }[]
+  title?: string
+  description?: string
 }) {
   const { categories } = useCategories("bill")
   const { data, total } = useMemo(() => {
     const nameOf = (id: string | null) =>
       categories.find((c) => c.id === id)?.name ?? "Uncategorized"
-    const byCat = new Map<string, number>()
-    for (const b of bills) {
-      if (!b.is_active) continue
-      const amount = effectiveAmount(b, ctx, month)
-      if (amount <= 0) continue
-      const cat = nameOf(b.category_id)
-      byCat.set(cat, (byCat.get(cat) ?? 0) + amount)
-    }
-    const data = Array.from(byCat.entries())
+    const entries: [string, number][] = slices
+      ? slices.map((s) => [s.category, s.amount])
+      : (() => {
+          const byCat = new Map<string, number>()
+          for (const b of bills) {
+            if (!b.is_active) continue
+            const amount = effectiveAmount(b, ctx, month)
+            if (amount <= 0) continue
+            const cat = nameOf(b.category_id)
+            byCat.set(cat, (byCat.get(cat) ?? 0) + amount)
+          }
+          return Array.from(byCat.entries())
+        })()
+    const data = entries
+      .filter(([, amount]) => amount > 0)
       .map(([category, amount]) => ({
         category,
         amount,
@@ -52,7 +65,7 @@ export function CategoryDonut({
       .sort((a, b) => b.amount - a.amount)
     const total = data.reduce((s, d) => s + d.amount, 0)
     return { data, total }
-  }, [bills, ctx, month, categories])
+  }, [bills, ctx, month, categories, slices])
 
   const config: ChartConfig = Object.fromEntries(
     data.map((d) => [d.category, { label: d.category, color: d.fill }]),
@@ -61,13 +74,13 @@ export function CategoryDonut({
   return (
     <Card className="flex flex-col">
       <CardHeader>
-        <CardTitle>Spending by category</CardTitle>
-        <CardDescription>Active bills this month</CardDescription>
+        <CardTitle>{title}</CardTitle>
+        <CardDescription>{description}</CardDescription>
       </CardHeader>
       <CardContent className="flex-1 pb-0">
         {data.length === 0 ? (
           <div className="text-muted-foreground flex h-[240px] items-center justify-center text-sm">
-            No bills this month.
+            Nothing to show this month.
           </div>
         ) : (
           <ChartContainer
