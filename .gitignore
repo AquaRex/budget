@@ -1,2 +1,15 @@
-
+# dependencies
 node_modules/
+
+# Next.js build cache and raw export (docs/ is the published copy and IS committed)
+.next/
+out/
+
+# environment variables (never commit these)
+.env.local
+.env*.local
+
+# misc
+.DS_Store
+*.tsbuildinfo
+next-env.d.ts

@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "deploy": "NEXT_PUBLIC_BASE_PATH=/budget next build && rm -rf docs && cp -r out docs && touch docs/.nojekyll",
     "start": "next start",
     "lint": "eslint",
     "format": "prettier --write \"**/*.{ts,tsx}\"",
