@@ -154,11 +154,15 @@ export function parseBankCsv(text: string): ParseResult {
     const tx_date = parseDate(get(iTx))
     const currency = get(iCur) || "NOK"
 
-    // A transfer between two of your own accounts isn't real spending.
+    // A transfer between your own accounts isn't real spending. These appear as
+    // "Overføring" / "Overført fra …" / "… mellom egne kontoer" / "Nettbank",
+    // often with only one account column filled.
+    const internalHay = `${type ?? ""} ${description ?? ""} ${message ?? ""}`
+      .toLowerCase()
     const isInternal =
-      (type ?? "").toLowerCase().includes("overf") &&
-      !!from_account &&
-      !!to_account
+      internalHay.includes("overf") ||
+      internalHay.includes("mellom egne kontoer") ||
+      internalHay.includes("nettbank")
 
     // Identity ignores amount + booking date so a pending card charge that
     // later settles (re-priced / re-booked) matches its earlier version. For

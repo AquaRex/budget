@@ -44,22 +44,32 @@ export default function SpendingPage() {
     return Array.from(set).sort((a, b) => b.localeCompare(a))
   }, [transactions])
 
+  // "all" = every transaction; otherwise a "YYYY-MM" key.
   const [period, setPeriod] = useState<string | null>(null)
   const active = period ?? periods[0] ?? monthKey(new Date())
+  const isAll = active === "all"
   const idx = periods.indexOf(active)
 
-  const stepPeriod = (delta: number) => {
-    if (periods.length === 0) return
-    const next = Math.min(Math.max(idx + delta, 0), periods.length - 1)
+  // periods are newest-first; stepping forward in time = toward index 0.
+  const stepPeriod = (deltaTime: number) => {
+    if (periods.length === 0 || isAll) return
+    const next = Math.min(Math.max(idx - deltaTime, 0), periods.length - 1)
     setPeriod(periods[next])
   }
 
-  const monthNum = Number(active.slice(5, 7))
-  const yearNum = active.slice(0, 4)
+  const monthNum = isAll ? 0 : Number(active.slice(5, 7))
+  const yearNum = isAll ? "" : active.slice(0, 4)
   const inPeriod = useMemo(
-    () => transactions.filter((t) => t.booked_date.slice(0, 7) === active),
-    [transactions, active],
+    () =>
+      isAll
+        ? transactions
+        : transactions.filter((t) => t.booked_date.slice(0, 7) === active),
+    [transactions, active, isAll],
   )
+  // Budget is the recurring template; over "all" sum each covered month.
+  const budgetMonths = isAll
+    ? periods.map((p) => Number(p.slice(5, 7)))
+    : [monthNum]
 
   const refresh = () => {
     mutateTx()
@@ -76,27 +86,36 @@ export default function SpendingPage() {
           </p>
         </div>
         {periods.length > 0 && (
-          <div className="flex items-center rounded-md border">
+          <div className="flex items-center gap-2">
+            <div className="flex items-center rounded-md border">
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="Older month"
+                onClick={() => stepPeriod(-1)}
+                disabled={isAll || idx >= periods.length - 1}
+              >
+                <ChevronLeft className="size-4" />
+              </Button>
+              <span className="w-32 text-center text-sm font-medium">
+                {isAll ? "All time" : `${MONTHS_LONG[monthNum - 1]} ${yearNum}`}
+              </span>
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="Newer month"
+                onClick={() => stepPeriod(1)}
+                disabled={isAll || idx <= 0}
+              >
+                <ChevronRight className="size-4" />
+              </Button>
+            </div>
             <Button
-              variant="ghost"
-              size="icon"
-              aria-label="Newer month"
-              onClick={() => stepPeriod(-1)}
-              disabled={idx <= 0}
+              variant={isAll ? "default" : "outline"}
+              size="sm"
+              onClick={() => setPeriod(isAll ? periods[0] : "all")}
             >
-              <ChevronLeft className="size-4" />
-            </Button>
-            <span className="w-32 text-center text-sm font-medium">
-              {MONTHS_LONG[monthNum - 1]} {yearNum}
-            </span>
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label="Older month"
-              onClick={() => stepPeriod(1)}
-              disabled={idx >= periods.length - 1}
-            >
-              <ChevronRight className="size-4" />
+              All time
             </Button>
           </div>
         )}
@@ -116,7 +135,7 @@ export default function SpendingPage() {
             transactions={inPeriod}
             bills={bills}
             ctx={ctx}
-            month={monthNum}
+            months={budgetMonths}
             categories={categories}
           />
 
@@ -124,7 +143,8 @@ export default function SpendingPage() {
 
           <div className="flex flex-col gap-3">
             <h2 className="text-lg font-semibold tracking-tight">
-              Transactions — {MONTHS_LONG[monthNum - 1]} {yearNum}
+              Transactions —{" "}
+              {isAll ? "All time" : `${MONTHS_LONG[monthNum - 1]} ${yearNum}`}
             </h2>
             <TransactionsTable
               transactions={inPeriod}

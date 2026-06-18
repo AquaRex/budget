@@ -7,7 +7,7 @@ import { toast } from "sonner"
 import type { Category, Transaction } from "@/lib/types"
 import { formatNOK } from "@/lib/format"
 import { cn } from "@/lib/utils"
-import { deriveStem, hasConflict } from "@/lib/spending"
+import { deriveStem, hasConflict, isInternalTx } from "@/lib/spending"
 import {
   setTransactionCategory,
   setTransactionExcluded,
@@ -74,7 +74,7 @@ export function TransactionsTable({
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase()
     return transactions.filter((t) => {
-      if (!showInternal && t.is_internal) return false
+      if (!showInternal && isInternalTx(t)) return false
       if (!q) return true
       return (
         (t.description ?? "").toLowerCase().includes(q) ||
@@ -197,7 +197,8 @@ export function TransactionsTable({
             ) : (
               rows.map((t) => {
                 const amt = Number(t.amount)
-                const income = amt > 0 && !t.is_internal
+                const internal = isInternalTx(t)
+                const income = amt > 0 && !internal
                 const conflict = hasConflict(t)
                 return (
                   <tr
@@ -215,7 +216,7 @@ export function TransactionsTable({
                       <div className="font-medium">{t.description || t.type}</div>
                       <div className="text-muted-foreground text-xs">
                         {t.type}
-                        {t.is_internal && (
+                        {internal && (
                           <Badge
                             variant="outline"
                             className="ml-1.5 text-[10px]"

@@ -100,9 +100,30 @@ export function classifyImport(
   return { toInsert, conflicts, unchangedCount }
 }
 
+/**
+ * True for transfers between your own accounts (not real spending/income).
+ * Derived so existing rows stay correct even if the stored flag is stale:
+ * any "Overføring", "Overført fra …", "… mellom egne kontoer" or "Nettbank".
+ */
+export function isInternalTx(t: {
+  is_internal?: boolean
+  type?: string | null
+  description?: string | null
+  message?: string | null
+}): boolean {
+  if (t.is_internal) return true
+  const hay = `${t.type ?? ""} ${t.description ?? ""} ${t.message ?? ""}`
+    .toLowerCase()
+  return (
+    hay.includes("overf") || // Overføring / Overført fra
+    hay.includes("mellom egne kontoer") ||
+    hay.includes("nettbank")
+  )
+}
+
 /** Spending transactions only: money out, not internal transfers / excluded. */
 export function isSpending(t: Transaction): boolean {
-  return !t.is_internal && !t.is_excluded && Number(t.amount) < 0
+  return !isInternalTx(t) && !t.is_excluded && Number(t.amount) < 0
 }
 
 /** True if this row has an unresolved proposed update from a later import. */

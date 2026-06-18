@@ -7,7 +7,7 @@ import type { Category, Entry, Transaction } from "@/lib/types"
 import { formatNOK } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import { monthTotal, type BudgetContext } from "@/lib/budget"
-import { isSpending } from "@/lib/spending"
+import { isSpending, isInternalTx } from "@/lib/spending"
 import { categoryColor } from "@/lib/categories"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
@@ -23,13 +23,14 @@ export function SpendingSummary({
   transactions,
   bills,
   ctx,
-  month,
+  months,
   categories,
 }: {
   transactions: Transaction[]
   bills: Entry[]
   ctx: BudgetContext
-  month: number
+  /** Month numbers (1-12) covered by the view; budget is summed over them. */
+  months: number[]
   categories: Category[]
 }) {
   const { rows, totalSpent, totalBudget, totalIncome } = useMemo(() => {
@@ -44,17 +45,16 @@ export function SpendingSummary({
           t.category_id,
           (actualByCat.get(t.category_id) ?? 0) + v,
         )
-      } else if (!t.is_internal && Number(t.amount) > 0) {
+      } else if (!isInternalTx(t) && Number(t.amount) > 0) {
         totalIncome += Number(t.amount)
       }
     }
 
-    const budgetFor = (catId: string | null) =>
-      monthTotal(
-        bills.filter((b) => b.category_id === catId),
-        ctx,
-        month,
-      )
+    // Budget is the recurring template; sum it across every month in view.
+    const budgetFor = (catId: string | null) => {
+      const filtered = bills.filter((b) => b.category_id === catId)
+      return months.reduce((s, m) => s + monthTotal(filtered, ctx, m), 0)
+    }
 
     const rows: Row[] = categories.map((c) => ({
       id: c.id,
@@ -76,9 +76,9 @@ export function SpendingSummary({
       rows,
       totalSpent,
       totalIncome,
-      totalBudget: monthTotal(bills, ctx, month),
+      totalBudget: months.reduce((s, m) => s + monthTotal(bills, ctx, m), 0),
     }
-  }, [transactions, bills, ctx, month, categories])
+  }, [transactions, bills, ctx, months, categories])
 
   const diff = totalBudget - totalSpent
   const usedPct =
