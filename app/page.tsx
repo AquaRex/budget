@@ -51,6 +51,7 @@ export default function DashboardPage() {
     totalIncome > 0
       ? Math.min(100, Math.round((totalBills / totalIncome) * 100))
       : 0
+  const savePct = totalIncome > 0 ? Math.round((remaining / totalIncome) * 100) : 0
 
   const cards = [
     {
@@ -130,47 +131,67 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-muted-foreground text-sm font-medium">
-              Income used
-            </CardTitle>
-            <PiggyBank className="text-muted-foreground size-4" />
-          </CardHeader>
-          <CardContent className="flex flex-col gap-2">
-            {loading ? (
-              <Skeleton className="h-4 w-full" />
-            ) : (
-              <>
-                <div className="flex items-baseline justify-between">
-                  <span className="text-2xl font-semibold tabular-nums">
-                    {usedPct}%
-                  </span>
-                  <span className="text-muted-foreground text-sm">
-                    {formatNOK(totalBills)} of {formatNOK(totalIncome)}
-                  </span>
-                </div>
-                <Progress value={usedPct} />
-              </>
-            )}
-          </CardContent>
-        </Card>
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-muted-foreground text-sm font-medium">
+            Year trend
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <BalanceChart data={series} height={260} highlightMonth={month} />
+        </CardContent>
+      </Card>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-muted-foreground text-sm font-medium">
-              Year trend
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <BalanceChart data={series} height={160} compact highlightMonth={month} />
-          </CardContent>
-        </Card>
-      </div>
+      <div className="grid items-start gap-6 lg:grid-cols-2">
+        <div className="flex flex-col gap-6">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-muted-foreground text-sm font-medium">
+                Income used
+              </CardTitle>
+              <PiggyBank className="text-muted-foreground size-4" />
+            </CardHeader>
+            <CardContent className="flex flex-col gap-2">
+              {loading ? (
+                <Skeleton className="h-4 w-full" />
+              ) : (
+                <>
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-2xl font-semibold tabular-nums">
+                      {usedPct}%
+                    </span>
+                    <span className="text-muted-foreground text-sm">
+                      {formatNOK(totalBills)} of {formatNOK(totalIncome)}
+                    </span>
+                  </div>
+                  <Progress value={usedPct} />
+                  <div className="text-muted-foreground flex justify-between text-xs">
+                    <span>
+                      Saving{" "}
+                      <span
+                        className={cn(
+                          "font-medium",
+                          savePct >= 0
+                            ? "text-emerald-600 dark:text-emerald-400"
+                            : "text-rose-600 dark:text-rose-400",
+                        )}
+                      >
+                        {savePct}%
+                      </span>{" "}
+                      of income
+                    </span>
+                    <span className="tabular-nums">
+                      {formatNOK(remaining)} left
+                    </span>
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <CategoryDonut bills={bills} ctx={ctx} month={month} />
+          <CategoryDonut bills={bills} ctx={ctx} month={month} />
+        </div>
+
         <UpcomingList bills={bills} incomes={incomes} ctx={ctx} month={month} />
       </div>
 

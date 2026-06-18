@@ -64,10 +64,6 @@ import {
 } from "@/components/ui/alert-dialog"
 
 const sticky = "sticky left-0 z-10"
-// Header cells stick to the top of the scroll box; the top-left corner sticks
-// to both edges and must sit above the row header (z-20) and first column (z-10).
-const stickyHead = "sticky top-0 z-20 bg-muted"
-const stickyCorner = "sticky top-0 left-0 z-30 bg-muted"
 const COLS = 18
 
 type Confirm = { type: "entry" | "category"; id: string; name: string }
@@ -469,31 +465,29 @@ export function EntriesGrid({ kind }: { kind: EntryKind }) {
 
       {!isBill && <SalaryCalculator onChanged={refresh} />}
 
-      <div className="max-h-[70vh] overflow-auto rounded-lg border">
+      <div className="overflow-x-auto rounded-lg border">
         <table className="w-full border-collapse text-sm">
           <thead>
-            <tr className="border-b">
-              <th className={cn(stickyCorner, "px-3 py-2 text-left font-medium")}>
+            <tr className="bg-muted/50 border-b">
+              <th className={cn(sticky, "bg-muted px-3 py-2 text-left font-medium")}>
                 Name
               </th>
-              <th className={cn(stickyHead, "text-muted-foreground px-2 py-2 text-left font-medium")}>
+              <th className="text-muted-foreground px-2 py-2 text-left font-medium">
                 Method
               </th>
-              <th className={cn(stickyHead, "text-muted-foreground px-2 py-2 text-left font-medium")}>
+              <th className="text-muted-foreground px-2 py-2 text-left font-medium">
                 Day
               </th>
               {MONTHS_SHORT.map((m) => (
-                <th key={m} className={cn(stickyHead, "text-muted-foreground px-1 py-2 text-right font-medium")}>
+                <th key={m} className="text-muted-foreground px-1 py-2 text-right font-medium">
                   {m}
                 </th>
               ))}
-              <th className={cn(stickyHead, "px-2 py-2 text-right font-semibold")}>
-                Total
-              </th>
-              <th className={cn(stickyHead, "text-muted-foreground px-2 py-2 text-right font-medium")}>
+              <th className="px-2 py-2 text-right font-semibold">Total</th>
+              <th className="text-muted-foreground px-2 py-2 text-right font-medium">
                 Avg
               </th>
-              <th className={cn(stickyHead, "w-8")} />
+              <th className="w-8" />
             </tr>
           </thead>
           <tbody>
