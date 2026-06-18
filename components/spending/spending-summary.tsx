@@ -7,16 +7,23 @@ import type { Category, Entry, Transaction } from "@/lib/types"
 import { formatNOK } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import { monthTotal, type BudgetContext } from "@/lib/budget"
-import { isSpending, isInternalTx } from "@/lib/spending"
+import {
+  isSpending,
+  isInternalTx,
+  effectiveCategoryId,
+  type TypeMap,
+} from "@/lib/spending"
 import { categoryColor } from "@/lib/categories"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 
 type Row = {
-  id: string | null
+  key: string
   name: string
   budget: number
   actual: number
+  /** True for an ungrouped bank type shown as its own bucket. */
+  isType?: boolean
 }
 
 export function SpendingSummary({
@@ -25,6 +32,7 @@ export function SpendingSummary({
   ctx,
   months,
   categories,
+  typeMap,
 }: {
   transactions: Transaction[]
   bills: Entry[]
@@ -32,43 +40,45 @@ export function SpendingSummary({
   /** Month numbers (1-12) covered by the view; budget is summed over them. */
   months: number[]
   categories: Category[]
+  typeMap: TypeMap
 }) {
   const { rows, totalSpent, totalBudget, totalIncome } = useMemo(() => {
-    const actualByCat = new Map<string | null, number>()
+    const actualByCat = new Map<string, number>() // resolved budget category
+    const actualByType = new Map<string, number>() // ungrouped bank types
+    let uncategorised = 0
     let totalSpent = 0
     let totalIncome = 0
     for (const t of transactions) {
       if (isSpending(t)) {
         const v = -Number(t.amount)
         totalSpent += v
-        actualByCat.set(
-          t.category_id,
-          (actualByCat.get(t.category_id) ?? 0) + v,
-        )
+        const ec = effectiveCategoryId(t, typeMap)
+        if (ec) actualByCat.set(ec, (actualByCat.get(ec) ?? 0) + v)
+        else if (t.type)
+          actualByType.set(t.type, (actualByType.get(t.type) ?? 0) + v)
+        else uncategorised += v
       } else if (!isInternalTx(t) && Number(t.amount) > 0) {
         totalIncome += Number(t.amount)
       }
     }
 
     // Budget is the recurring template; sum it across every month in view.
-    const budgetFor = (catId: string | null) => {
+    const budgetFor = (catId: string) => {
       const filtered = bills.filter((b) => b.category_id === catId)
       return months.reduce((s, m) => s + monthTotal(filtered, ctx, m), 0)
     }
 
     const rows: Row[] = categories.map((c) => ({
-      id: c.id,
+      key: c.id,
       name: c.name,
       budget: budgetFor(c.id),
       actual: actualByCat.get(c.id) ?? 0,
     }))
-    if ((actualByCat.get(null) ?? 0) > 0 || budgetFor(null) > 0) {
-      rows.push({
-        id: null,
-        name: "Uncategorised",
-        budget: budgetFor(null),
-        actual: actualByCat.get(null) ?? 0,
-      })
+    for (const [type, actual] of actualByType) {
+      rows.push({ key: `type:${type}`, name: type, budget: 0, actual, isType: true })
+    }
+    if (uncategorised > 0) {
+      rows.push({ key: "uncat", name: "Uncategorised", budget: 0, actual: uncategorised })
     }
     rows.sort((a, b) => b.actual - a.actual)
 
@@ -78,7 +88,7 @@ export function SpendingSummary({
       totalIncome,
       totalBudget: months.reduce((s, m) => s + monthTotal(bills, ctx, m), 0),
     }
-  }, [transactions, bills, ctx, months, categories])
+  }, [transactions, bills, ctx, months, categories, typeMap])
 
   const diff = totalBudget - totalSpent
   const usedPct =
@@ -176,7 +186,7 @@ export function SpendingSummary({
                   rows.map((r) => {
                     const d = r.budget - r.actual
                     return (
-                      <tr key={r.id ?? "uncat"} className="border-b last:border-0">
+                      <tr key={r.key} className="border-b last:border-0">
                         <td className="py-1.5 pr-2">
                           <span className="flex items-center gap-2">
                             <span
@@ -184,6 +194,11 @@ export function SpendingSummary({
                               style={{ backgroundColor: categoryColor(r.name) }}
                             />
                             {r.name}
+                            {r.isType && (
+                              <span className="text-muted-foreground text-[10px]">
+                                bank type
+                              </span>
+                            )}
                           </span>
                         </td>
                         <td className="text-muted-foreground px-2 py-1.5 text-right tabular-nums">

@@ -74,6 +74,14 @@ export type Transaction = {
   created_at: string
 }
 
+export type TypeCategory = {
+  id: string
+  user_id: string
+  bank_type: string
+  category_id: string
+  created_at: string
+}
+
 export type TxMatchType = "description" | "account"
 
 export type TxRule = {

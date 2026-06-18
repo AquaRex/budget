@@ -1,5 +1,27 @@
-import type { Transaction, TxRule } from "@/lib/types"
+import type { Transaction, TxRule, TypeCategory } from "@/lib/types"
 import type { ParsedTx } from "@/lib/csv"
+
+/** bank-type string -> budget category id. */
+export type TypeMap = Map<string, string>
+
+export function buildTypeMap(rows: TypeCategory[]): TypeMap {
+  return new Map(rows.map((r) => [r.bank_type, r.category_id]))
+}
+
+/**
+ * The category a transaction counts under, resolving in order:
+ *   1. an explicit per-transaction category (manual / source rule),
+ *   2. the bank-type's mapping,
+ *   3. none (it stays ungrouped under its own bank type).
+ */
+export function effectiveCategoryId(
+  t: { category_id: string | null; type: string | null },
+  typeMap: TypeMap,
+): string | null {
+  if (t.category_id) return t.category_id
+  if (t.type && typeMap.has(t.type)) return typeMap.get(t.type)!
+  return null
+}
 
 /** Lowercase + collapse whitespace, for stable rule matching. */
 export function normalizeText(s: string | null | undefined): string {

@@ -1,9 +1,10 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { ChevronLeft, ChevronRight } from "lucide-react"
+import { ChevronLeft, ChevronRight, Tags } from "lucide-react"
 
 import { MONTHS_LONG } from "@/lib/budget"
+import { buildTypeMap } from "@/lib/spending"
 import {
   useEntries,
   useAmounts,
@@ -12,6 +13,7 @@ import {
   useCategories,
   useTransactions,
   useTxRules,
+  useTypeCategories,
 } from "@/lib/data/use-budget"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -19,6 +21,7 @@ import { Separator } from "@/components/ui/separator"
 import { CsvDropzone } from "@/components/spending/csv-dropzone"
 import { SpendingSummary } from "@/components/spending/spending-summary"
 import { TransactionsTable } from "@/components/spending/transactions-table"
+import { TypeMapper } from "@/components/spending/type-mapper"
 
 function monthKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
@@ -36,6 +39,9 @@ export default function SpendingPage() {
     mutate: mutateTx,
   } = useTransactions()
   const { rules, mutate: mutateRules } = useTxRules()
+  const { typeCategories, mutate: mutateTypeCats } = useTypeCategories()
+  const typeMap = useMemo(() => buildTypeMap(typeCategories), [typeCategories])
+  const [mapperOpen, setMapperOpen] = useState(false)
 
   // Months that actually have data, newest first.
   const periods = useMemo(() => {
@@ -74,6 +80,7 @@ export default function SpendingPage() {
   const refresh = () => {
     mutateTx()
     mutateRules()
+    mutateTypeCats()
   }
 
   return (
@@ -117,6 +124,14 @@ export default function SpendingPage() {
             >
               All time
             </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setMapperOpen(true)}
+            >
+              <Tags className="size-4" />
+              Bank categories
+            </Button>
           </div>
         )}
       </div>
@@ -137,6 +152,7 @@ export default function SpendingPage() {
             ctx={ctx}
             months={budgetMonths}
             categories={categories}
+            typeMap={typeMap}
           />
 
           <Separator className="my-1" />
@@ -149,11 +165,21 @@ export default function SpendingPage() {
             <TransactionsTable
               transactions={inPeriod}
               categories={categories}
+              typeMap={typeMap}
               onChanged={refresh}
             />
           </div>
         </>
       )}
+
+      <TypeMapper
+        open={mapperOpen}
+        onOpenChange={setMapperOpen}
+        transactions={transactions}
+        categories={categories}
+        typeCategories={typeCategories}
+        onChanged={refresh}
+      />
     </div>
   )
 }

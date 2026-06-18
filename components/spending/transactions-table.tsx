@@ -7,7 +7,13 @@ import { toast } from "sonner"
 import type { Category, Transaction } from "@/lib/types"
 import { formatNOK } from "@/lib/format"
 import { cn } from "@/lib/utils"
-import { deriveStem, hasConflict, isInternalTx } from "@/lib/spending"
+import {
+  deriveStem,
+  hasConflict,
+  isInternalTx,
+  effectiveCategoryId,
+  type TypeMap,
+} from "@/lib/spending"
 import {
   categorizeBySource,
   setTransactionExcluded,
@@ -57,10 +63,12 @@ type RuleDraft = {
 export function TransactionsTable({
   transactions,
   categories,
+  typeMap,
   onChanged,
 }: {
   transactions: Transaction[]
   categories: Category[]
+  typeMap: TypeMap
   onChanged: () => void
 }) {
   const [query, setQuery] = useState("")
@@ -232,12 +240,20 @@ export function TransactionsTable({
                     </td>
                     <td className="px-2 py-2">
                       <Select
-                        value={t.category_id ?? NONE}
+                        value={effectiveCategoryId(t, typeMap) ?? NONE}
                         onValueChange={(v) => assignCategory(t, v)}
                       >
                         <SelectTrigger className="h-8 w-[150px] text-xs">
                           <SelectValue placeholder="Uncategorised">
-                            {catName(t.category_id) ?? "Uncategorised"}
+                            {(() => {
+                              const ec = effectiveCategoryId(t, typeMap)
+                              if (ec) return catName(ec)
+                              return (
+                                <span className="text-muted-foreground">
+                                  {t.type || "Uncategorised"}
+                                </span>
+                              )
+                            })()}
                           </SelectValue>
                         </SelectTrigger>
                         <SelectContent>
