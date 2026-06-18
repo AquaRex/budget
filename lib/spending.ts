@@ -25,6 +25,32 @@ type TxLike = {
   to_account: string | null
 }
 
+export type SourceKey = { matchType: "description" | "account"; pattern: string }
+
+/**
+ * The stable "source" of a transaction used to group/auto-categorise it:
+ * a merchant/creditor description stem when present, else the counterparty
+ * account number. Returns null when neither is available.
+ */
+export function sourceKeyFor(tx: TxLike): SourceKey | null {
+  const stem = deriveStem(tx.description)
+  if (stem) return { matchType: "description", pattern: stem }
+  const acct = tx.to_account || tx.from_account
+  if (acct) return { matchType: "account", pattern: acct }
+  return null
+}
+
+/** Does a transaction match a (matchType, pattern) source? */
+export function txMatchesSource(
+  tx: TxLike,
+  matchType: "description" | "account",
+  pattern: string,
+): boolean {
+  if (matchType === "description")
+    return normalizeText(tx.description).includes(pattern)
+  return pattern === tx.from_account || pattern === tx.to_account
+}
+
 /** First matching rule's category for a transaction, or null. */
 export function ruleCategoryFor(tx: TxLike, rules: TxRule[]): string | null {
   const desc = normalizeText(tx.description)

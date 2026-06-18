@@ -1,7 +1,13 @@
 import { getSupabase } from "@/lib/supabase/client"
 import type { ImportBatch, Transaction, TxRule } from "@/lib/types"
 import type { ParsedTx } from "@/lib/csv"
-import { classifyImport, ruleCategoryFor, type ImportPlan } from "@/lib/spending"
+import {
+  classifyImport,
+  ruleCategoryFor,
+  sourceKeyFor,
+  txMatchesSource,
+  type ImportPlan,
+} from "@/lib/spending"
 
 export async function fetchTransactions(): Promise<Transaction[]> {
   const supabase = getSupabase()
@@ -143,6 +149,56 @@ export async function setTransactionCategory(
     .update({ category_id: categoryId })
     .eq("id", id)
   if (error) throw error
+}
+
+/**
+ * Categorise every transaction sharing this one's source (same merchant /
+ * account) and persist a rule so future imports inherit it. Passing null
+ * clears the category for the whole source and removes the rule.
+ * Returns how many transactions were updated.
+ */
+export async function categorizeBySource(
+  tx: Transaction,
+  categoryId: string | null,
+): Promise<number> {
+  const supabase = getSupabase()
+  const src = sourceKeyFor(tx)
+  if (!src) {
+    await setTransactionCategory(tx.id, categoryId)
+    return 1
+  }
+
+  if (categoryId) {
+    const { error } = await supabase.from("tx_rules").upsert(
+      {
+        match_type: src.matchType,
+        pattern: src.pattern,
+        category_id: categoryId,
+      },
+      { onConflict: "user_id,match_type,pattern" },
+    )
+    if (error) throw error
+  } else {
+    await supabase
+      .from("tx_rules")
+      .delete()
+      .eq("match_type", src.matchType)
+      .eq("pattern", src.pattern)
+  }
+
+  const { data } = await supabase.from("transactions").select("*")
+  const matches = ((data ?? []) as Transaction[]).filter((t) =>
+    txMatchesSource(t, src.matchType, src.pattern),
+  )
+  await Promise.all(
+    matches.map((t) =>
+      supabase
+        .from("transactions")
+        .update({ category_id: categoryId })
+        .eq("id", t.id),
+    ),
+  )
+  return matches.length
 }
 
 export async function setTransactionExcluded(

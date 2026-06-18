@@ -9,7 +9,7 @@ import { formatNOK } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import { deriveStem, hasConflict, isInternalTx } from "@/lib/spending"
 import {
-  setTransactionCategory,
+  categorizeBySource,
   setTransactionExcluded,
   resolveConflict,
   saveRuleAndApply,
@@ -89,8 +89,12 @@ export function TransactionsTable({
   async function assignCategory(t: Transaction, value: string) {
     const id = value === NONE ? null : value
     try {
-      await setTransactionCategory(t.id, id)
+      const n = await categorizeBySource(t, id)
       onChanged()
+      if (n > 1)
+        toast.success(
+          `Updated ${n} transactions from this source — future imports too.`,
+        )
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not update category.")
     }
