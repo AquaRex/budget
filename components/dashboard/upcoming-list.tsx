@@ -7,6 +7,7 @@ import type { Entry } from "@/lib/types"
 import { formatNOK, dayLabel } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import { effectiveAmount, type BudgetContext } from "@/lib/budget"
+import { useCategories } from "@/lib/data/use-budget"
 import {
   Card,
   CardContent,
@@ -21,6 +22,7 @@ type Item = {
   day: number
   amount: number
   kind: "bill" | "income"
+  category: string | null
 }
 
 export function UpcomingList({
@@ -34,7 +36,10 @@ export function UpcomingList({
   ctx: BudgetContext
   month: number
 }) {
+  const { categories } = useCategories()
   const items = useMemo<Item[]>(() => {
+    const nameOf = (id: string | null) =>
+      categories.find((c) => c.id === id)?.name ?? null
     const build = (entries: Entry[], kind: "bill" | "income"): Item[] =>
       entries
         .filter((e) => e.is_active)
@@ -44,12 +49,13 @@ export function UpcomingList({
           day: e.due_day,
           amount: effectiveAmount(e, ctx, month),
           kind,
+          category: nameOf(e.category_id),
         }))
         .filter((i) => i.amount > 0)
     return [...build(bills, "bill"), ...build(incomes, "income")].sort(
       (a, z) => a.day - z.day,
     )
-  }, [bills, incomes, ctx, month])
+  }, [bills, incomes, ctx, month, categories])
 
   return (
     <Card>
@@ -94,7 +100,8 @@ export function UpcomingList({
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium">{item.name}</p>
                     <p className="text-muted-foreground text-xs">
-                      {dayLabel(item.day)} · {isIncome ? "Income" : "Bill"}
+                      {dayLabel(item.day)}
+                      {item.category ? ` · ${item.category}` : ""}
                     </p>
                   </div>
                   <span
