@@ -145,7 +145,7 @@ export default function DashboardPage() {
                   key={v}
                   onClick={() => setView(v)}
                   className={cn(
-                    "rounded px-2.5 py-1 text-xs font-medium capitalize transition-colors",
+                    "rounded-sm px-2.5 py-1 text-xs font-medium capitalize transition-colors",
                     view === v
                       ? "bg-secondary text-secondary-foreground"
                       : "text-muted-foreground hover:text-foreground",

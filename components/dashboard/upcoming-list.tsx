@@ -4,7 +4,7 @@ import { useMemo } from "react"
 import { ArrowDownRight, ArrowUpRight } from "lucide-react"
 
 import type { Entry } from "@/lib/types"
-import { formatNOK, dayLabel } from "@/lib/format"
+import { formatNOK } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import { effectiveAmount, type BudgetContext } from "@/lib/budget"
 import { useCategories } from "@/lib/data/use-budget"
@@ -99,10 +99,11 @@ export function UpcomingList({
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium">{item.name}</p>
-                    <p className="text-muted-foreground text-xs">
-                      {dayLabel(item.day)}
-                      {item.category ? ` · ${item.category}` : ""}
-                    </p>
+                    {item.category && (
+                      <p className="text-muted-foreground text-xs">
+                        {item.category}
+                      </p>
+                    )}
                   </div>
                   <span
                     className={cn(
