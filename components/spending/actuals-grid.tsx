@@ -1,6 +1,6 @@
 "use client"
 
-import { Fragment, useMemo } from "react"
+import { Fragment, useMemo, useState } from "react"
 
 import type { Category, Transaction } from "@/lib/types"
 import { formatNumber, formatNOK } from "@/lib/format"
@@ -100,6 +100,11 @@ export function ActualsGrid({
     return active ? total / active : 0
   }
 
+  // Same column-hover highlight as the budget grids: weak tint on the column,
+  // stronger on the hovered cell.
+  const [hoverCol, setHoverCol] = useState<number | null>(null)
+  const colBg = (m: number) => (hoverCol === m ? "bg-primary/5" : "")
+
   if (bands.length === 0) {
     return (
       <div className="text-muted-foreground rounded-lg border py-10 text-center text-sm">
@@ -111,16 +116,27 @@ export function ActualsGrid({
   return (
     <div className="flex flex-col gap-3">
       <div className="overflow-x-auto rounded-lg border">
-        <table className="w-full border-collapse text-sm">
+        <table
+          className="w-full border-collapse text-sm"
+          onMouseOver={(e) => {
+            const el = (e.target as HTMLElement).closest("[data-col]")
+            setHoverCol(el ? Number(el.getAttribute("data-col")) : null)
+          }}
+          onMouseLeave={() => setHoverCol(null)}
+        >
           <thead>
             <tr className="bg-muted border-b">
               <th className={cn(sticky, "bg-muted px-3 py-2 text-left font-medium")}>
                 {kind === "bill" ? "Merchant" : "Source"}
               </th>
-              {MONTHS_SHORT.map((m) => (
+              {MONTHS_SHORT.map((m, i) => (
                 <th
                   key={m}
-                  className="text-muted-foreground px-1 py-2 text-right font-medium"
+                  data-col={i + 1}
+                  className={cn(
+                    "text-muted-foreground px-1 py-2 text-right font-medium",
+                    colBg(i + 1),
+                  )}
                 >
                   {m}
                 </th>
@@ -148,7 +164,11 @@ export function ActualsGrid({
                     {band.subtotals.map((t, i) => (
                       <td
                         key={i}
-                        className="px-1 py-2 text-right font-medium tabular-nums whitespace-nowrap"
+                        data-col={i + 1}
+                        className={cn(
+                          "px-1 py-2 text-right font-medium tabular-nums whitespace-nowrap",
+                          colBg(i + 1),
+                        )}
                       >
                         {t ? formatNumber(t) : ""}
                       </td>
@@ -165,30 +185,25 @@ export function ActualsGrid({
                       </td>
                       {it.months.map((v, i) => {
                         const period = `${year}-${String(i + 1).padStart(2, "0")}`
+                        const clickable = v > 0 && !!onDrill
                         return (
                           <td
                             key={i}
+                            data-col={i + 1}
+                            onClick={
+                              clickable
+                                ? () => onDrill!(period, it.key)
+                                : undefined
+                            }
+                            title={clickable ? "View these transactions" : undefined}
                             className={cn(
                               "px-1 py-1.5 text-right tabular-nums whitespace-nowrap",
+                              colBg(i + 1),
                               v ? "" : "text-muted-foreground/40",
+                              clickable && "hover:bg-muted cursor-pointer",
                             )}
                           >
-                            {v ? (
-                              onDrill ? (
-                                <button
-                                  type="button"
-                                  onClick={() => onDrill(period, it.key)}
-                                  className="hover:text-primary cursor-pointer hover:underline"
-                                  title="View these transactions"
-                                >
-                                  {formatNumber(v)}
-                                </button>
-                              ) : (
-                                formatNumber(v)
-                              )
-                            ) : (
-                              "–"
-                            )}
+                            {v ? formatNumber(v) : "–"}
                           </td>
                         )
                       })}
@@ -208,7 +223,14 @@ export function ActualsGrid({
             <tr className="bg-muted border-t-2 font-semibold">
               <td className={cn(sticky, "bg-muted px-3 py-2")}>Total</td>
               {grand.map((t, i) => (
-                <td key={i} className="px-1 py-2 text-right tabular-nums whitespace-nowrap">
+                <td
+                  key={i}
+                  data-col={i + 1}
+                  className={cn(
+                    "px-1 py-2 text-right tabular-nums whitespace-nowrap",
+                    colBg(i + 1),
+                  )}
+                >
                   {formatNumber(t)}
                 </td>
               ))}
