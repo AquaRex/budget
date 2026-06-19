@@ -23,7 +23,7 @@ import { CsvDropzone } from "@/components/spending/csv-dropzone"
 import { SpendingSummary } from "@/components/spending/spending-summary"
 import { TransactionsTable } from "@/components/spending/transactions-table"
 import { TypeMapper } from "@/components/spending/type-mapper"
-import { ActualsGrid } from "@/components/spending/actuals-grid"
+import { ActualsGrid, type DrillMode } from "@/components/spending/actuals-grid"
 
 function monthKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
@@ -90,12 +90,19 @@ export default function SpendingPage() {
     merchant: string
     period: string
   } | null>(null)
-  // Drill from a Bills/Income cell: open the full All-time list, then scroll to
-  // and highlight only the clicked item (that merchant in that exact month).
-  const drillTo = (period: string, merchant: string) => {
-    setPeriod("all")
-    setTxQuery("")
-    setHighlight({ merchant, period })
+  // Drill from a Bills/Income cell. "filter" (quick click) shows just that
+  // cell's items (merchant + month). "full" (click-and-hold) opens the All-time
+  // list and scrolls to / highlights that item.
+  const drillTo = (period: string, merchant: string, mode: DrillMode) => {
+    if (mode === "full") {
+      setPeriod("all")
+      setTxQuery("")
+      setHighlight({ merchant, period })
+    } else {
+      setPeriod(period)
+      setTxQuery(merchant)
+      setHighlight(null)
+    }
     setTab("transactions")
   }
   const handleQueryChange = (q: string) => {

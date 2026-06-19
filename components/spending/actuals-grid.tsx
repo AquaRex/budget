@@ -1,6 +1,6 @@
 "use client"
 
-import { Fragment, useMemo, useState } from "react"
+import { Fragment, useMemo, useRef, useState } from "react"
 
 import type { Category, Transaction } from "@/lib/types"
 import { formatNumber, formatNOK } from "@/lib/format"
@@ -16,6 +16,9 @@ import {
 
 const sticky = "sticky left-0 z-10"
 const COLS = 15 // name + 12 months + total + avg
+const HOLD_MS = 350 // press longer than this = "full list" drill
+
+export type DrillMode = "filter" | "full"
 
 type Item = { key: string; name: string; months: number[]; total: number }
 type Band = { key: string; name: string; order: number; items: Item[]; subtotals: number[] }
@@ -33,8 +36,11 @@ export function ActualsGrid({
   typeMap: TypeMap
   kind: "bill" | "income"
   year: string
-  /** Jump to these transactions: (period "YYYY-MM", merchant search query). */
-  onDrill?: (period: string, query: string) => void
+  /**
+   * Jump to these transactions. mode "filter" (quick click) filters the list to
+   * the cell; "full" (click-and-hold) opens the full list and highlights it.
+   */
+  onDrill?: (period: string, merchant: string, mode: DrillMode) => void
 }) {
   const { bands, grand, grandTotal } = useMemo(() => {
     const wanted = (t: Transaction) =>
@@ -104,6 +110,7 @@ export function ActualsGrid({
   // stronger on the hovered cell.
   const [hoverCol, setHoverCol] = useState<number | null>(null)
   const colBg = (m: number) => (hoverCol === m ? "bg-primary/5" : "")
+  const pressStart = useRef(0)
 
   if (bands.length === 0) {
     return (
@@ -157,8 +164,8 @@ export function ActualsGrid({
                       <td colSpan={COLS} className="bg-background h-6 border-0 p-0" />
                     </tr>
                   )}
-                  <tr className="bg-muted/60 border-y">
-                    <td className={cn(sticky, "bg-muted/60 px-3 py-2 font-semibold whitespace-nowrap")}>
+                  <tr className="bg-muted border-y">
+                    <td className={cn(sticky, "bg-muted px-3 py-2 font-semibold whitespace-nowrap")}>
                       {band.name}
                     </td>
                     {band.subtotals.map((t, i) => (
@@ -190,14 +197,33 @@ export function ActualsGrid({
                           <td
                             key={i}
                             data-col={i + 1}
-                            onClick={
+                            onPointerDown={
                               clickable
-                                ? () => onDrill!(period, it.key)
+                                ? () => {
+                                    pressStart.current = Date.now()
+                                  }
                                 : undefined
                             }
-                            title={clickable ? "View these transactions" : undefined}
+                            onPointerUp={
+                              clickable
+                                ? () => {
+                                    const held =
+                                      Date.now() - pressStart.current >= HOLD_MS
+                                    onDrill!(
+                                      period,
+                                      it.key,
+                                      held ? "full" : "filter",
+                                    )
+                                  }
+                                : undefined
+                            }
+                            title={
+                              clickable
+                                ? "Click to filter · hold to see all & highlight"
+                                : undefined
+                            }
                             className={cn(
-                              "px-1 py-1.5 text-right tabular-nums whitespace-nowrap",
+                              "px-1 py-1.5 text-right tabular-nums whitespace-nowrap select-none",
                               colBg(i + 1),
                               v ? "" : "text-muted-foreground/40",
                               clickable && "hover:bg-muted cursor-pointer",

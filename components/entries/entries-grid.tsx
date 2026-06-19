@@ -367,12 +367,12 @@ export function EntriesGrid({ kind }: { kind: EntryKind }) {
     return (
       <tr
         className={cn(
-          "bg-muted/60 border-y",
+          "bg-muted border-y",
           isOver && "ring-primary ring-2 ring-inset",
         )}
       >
         <td
-          className={cn(sticky, "bg-muted/60 px-2 py-2")}
+          className={cn(sticky, "bg-muted px-2 py-2")}
           onDragOver={(e) => {
             if (!hasType(e, REORDER_ENTRY) && !hasType(e, REORDER_CATEGORY))
               return
