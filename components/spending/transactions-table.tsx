@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { Check, MoreHorizontal, Search, Wand2 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -67,6 +67,7 @@ export function TransactionsTable({
   typeMap,
   query,
   onQueryChange,
+  highlight,
   onChanged,
 }: {
   transactions: Transaction[]
@@ -74,11 +75,14 @@ export function TransactionsTable({
   typeMap: TypeMap
   query: string
   onQueryChange: (q: string) => void
+  /** Merchant key to scroll to and highlight (from a Bills/Income drill). */
+  highlight?: string | null
   onChanged: () => void
 }) {
   const [showInternal, setShowInternal] = useState(false)
   const [rule, setRule] = useState<RuleDraft | null>(null)
   const [savingRule, setSavingRule] = useState(false)
+  const firstHitRef = useRef<HTMLTableRowElement | null>(null)
 
   const catName = (id: string | null) =>
     categories.find((c) => c.id === id)?.name ?? null
@@ -97,6 +101,21 @@ export function TransactionsTable({
       )
     })
   }, [transactions, query, showInternal])
+
+  // The first row matching a drill highlight — used to scroll it into view.
+  const firstHitId = useMemo(() => {
+    if (!highlight) return null
+    return rows.find((t) => descMatches(t.description, highlight))?.id ?? null
+  }, [rows, highlight])
+
+  useEffect(() => {
+    if (!firstHitId) return
+    const el = firstHitRef.current
+    if (el)
+      requestAnimationFrame(() =>
+        el.scrollIntoView({ behavior: "smooth", block: "center" }),
+      )
+  }, [firstHitId])
 
   const conflictCount = transactions.filter(hasConflict).length
 
@@ -218,13 +237,16 @@ export function TransactionsTable({
                 const internal = isInternalTx(t)
                 const income = amt > 0 && !internal
                 const conflict = hasConflict(t)
+                const hit = highlight ? descMatches(t.description, highlight) : false
                 return (
                   <tr
                     key={t.id}
+                    ref={t.id === firstHitId ? firstHitRef : undefined}
                     className={cn(
                       "border-b last:border-0 align-top",
                       t.is_excluded && "opacity-50",
                       conflict && "bg-amber-500/5",
+                      hit && "bg-primary/10",
                     )}
                   >
                     <td className="text-muted-foreground px-3 py-2 whitespace-nowrap">
