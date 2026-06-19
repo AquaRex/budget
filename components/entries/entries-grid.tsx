@@ -308,7 +308,7 @@ export function EntriesGrid({ kind }: { kind: EntryKind }) {
         {values.map((v, i) => (
           <td
             key={i}
-            onMouseEnter={() => setHoverCol(i + 1)}
+            data-col={i + 1}
             className={cn("px-0.5 py-1", colBg(i + 1))}
           >
             <EditableCell
@@ -465,7 +465,7 @@ export function EntriesGrid({ kind }: { kind: EntryKind }) {
         {subtotals.map((t, i) => (
           <td
             key={i}
-            onMouseEnter={() => setHoverCol(i + 1)}
+            data-col={i + 1}
             className={cn(
               "px-1 py-2 text-right font-medium tabular-nums whitespace-nowrap",
               colBg(i + 1),
@@ -515,6 +515,10 @@ export function EntriesGrid({ kind }: { kind: EntryKind }) {
       <div ref={wrapperRef} className="overflow-x-auto rounded-lg border">
         <table
           className="w-full border-collapse text-sm"
+          onMouseOver={(e) => {
+            const el = (e.target as HTMLElement).closest("[data-col]")
+            setHoverCol(el ? Number(el.getAttribute("data-col")) : null)
+          }}
           onMouseLeave={() => setHoverCol(null)}
         >
           <thead
@@ -535,7 +539,7 @@ export function EntriesGrid({ kind }: { kind: EntryKind }) {
               {MONTHS_SHORT.map((m, i) => (
                 <th
                   key={m}
-                  onMouseEnter={() => setHoverCol(i + 1)}
+                  data-col={i + 1}
                   className={cn(
                     "text-muted-foreground px-1 py-2 text-right font-medium",
                     colBg(i + 1),
@@ -602,7 +606,7 @@ export function EntriesGrid({ kind }: { kind: EntryKind }) {
                 {grandTotals.map((t, i) => (
                   <td
                     key={i}
-                    onMouseEnter={() => setHoverCol(i + 1)}
+                    data-col={i + 1}
                     className={cn(
                       "px-1 py-2 text-right tabular-nums whitespace-nowrap",
                       colBg(i + 1),
