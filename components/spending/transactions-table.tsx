@@ -75,8 +75,8 @@ export function TransactionsTable({
   typeMap: TypeMap
   query: string
   onQueryChange: (q: string) => void
-  /** Merchant key to scroll to and highlight (from a Bills/Income drill). */
-  highlight?: string | null
+  /** A Bills/Income drill target: highlight this merchant in this exact month. */
+  highlight?: { merchant: string; period: string } | null
   onChanged: () => void
 }) {
   const [showInternal, setShowInternal] = useState(false)
@@ -102,10 +102,17 @@ export function TransactionsTable({
     })
   }, [transactions, query, showInternal])
 
-  // The first row matching a drill highlight — used to scroll it into view.
+  // A row is a drill hit when it matches the merchant AND the exact month.
+  const isHit = (t: Transaction) =>
+    !!highlight &&
+    t.booked_date.slice(0, 7) === highlight.period &&
+    descMatches(t.description, highlight.merchant)
+
+  // The first matching row — used to scroll it into view.
   const firstHitId = useMemo(() => {
     if (!highlight) return null
-    return rows.find((t) => descMatches(t.description, highlight))?.id ?? null
+    return rows.find(isHit)?.id ?? null
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows, highlight])
 
   useEffect(() => {
@@ -237,7 +244,7 @@ export function TransactionsTable({
                 const internal = isInternalTx(t)
                 const income = amt > 0 && !internal
                 const conflict = hasConflict(t)
-                const hit = highlight ? descMatches(t.description, highlight) : false
+                const hit = isHit(t)
                 return (
                   <tr
                     key={t.id}

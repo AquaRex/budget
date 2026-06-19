@@ -86,13 +86,16 @@ export default function SpendingPage() {
   // Income grids can drill into a specific merchant + month).
   const [tab, setTab] = useState("transactions")
   const [txQuery, setTxQuery] = useState("")
-  const [highlight, setHighlight] = useState<string | null>(null)
-  // Drill from a Bills/Income cell: show that month's full list (no merchant
-  // filter), then scroll to and highlight the clicked item.
+  const [highlight, setHighlight] = useState<{
+    merchant: string
+    period: string
+  } | null>(null)
+  // Drill from a Bills/Income cell: open the full All-time list, then scroll to
+  // and highlight only the clicked item (that merchant in that exact month).
   const drillTo = (period: string, merchant: string) => {
-    setPeriod(period)
+    setPeriod("all")
     setTxQuery("")
-    setHighlight(merchant)
+    setHighlight({ merchant, period })
     setTab("transactions")
   }
   const handleQueryChange = (q: string) => {
