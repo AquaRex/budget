@@ -26,12 +26,15 @@ export function ActualsGrid({
   typeMap,
   kind,
   year,
+  onDrill,
 }: {
   transactions: Transaction[]
   categories: Category[]
   typeMap: TypeMap
   kind: "bill" | "income"
   year: string
+  /** Jump to these transactions: (period "YYYY-MM", merchant search query). */
+  onDrill?: (period: string, query: string) => void
 }) {
   const { bands, grand, grandTotal } = useMemo(() => {
     const wanted = (t: Transaction) =>
@@ -160,17 +163,35 @@ export function ActualsGrid({
                       <td className={cn(sticky, "bg-background px-3 py-1.5 whitespace-nowrap")}>
                         <span className="font-medium">{it.name}</span>
                       </td>
-                      {it.months.map((v, i) => (
-                        <td
-                          key={i}
-                          className={cn(
-                            "px-1 py-1.5 text-right tabular-nums whitespace-nowrap",
-                            v ? "" : "text-muted-foreground/40",
-                          )}
-                        >
-                          {v ? formatNumber(v) : "–"}
-                        </td>
-                      ))}
+                      {it.months.map((v, i) => {
+                        const period = `${year}-${String(i + 1).padStart(2, "0")}`
+                        return (
+                          <td
+                            key={i}
+                            className={cn(
+                              "px-1 py-1.5 text-right tabular-nums whitespace-nowrap",
+                              v ? "" : "text-muted-foreground/40",
+                            )}
+                          >
+                            {v ? (
+                              onDrill ? (
+                                <button
+                                  type="button"
+                                  onClick={() => onDrill(period, it.key)}
+                                  className="hover:text-primary cursor-pointer hover:underline"
+                                  title="View these transactions"
+                                >
+                                  {formatNumber(v)}
+                                </button>
+                              ) : (
+                                formatNumber(v)
+                              )
+                            ) : (
+                              "–"
+                            )}
+                          </td>
+                        )
+                      })}
                       <td className="px-2 py-1.5 text-right font-semibold tabular-nums whitespace-nowrap">
                         {formatNumber(it.total)}
                       </td>

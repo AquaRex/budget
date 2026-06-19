@@ -82,6 +82,16 @@ export default function SpendingPage() {
   const [gridYear, setGridYear] = useState<string | null>(null)
   const activeYear = gridYear ?? years[0] ?? String(new Date().getFullYear())
 
+  // Active sub-tab and the transaction-list search (controlled so the Bills/
+  // Income grids can drill into a specific merchant + month).
+  const [tab, setTab] = useState("transactions")
+  const [txQuery, setTxQuery] = useState("")
+  const drillTo = (period: string, query: string) => {
+    setPeriod(period)
+    setTxQuery(query)
+    setTab("transactions")
+  }
+
   const refresh = () => {
     mutateTx()
     mutateRules()
@@ -130,7 +140,7 @@ export default function SpendingPage() {
       {lt ? (
         <Skeleton className="h-40 w-full" />
       ) : transactions.length === 0 ? null : (
-        <Tabs defaultValue="transactions" className="gap-6">
+        <Tabs value={tab} onValueChange={setTab} className="gap-6">
           <TabsList>
             <TabsTrigger value="transactions">Transactions</TabsTrigger>
             <TabsTrigger value="bills">Bills</TabsTrigger>
@@ -191,6 +201,8 @@ export default function SpendingPage() {
                 transactions={inPeriod}
                 categories={categories}
                 typeMap={typeMap}
+                query={txQuery}
+                onQueryChange={setTxQuery}
                 onChanged={refresh}
               />
             </div>
@@ -209,6 +221,7 @@ export default function SpendingPage() {
               typeMap={typeMap}
               kind="bill"
               year={activeYear}
+              onDrill={drillTo}
             />
           </TabsContent>
 
@@ -225,6 +238,7 @@ export default function SpendingPage() {
               typeMap={typeMap}
               kind="income"
               year={activeYear}
+              onDrill={drillTo}
             />
           </TabsContent>
         </Tabs>

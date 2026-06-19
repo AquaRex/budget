@@ -9,6 +9,7 @@ import { formatNOK } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import {
   deriveStem,
+  descMatches,
   hasConflict,
   isInternalTx,
   effectiveCategoryId,
@@ -64,14 +65,17 @@ export function TransactionsTable({
   transactions,
   categories,
   typeMap,
+  query,
+  onQueryChange,
   onChanged,
 }: {
   transactions: Transaction[]
   categories: Category[]
   typeMap: TypeMap
+  query: string
+  onQueryChange: (q: string) => void
   onChanged: () => void
 }) {
-  const [query, setQuery] = useState("")
   const [showInternal, setShowInternal] = useState(false)
   const [rule, setRule] = useState<RuleDraft | null>(null)
   const [savingRule, setSavingRule] = useState(false)
@@ -85,7 +89,9 @@ export function TransactionsTable({
       if (!showInternal && isInternalTx(t)) return false
       if (!q) return true
       return (
-        (t.description ?? "").toLowerCase().includes(q) ||
+        // descMatches is stem-aware so a drilled merchant key (e.g. "compass
+        // hi") matches "COMPASS 5105 HI" with interior digits.
+        descMatches(t.description, q) ||
         (t.type ?? "").toLowerCase().includes(q) ||
         (t.message ?? "").toLowerCase().includes(q)
       )
@@ -160,7 +166,7 @@ export function TransactionsTable({
           <Search className="text-muted-foreground absolute top-2.5 left-2.5 size-4" />
           <Input
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => onQueryChange(e.target.value)}
             placeholder="Search merchant, type…"
             className="pl-8"
           />
