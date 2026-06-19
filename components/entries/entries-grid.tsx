@@ -63,7 +63,9 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 
-const sticky = "sticky left-0 z-10"
+// Freeze the first (name) column only on ≥sm screens. On phones it would eat
+// the viewport and hide the months behind it, so let the row scroll as one.
+const sticky = "sm:sticky sm:left-0 sm:z-10"
 const COLS = 18
 
 type Confirm = { type: "entry" | "category"; id: string; name: string }

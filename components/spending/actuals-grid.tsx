@@ -14,7 +14,8 @@ import {
   type TypeMap,
 } from "@/lib/spending"
 
-const sticky = "sticky left-0 z-10"
+// Freeze the first column only on ≥sm screens (see entries-grid for why).
+const sticky = "sm:sticky sm:left-0 sm:z-10"
 const COLS = 15 // name + 12 months + total + avg
 const HOLD_MS = 350 // press longer than this = "full list" drill
 
