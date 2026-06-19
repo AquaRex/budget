@@ -31,7 +31,7 @@ export default function SpendingPage() {
   const { entries: bills } = useEntries("bill")
   const { amounts } = useAmounts()
   const { profile } = useSalaryProfile()
-  const { categories } = useCategories("bill")
+  const { categories, mutate: mutateCategories } = useCategories()
   const ctx = useBudgetContext(amounts, profile)
   const {
     transactions,
@@ -81,6 +81,7 @@ export default function SpendingPage() {
     mutateTx()
     mutateRules()
     mutateTypeCats()
+    mutateCategories()
   }
 
   return (

@@ -43,10 +43,10 @@ export function useAmounts() {
   return { amounts: data ?? [], error, isLoading, mutate }
 }
 
-export function useCategories(kind: EntryKind) {
+export function useCategories() {
   const { data, error, isLoading, mutate } = useSWR<Category[]>(
-    ["categories", kind],
-    () => fetchCategories(kind),
+    "categories",
+    fetchCategories,
   )
   return { categories: data ?? [], error, isLoading, mutate }
 }

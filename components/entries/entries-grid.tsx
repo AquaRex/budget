@@ -74,7 +74,7 @@ export function EntriesGrid({ kind }: { kind: EntryKind }) {
   const { entries, isLoading: le, mutate: mutateEntries } = useEntries(kind)
   const { amounts, isLoading: la, mutate: mutateAmounts } = useAmounts()
   const { profile, mutate: mutateSalary } = useSalaryProfile()
-  const { categories, mutate: mutateCategories } = useCategories(kind)
+  const { categories, mutate: mutateCategories } = useCategories()
   const { methods } = useMethods()
   const ctx = useBudgetContext(amounts, profile)
 
@@ -244,6 +244,8 @@ export function EntriesGrid({ kind }: { kind: EntryKind }) {
       .filter((e) => e.category_id === catId)
       .sort((a, b) => a.sort_order - b.sort_order)
   const uncategorized = itemsOf(null)
+  // Categories are a shared pool now; only show bands that hold entries here.
+  const visibleCats = categories.filter((c) => itemsOf(c.id).length > 0)
 
   function renderEntryRow(entry: Entry) {
     const values = rowMonthlyAmounts(entry, ctx)
@@ -565,11 +567,11 @@ export function EntriesGrid({ kind }: { kind: EntryKind }) {
                     : " Set up the salary calculator above, or click “Add”."}
                 </td>
               </tr>
-            ) : categories.length === 0 ? (
+            ) : visibleCats.length === 0 ? (
               uncategorized.map((e) => renderEntryRow(e))
             ) : (
               <>
-                {categories.map((cat, idx) => (
+                {visibleCats.map((cat, idx) => (
                   <Fragment key={cat.id}>
                     {idx > 0 && (
                       <tr aria-hidden>
@@ -582,11 +584,9 @@ export function EntriesGrid({ kind }: { kind: EntryKind }) {
                 ))}
                 {uncategorized.length > 0 && (
                   <>
-                    {categories.length > 0 && (
-                      <tr aria-hidden>
-                        <td colSpan={COLS} className="bg-background h-12 border-0 p-0" />
-                      </tr>
-                    )}
+                    <tr aria-hidden>
+                      <td colSpan={COLS} className="bg-background h-12 border-0 p-0" />
+                    </tr>
                     {renderBand(null, uncategorized)}
                     {uncategorized.map((e) => renderEntryRow(e))}
                   </>

@@ -1,32 +1,38 @@
 import { getSupabase } from "@/lib/supabase/client"
-import type { Category, EntryKind } from "@/lib/types"
+import type { Category } from "@/lib/types"
 
-export async function fetchCategories(kind: EntryKind): Promise<Category[]> {
+/** The single shared category list (bills, income and bank types all use it). */
+export async function fetchCategories(): Promise<Category[]> {
   const supabase = getSupabase()
   const { data, error } = await supabase
     .from("categories")
     .select("*")
-    .eq("kind", kind)
     .order("sort_order", { ascending: true })
+    .order("name", { ascending: true })
   if (error) throw error
   return (data ?? []) as Category[]
 }
 
-export async function createCategory(
-  kind: EntryKind,
-  name: string,
-): Promise<Category> {
+export async function createCategory(name: string): Promise<Category> {
   const supabase = getSupabase()
+  const clean = name.trim()
+  // Reuse an existing category with the same name (case-insensitive).
+  const { data: existing } = await supabase
+    .from("categories")
+    .select("*")
+    .ilike("name", clean)
+    .limit(1)
+  if (existing && existing[0]) return existing[0] as Category
+
   const { data: last } = await supabase
     .from("categories")
     .select("sort_order")
-    .eq("kind", kind)
     .order("sort_order", { ascending: false })
     .limit(1)
   const sort_order = (last?.[0]?.sort_order ?? -1) + 1
   const { data, error } = await supabase
     .from("categories")
-    .insert({ kind, name: name.trim(), sort_order })
+    .insert({ name: clean, sort_order })
     .select("*")
     .single()
   if (error) throw error

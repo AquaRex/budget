@@ -38,7 +38,7 @@ export function CategoryDonut({
   title?: string
   description?: string
 }) {
-  const { categories } = useCategories("bill")
+  const { categories } = useCategories()
   const { data, total } = useMemo(() => {
     const nameOf = (id: string | null) =>
       categories.find((c) => c.id === id)?.name ?? "Uncategorized"

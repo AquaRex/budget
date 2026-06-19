@@ -74,7 +74,7 @@ export function EntryDialog({
   const isBill = kind === "bill"
   const catListId = useId()
   const methodListId = useId()
-  const { categories, mutate: mutateCategories } = useCategories(kind)
+  const { categories, mutate: mutateCategories } = useCategories()
   const { methods, mutate: mutateMethods } = useMethods()
 
   const [form, setForm] = useState<FormState>(() => emptyForm())
@@ -129,7 +129,7 @@ export function EntryDialog({
       (c) => c.name.toLowerCase() === name.toLowerCase(),
     )
     if (existing) return existing.id
-    const created = await createCategory(kind, name)
+    const created = await createCategory(name)
     await mutateCategories()
     return created.id
   }

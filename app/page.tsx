@@ -51,7 +51,7 @@ export default function DashboardPage() {
   const { entries: incomes, isLoading: li } = useEntries("income")
   const { amounts, isLoading: la } = useAmounts()
   const { profile, isLoading: ls } = useSalaryProfile()
-  const { categories } = useCategories("bill")
+  const { categories } = useCategories()
   const { transactions } = useTransactions()
   const { typeCategories } = useTypeCategories()
   const ctx = useBudgetContext(amounts, profile)

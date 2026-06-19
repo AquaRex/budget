@@ -1,9 +1,10 @@
 export type EntryKind = "bill" | "income"
 
+// Categories are a single shared pool (used by both bills and income, and
+// auto-populated from the bank's transaction types).
 export type Category = {
   id: string
   user_id: string
-  kind: EntryKind
   name: string
   sort_order: number
 }

@@ -46,6 +46,71 @@ export type ImportSummary = {
   unchanged: number
 }
 
+const isInternalType = (type: string) =>
+  /overf/i.test(type) || type.toLowerCase() === "nettbank"
+
+/**
+ * Make sure every bank "Type" in the import exists as a category and is mapped
+ * to it (unless the user already mapped that type elsewhere). The bank CSV is
+ * the source of truth, so its categories flow into our shared pool.
+ */
+async function ensureCategoriesForTypes(types: (string | null)[]): Promise<void> {
+  const supabase = getSupabase()
+  const clean = Array.from(
+    new Set(
+      types
+        .map((t) => (t ?? "").trim())
+        .filter((t) => t !== "" && !isInternalType(t)),
+    ),
+  )
+  if (clean.length === 0) return
+
+  const { data: cats } = await supabase.from("categories").select("id,name")
+  const byName = new Map(
+    ((cats ?? []) as { id: string; name: string }[]).map((c) => [
+      c.name.toLowerCase(),
+      c.id,
+    ]),
+  )
+  const { data: maps } = await supabase
+    .from("type_categories")
+    .select("bank_type")
+  const mapped = new Set(
+    ((maps ?? []) as { bank_type: string }[]).map((m) => m.bank_type),
+  )
+
+  for (const type of clean) {
+    let catId = byName.get(type.toLowerCase())
+    if (!catId) {
+      try {
+        const { data } = await supabase
+          .from("categories")
+          .insert({ name: type })
+          .select("id")
+          .single()
+        catId = (data as { id: string } | null)?.id
+        if (catId) byName.set(type.toLowerCase(), catId)
+      } catch {
+        // A racing insert may have created it; look it up.
+        const { data } = await supabase
+          .from("categories")
+          .select("id")
+          .ilike("name", type)
+          .limit(1)
+        catId = (data?.[0] as { id: string } | undefined)?.id
+      }
+    }
+    if (catId && !mapped.has(type)) {
+      await supabase
+        .from("type_categories")
+        .upsert(
+          { bank_type: type, category_id: catId },
+          { onConflict: "user_id,bank_type" },
+        )
+    }
+  }
+}
+
 /**
  * Apply a parsed CSV: insert new rows (auto-categorised by rules), record
  * proposed updates on conflicting rows, and create an import batch. Returns a
@@ -59,6 +124,10 @@ export async function importTransactions(
 ): Promise<ImportSummary> {
   const supabase = getSupabase()
   const plan: ImportPlan = classifyImport(parsed, existing)
+
+  // Promote any new bank types into our shared category pool first, so the
+  // freshly imported rows resolve to a category immediately.
+  await ensureCategoriesForTypes(parsed.map((r) => r.type))
 
   // Record the import batch first so rows can reference it.
   const { data: imp, error: impErr } = await supabase
