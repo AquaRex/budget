@@ -526,33 +526,30 @@ export function EntriesGrid({ kind }: { kind: EntryKind }) {
             className="relative z-[11]"
             style={{ top: headOffset || undefined }}
           >
-            <tr className="bg-muted border-b">
+            <tr className="border-b">
               <th className={cn(sticky, "bg-muted px-3 py-2 text-left font-medium")}>
                 Name
               </th>
-              <th className="text-muted-foreground px-2 py-2 text-left font-medium">
+              <th className="bg-muted text-muted-foreground px-2 py-2 text-left font-medium">
                 Method
               </th>
-              <th className="text-muted-foreground px-2 py-2 text-left font-medium">
+              <th className="bg-muted text-muted-foreground px-2 py-2 text-left font-medium">
                 Day
               </th>
               {MONTHS_SHORT.map((m, i) => (
                 <th
                   key={m}
                   data-col={i + 1}
-                  className={cn(
-                    "text-muted-foreground px-1 py-2 text-right font-medium",
-                    colBg(i + 1),
-                  )}
+                  className="bg-muted text-muted-foreground px-1 py-2 text-right font-medium"
                 >
                   {m}
                 </th>
               ))}
-              <th className="px-2 py-2 text-right font-semibold">Total</th>
-              <th className="text-muted-foreground px-2 py-2 text-right font-medium">
+              <th className="bg-muted px-2 py-2 text-right font-semibold">Total</th>
+              <th className="bg-muted text-muted-foreground px-2 py-2 text-right font-medium">
                 Avg
               </th>
-              <th className="w-8" />
+              <th className="bg-muted w-8" />
             </tr>
           </thead>
           <tbody>
