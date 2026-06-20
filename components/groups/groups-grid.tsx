@@ -228,12 +228,13 @@ export function GroupsGrid({
             {bands.map((band, idx) => {
               const budgetTotal = sum(band.budget)
               const actualTotal = sum(band.actual)
-              const diff = band.budget.map((b, i) => band.actual[i] - b)
-              const diffTotal = actualTotal - budgetTotal
-              // For bills, spending over budget is "bad"; for income, a
-              // shortfall (negative diff) is "bad".
-              const badSign = (v: number) =>
-                band.kind === "income" ? v < 0 : v > 0
+              // Difference is signed so positive is always good: money saved
+              // (bills under budget) or extra income; negative is over budget
+              // / short on income. So red is always "−", green always "+".
+              const dsign = band.kind === "income" ? 1 : -1
+              const diff = band.budget.map((b, i) => dsign * (band.actual[i] - b))
+              const diffTotal = dsign * (actualTotal - budgetTotal)
+              const badSign = (v: number) => v < 0
               return (
                 <Fragment key={band.key}>
                   {idx > 0 && (
@@ -433,11 +434,11 @@ export function GroupsGrid({
           {formatNOK(
             bands
               .filter((b) => b.hasBudget && b.kind === "bill")
-              .reduce((s, b) => s + (sum(b.actual) - sum(b.budget)), 0),
+              .reduce((s, b) => s + (sum(b.budget) - sum(b.actual)), 0),
           )}
         </span>{" "}
-        net over/under on budgeted spending. Click a month name for a day-by-day
-        calendar.
+        net vs budget on spending (positive = saved). Click a month name for a
+        day-by-day calendar.
       </p>
 
       <MonthCalendar
