@@ -17,6 +17,7 @@ import {
   avgMonthlySpend,
   latestPeriodByMonth,
   spentInPeriod,
+  incomeInPeriod,
   actualByCategory,
   effectiveCategoryId,
   groupOfCategory,
@@ -244,33 +245,75 @@ export default function DashboardPage() {
   }
   const [monthCalOpen, setMonthCalOpen] = useState(false)
 
+  // Extra actual-spend stats for the selected month.
+  const actualIncome = useMemo(
+    () => incomeInPeriod(transactions, period),
+    [transactions, period],
+  )
+  const savingsRate =
+    income > 0 ? Math.round(((income - outgoing) / income) * 100) : 0
+  const monthStats = useMemo(() => {
+    const inP = transactions.filter(
+      (t) => !!period && t.booked_date.slice(0, 7) === period && isSpending(t),
+    )
+    let biggest = { amount: 0, name: "—" }
+    for (const t of inP) {
+      const amt = -Number(t.amount)
+      if (amt > biggest.amount) {
+        const ec = effectiveCategoryId(t, typeMap)
+        biggest = {
+          amount: amt,
+          name: (ec && categories.find((c) => c.id === ec)?.name) || t.type || "—",
+        }
+      }
+    }
+    let top = { amount: 0, name: "—" }
+    for (const [id, amt] of actualByCategory(transactions, period, typeMap)) {
+      if (amt > top.amount)
+        top = {
+          amount: amt,
+          name: (id && categories.find((c) => c.id === id)?.name) || "Uncategorised",
+        }
+    }
+    return {
+      count: inP.length,
+      avgTx: inP.length ? actualSpent / inP.length : 0,
+      biggest,
+      top,
+    }
+  }, [transactions, period, typeMap, categories, actualSpent])
+
+  const up = "text-emerald-600 dark:text-emerald-400"
+  const down = "text-rose-600 dark:text-rose-400"
+
   const tiles: {
     label: string
-    value: number
+    value: string
     tone?: string
     hint?: string
     hintTone?: "good" | "bad"
   }[] = [
-    { label: "Income", value: budgetIncome, tone: "text-emerald-600 dark:text-emerald-400" },
-    { label: "Bills", value: budgetBills, tone: "text-rose-600 dark:text-rose-400" },
+    { label: "Income", value: formatNOK(budgetIncome), tone: up },
+    { label: "Bills", value: formatNOK(budgetBills), tone: down },
+    { label: "Projected left", value: formatNOK(left), tone: left >= 0 ? up : down },
     {
-      label: "Projected left",
-      value: left,
-      tone:
-        left >= 0
-          ? "text-emerald-600 dark:text-emerald-400"
-          : "text-rose-600 dark:text-rose-400",
+      label: "Savings rate",
+      value: `${savingsRate}%`,
+      tone: savingsRate >= 0 ? up : down,
+      hint: "of budgeted income",
     },
     ...(hasActuals
       ? [
           {
-            label: "Avg spent / month",
-            value: spend.avg,
-            hint: `over ${spend.months} mo`,
+            label: "Income received",
+            value: formatNOK(actualIncome),
+            tone: up,
+            hint: `${actualIncome >= budgetIncome ? "+" : ""}${formatNOK(actualIncome - budgetIncome)} vs budget`,
+            hintTone: (actualIncome >= budgetIncome ? "good" : "bad") as "good" | "bad",
           },
           {
             label: "Spent this month",
-            value: actualSpent,
+            value: formatNOK(actualSpent),
             hint:
               actualSpent === 0
                 ? "no transactions"
@@ -279,12 +322,35 @@ export default function DashboardPage() {
           },
           {
             label: vsBudget >= 0 ? "Under budget" : "Over budget",
-            value: Math.abs(vsBudget),
-            tone:
-              vsBudget >= 0
-                ? "text-emerald-600 dark:text-emerald-400"
-                : "text-rose-600 dark:text-rose-400",
+            value: formatNOK(Math.abs(vsBudget)),
+            tone: vsBudget >= 0 ? up : down,
             hint: `${formatNOK(actualSpent)} of ${formatNOK(budgetBills)}`,
+          },
+          {
+            label: "Avg spent / month",
+            value: formatNOK(spend.avg),
+            hint: `over ${spend.months} mo`,
+          },
+          {
+            label: "Transactions",
+            value: String(monthStats.count),
+            hint: "this month",
+          },
+          {
+            label: "Avg / transaction",
+            value: formatNOK(monthStats.avgTx),
+          },
+          {
+            label: "Top category",
+            value: formatNOK(monthStats.top.amount),
+            tone: down,
+            hint: monthStats.top.name,
+          },
+          {
+            label: "Biggest expense",
+            value: formatNOK(monthStats.biggest.amount),
+            tone: down,
+            hint: monthStats.biggest.name,
           },
         ]
       : []),
@@ -329,11 +395,11 @@ export default function DashboardPage() {
               ) : (
                 <div
                   className={cn(
-                    "mt-0.5 text-xl font-semibold tabular-nums",
+                    "mt-0.5 truncate text-xl font-semibold tabular-nums",
                     t.tone,
                   )}
                 >
-                  {formatNOK(t.value)}
+                  {t.value}
                 </div>
               )}
               {t.hint && (
