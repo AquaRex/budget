@@ -13,6 +13,7 @@ import {
   fetchTxRules,
 } from "@/lib/data/transactions"
 import { fetchTypeCategories } from "@/lib/data/type-categories"
+import { fetchTypeGroups } from "@/lib/data/groups"
 import { buildAmountMap, type BudgetContext } from "@/lib/budget"
 import type { SalaryProfile } from "@/lib/salary"
 import type {
@@ -25,6 +26,7 @@ import type {
   Transaction,
   TxRule,
   TypeCategory,
+  TypeGroup,
 } from "@/lib/types"
 
 export function useEntries(kind: EntryKind) {
@@ -97,6 +99,14 @@ export function useTypeCategories() {
     fetchTypeCategories,
   )
   return { typeCategories: data ?? [], error, isLoading, mutate }
+}
+
+export function useTypeGroups() {
+  const { data, error, isLoading, mutate } = useSWR<TypeGroup[]>(
+    "type_groups",
+    fetchTypeGroups,
+  )
+  return { typeGroups: data ?? [], error, isLoading, mutate }
 }
 
 /** Build a BudgetContext from a live amounts array + the salary profile. */

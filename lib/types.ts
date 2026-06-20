@@ -7,6 +7,9 @@ export type Category = {
   user_id: string
   name: string
   sort_order: number
+  // Marks a category as a high-level "group" on the Groups page (budget vs
+  // actual). Independent of bills/income — they ignore this flag.
+  is_group: boolean
 }
 
 export type PaymentMethod = {
@@ -80,6 +83,16 @@ export type TypeCategory = {
   user_id: string
   bank_type: string
   category_id: string
+  created_at: string
+}
+
+// Maps a bank "Type" to a group category (categories.is_group). Used only by
+// the Groups page; type_categories (above) is left untouched for Spending.
+export type TypeGroup = {
+  id: string
+  user_id: string
+  bank_type: string
+  group_id: string
   created_at: string
 }
 

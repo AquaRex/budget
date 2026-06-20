@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation"
 import { useTheme } from "next-themes"
 import {
   LayoutDashboard,
+  Layers,
   Moon,
   Receipt,
   Sun,
@@ -22,6 +23,7 @@ const nav = [
   { href: "/bills", label: "Bills", icon: Receipt },
   { href: "/income", label: "Income", icon: TrendingUp },
   { href: "/spending", label: "Spending", icon: Wallet },
+  { href: "/groups", label: "Groups", icon: Layers },
 ]
 
 export function AppShell({ children }: { children: React.ReactNode }) {

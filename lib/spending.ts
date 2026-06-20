@@ -1,4 +1,4 @@
-import type { Transaction, TxRule, TypeCategory } from "@/lib/types"
+import type { Transaction, TxRule, TypeCategory, TypeGroup } from "@/lib/types"
 import type { ParsedTx } from "@/lib/csv"
 
 /** bank-type string -> budget category id. */
@@ -6,6 +6,26 @@ export type TypeMap = Map<string, string>
 
 export function buildTypeMap(rows: TypeCategory[]): TypeMap {
   return new Map(rows.map((r) => [r.bank_type, r.category_id]))
+}
+
+/** bank-type string -> group category id (Groups page only). */
+export type GroupMap = Map<string, string>
+
+export function buildGroupMap(rows: TypeGroup[]): GroupMap {
+  return new Map(rows.map((r) => [r.bank_type, r.group_id]))
+}
+
+/**
+ * The group a transaction rolls up into — resolved purely by its bank type, so
+ * the actual rows on the Groups page are the bank's own categories. Returns
+ * null when the type has no group mapping yet (it shows under "Unassigned").
+ */
+export function groupForTx(
+  t: { type: string | null },
+  groupMap: GroupMap,
+): string | null {
+  if (t.type && groupMap.has(t.type)) return groupMap.get(t.type)!
+  return null
 }
 
 /**
