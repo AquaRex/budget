@@ -1,1 +1,0 @@
-(globalThis.TURBOPACK||(globalThis.TURBOPACK=[])).push(["object"==typeof document?document.currentScript:void 0,53290,i=>{"use strict";var t=i.i(76350),e=i.i(95608);i.s(["default",0,function(){return(0,t.jsx)(e.EntriesGrid,{kind:"bill"})}])}]);
