@@ -9,8 +9,10 @@ import { formatNOK, formatNumber, dayLabel } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import {
   MONTHS_SHORT,
+  MONTHS_LONG,
   hasOverride,
   isFilledEveryMonth,
+  effectiveAmount,
   rowMonthlyAmounts,
   rowTotal,
   rowAverage,
@@ -46,6 +48,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { EditableCell } from "@/components/entries/editable-cell"
 import { EntryDialog } from "@/components/entries/entry-dialog"
 import { SalaryCalculator } from "@/components/income/salary-calculator"
+import { MonthCalendar, type CalEvent } from "@/components/calendar/month-calendar"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -89,6 +92,7 @@ export function EntriesGrid({ kind }: { kind: EntryKind }) {
   const [renameDraft, setRenameDraft] = useState("")
   const [dropTarget, setDropTarget] = useState<string | null>(null)
   const [hoverCol, setHoverCol] = useState<number | null>(null)
+  const [calMonth, setCalMonth] = useState<number | null>(null)
 
   // Float the header to the top of the page as the table scrolls past, without
   // turning the list into its own scroll box. (A horizontal-scroll wrapper can't
@@ -542,7 +546,9 @@ export function EntriesGrid({ kind }: { kind: EntryKind }) {
                 <th
                   key={m}
                   data-col={i + 1}
-                  className="bg-muted text-muted-foreground px-1 py-2 text-right font-medium"
+                  onClick={() => setCalMonth(i + 1)}
+                  title={`${MONTHS_LONG[i]} — day by day`}
+                  className="bg-muted text-muted-foreground hover:text-foreground cursor-pointer px-1 py-2 text-right font-medium"
                 >
                   {m}
                 </th>
@@ -628,10 +634,32 @@ export function EntriesGrid({ kind }: { kind: EntryKind }) {
       <p className="text-muted-foreground text-xs">
         Drag the ⋮⋮ handle to reorder rows or whole categories (drop a row on a
         category band to move it there). Click a month cell to type, or drag a
-        cell / salary result onto another. Annual total:{" "}
+        cell / salary result onto another. Click a month name for a day-by-day
+        calendar. Annual total:{" "}
         <span className="text-foreground font-medium">{formatNOK(grandTotal)}</span>
         .
       </p>
+
+      <MonthCalendar
+        open={calMonth != null}
+        onOpenChange={(o) => !o && setCalMonth(null)}
+        year={new Date().getFullYear()}
+        month={calMonth ?? 1}
+        subtitle={`Budgeted ${isBill ? "bills" : "income"} on their due day`}
+        events={
+          calMonth == null
+            ? []
+            : entries
+                .filter((e) => e.is_active)
+                .map<CalEvent>((e) => ({
+                  day: e.due_day,
+                  name: e.name,
+                  amount: Math.abs(effectiveAmount(e, ctx, calMonth)),
+                  kind,
+                }))
+                .filter((e) => e.amount > 0)
+        }
+      />
 
       <EntryDialog
         kind={kind}

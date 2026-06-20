@@ -5,7 +5,8 @@ import { Fragment, useMemo, useRef, useState } from "react"
 import type { Category, Transaction } from "@/lib/types"
 import { formatNumber, formatNOK } from "@/lib/format"
 import { cn } from "@/lib/utils"
-import { MONTHS_SHORT } from "@/lib/budget"
+import { MONTHS_SHORT, MONTHS_LONG } from "@/lib/budget"
+import { MonthCalendar, type CalEvent } from "@/components/calendar/month-calendar"
 import {
   effectiveCategoryId,
   deriveStem,
@@ -112,6 +113,25 @@ export function ActualsGrid({
   const [hoverCol, setHoverCol] = useState<number | null>(null)
   const colBg = (m: number) => (hoverCol === m ? "bg-primary/5" : "")
   const pressStart = useRef(0)
+  const [calMonth, setCalMonth] = useState<number | null>(null)
+
+  const wanted = (t: Transaction) =>
+    kind === "bill" ? isSpending(t) : !isInternalTx(t) && Number(t.amount) > 0
+  const calEvents: CalEvent[] =
+    calMonth == null
+      ? []
+      : transactions
+          .filter(
+            (t) =>
+              t.booked_date.slice(0, 7) ===
+                `${year}-${String(calMonth).padStart(2, "0")}` && wanted(t),
+          )
+          .map((t) => ({
+            day: Number(t.booked_date.slice(8, 10)),
+            name: t.description || t.type || "—",
+            amount: Math.abs(Number(t.amount)),
+            kind,
+          }))
 
   if (bands.length === 0) {
     return (
@@ -141,8 +161,10 @@ export function ActualsGrid({
                 <th
                   key={m}
                   data-col={i + 1}
+                  onClick={() => setCalMonth(i + 1)}
+                  title={`${MONTHS_LONG[i]} ${year} — day by day`}
                   className={cn(
-                    "text-muted-foreground px-1 py-2 text-right font-medium",
+                    "text-muted-foreground hover:text-foreground cursor-pointer px-1 py-2 text-right font-medium",
                     colBg(i + 1),
                   )}
                 >
@@ -275,8 +297,17 @@ export function ActualsGrid({
         <span className="text-foreground font-medium">
           {formatNOK(grandTotal)}
         </span>
-        .
+        . Click a month name for a day-by-day calendar.
       </p>
+
+      <MonthCalendar
+        open={calMonth != null}
+        onOpenChange={(o) => !o && setCalMonth(null)}
+        year={Number(year)}
+        month={calMonth ?? 1}
+        subtitle={`Actual ${kind === "bill" ? "spending" : "income"}`}
+        events={calEvents}
+      />
     </div>
   )
 }
