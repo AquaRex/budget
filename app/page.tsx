@@ -370,20 +370,6 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          <CategoryDonut
-            bills={bills}
-            ctx={ctx}
-            month={month}
-            slices={actualSlices}
-            description={
-              isActual
-                ? `Actual — ${MONTHS_LONG[month - 1]}${
-                    period ? ` ${period.slice(0, 4)}` : ""
-                  }`
-                : "Active bills this month"
-            }
-          />
-
           {categoryCompare.length > 0 && (
             <Card>
               <CardHeader className="pb-2">
@@ -397,6 +383,20 @@ export default function DashboardPage() {
               </CardContent>
             </Card>
           )}
+
+          <CategoryDonut
+            bills={bills}
+            ctx={ctx}
+            month={month}
+            slices={actualSlices}
+            description={
+              isActual
+                ? `Actual — ${MONTHS_LONG[month - 1]}${
+                    period ? ` ${period.slice(0, 4)}` : ""
+                  }`
+                : "Active bills this month"
+            }
+          />
         </div>
 
         <UpcomingList bills={bills} incomes={incomes} ctx={ctx} month={month} />
