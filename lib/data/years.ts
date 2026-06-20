@@ -13,6 +13,18 @@ type SalaryRow = {
   deduction_days: number
 }
 
+/** Delete a year's entire budget (entries cascade their amounts) and salary. */
+export async function deleteYearBudget(year: number): Promise<void> {
+  const supabase = getSupabase()
+  const { error: e1 } = await supabase.from("entries").delete().eq("year", year)
+  if (e1) throw e1
+  const { error: e2 } = await supabase
+    .from("salary_settings")
+    .delete()
+    .eq("year", year)
+  if (e2) throw e2
+}
+
 /**
  * Copy a whole year's budget (bills, income, per-month amounts and the salary
  * profile) from one year to another, REPLACING the target year's data.

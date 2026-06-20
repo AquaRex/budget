@@ -15,6 +15,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton"
 import { CategoryGroups } from "@/components/settings/category-groups"
 import { DateModeToggle } from "@/components/settings/date-mode-toggle"
+import { YearManager } from "@/components/settings/year-manager"
 
 export default function SettingsPage() {
   const { entries: bills } = useEntries("bill")
@@ -39,6 +40,8 @@ export default function SettingsPage() {
   return (
     <div className="flex flex-col gap-6">
       <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
+
+      <YearManager />
 
       <DateModeToggle />
 
