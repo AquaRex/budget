@@ -1,16 +1,8 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
-import {
-  ChevronLeft,
-  ChevronRight,
-  PiggyBank,
-  Receipt,
-  TrendingDown,
-  TrendingUp,
-  Wallet,
-} from "lucide-react"
+import { ChevronLeft, ChevronRight, PiggyBank } from "lucide-react"
 
 import { formatNOK } from "@/lib/format"
 import { cn } from "@/lib/utils"
@@ -25,7 +17,6 @@ import {
   avgMonthlySpend,
   latestPeriodByMonth,
   spentInPeriod,
-  incomeInPeriod,
   actualByCategory,
   effectiveCategoryId,
   groupOfCategory,
@@ -53,13 +44,11 @@ import { YearSummary } from "@/components/dashboard/year-summary"
 import { BalanceChart } from "@/components/dashboard/balance-chart"
 import { CategoryBudgetChart } from "@/components/dashboard/category-budget-chart"
 import { CategoryTrend, type CatTrend } from "@/components/dashboard/category-trend"
+import { MiniMonthCalendar } from "@/components/dashboard/mini-month-calendar"
 import { MonthCalendar, type CalEvent } from "@/components/calendar/month-calendar"
-
-type View = "budget" | "actual"
 
 export default function DashboardPage() {
   const [month, setMonth] = useState(new Date().getMonth() + 1) // 1-12
-  const [view, setView] = useState<View>("budget")
 
   const { entries: bills, isLoading: lb } = useEntries("bill")
   const { entries: incomes, isLoading: li } = useEntries("income")
@@ -73,10 +62,22 @@ export default function DashboardPage() {
 
   const typeMap = useMemo(() => buildTypeMap(typeCategories), [typeCategories])
   const hasActuals = transactions.length > 0
-  const isActual = view === "actual" && hasActuals
 
   const stepMonth = (delta: number) =>
     setMonth((m) => ((m - 1 + delta + 12) % 12) + 1)
+
+  // Left/right arrow keys change the month (unless typing or a dialog is open).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return
+      const el = e.target as HTMLElement | null
+      if (el && /^(input|textarea|select)$/i.test(el.tagName)) return
+      if (document.querySelector('[role="dialog"]')) return
+      setMonth((m) => ((m - 1 + (e.key === "ArrowLeft" ? -1 : 1) + 12) % 12) + 1)
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [])
 
   const series = monthlySeries(incomes, bills, ctx)
   const budgetIncome = monthTotal(incomes, ctx, month)
@@ -91,11 +92,8 @@ export default function DashboardPage() {
     () => spentInPeriod(transactions, period),
     [transactions, period],
   )
-  const actualIncome = useMemo(
-    () => incomeInPeriod(transactions, period),
-    [transactions, period],
-  )
   const spend = avgMonthlySpend(transactions)
+  const miniYear = period ? Number(period.slice(0, 4)) : new Date().getFullYear()
 
   // Budgeted vs spent, per budget category (group), across the whole year.
   // Spend for each calendar month uses that month's most recent period.
@@ -205,146 +203,172 @@ export default function DashboardPage() {
       }))
   }
 
-  // Values the cards show, depending on the toggle.
-  const income = isActual ? actualIncome : budgetIncome
-  const outgoing = isActual ? actualSpent : budgetBills
+  // Budget figures (cards always show budget; actuals show alongside).
+  const income = budgetIncome
+  const outgoing = budgetBills
   const left = income - outgoing
   const usedPct =
     income > 0 ? Math.min(100, Math.round((outgoing / income) * 100)) : 0
   const savePct = income > 0 ? Math.round((left / income) * 100) : 0
   const vsBudget = budgetBills - actualSpent // + = under budget
 
-  // Actual category split for the donut (resolved categories -> names).
+  // Actual spending split for the donut (resolved categories -> names).
   const actualSlices = useMemo(() => {
-    if (!isActual) return undefined
+    if (!hasActuals) return undefined
     const nameOf = (id: string | null) =>
       categories.find((c) => c.id === id)?.name ?? "Uncategorised"
     return Array.from(actualByCategory(transactions, period, typeMap)).map(
       ([id, amount]) => ({ category: nameOf(id), amount }),
     )
-  }, [isActual, transactions, period, typeMap, categories])
+  }, [hasActuals, transactions, period, typeMap, categories])
 
-  const cards = [
+  // Spending events for the mini-calendar / full month calendar.
+  const monthEvents = (yy: number, m: number): CalEvent[] => {
+    const key = `${yy}-${String(m).padStart(2, "0")}`
+    return transactions
+      .filter((t) => t.booked_date.slice(0, 7) === key && isSpending(t))
+      .map((t) => ({
+        day: Number(t.booked_date.slice(8, 10)),
+        name: t.description || t.type || "—",
+        amount: -Number(t.amount),
+        kind: "bill",
+        merchant: deriveStem(t.description) || t.type || "",
+      }))
+  }
+  const [monthCalOpen, setMonthCalOpen] = useState(false)
+
+  const tiles: {
+    label: string
+    value: number
+    tone?: string
+    hint?: string
+    hintTone?: "good" | "bad"
+  }[] = [
+    { label: "Income", value: budgetIncome, tone: "text-emerald-600 dark:text-emerald-400" },
+    { label: "Bills", value: budgetBills, tone: "text-rose-600 dark:text-rose-400" },
     {
-      label: isActual ? "Income received" : "Income",
-      value: income,
-      icon: TrendingUp,
-      tone: "text-emerald-600 dark:text-emerald-400",
-    },
-    {
-      label: isActual ? "Spent" : "Bills",
-      value: outgoing,
-      icon: Receipt,
-      tone: "text-rose-600 dark:text-rose-400",
-    },
-    {
-      label: isActual ? "Left after spending" : "Projected left",
+      label: "Projected left",
       value: left,
-      icon: Wallet,
       tone:
         left >= 0
           ? "text-emerald-600 dark:text-emerald-400"
           : "text-rose-600 dark:text-rose-400",
     },
+    ...(hasActuals
+      ? [
+          {
+            label: "Avg spent / month",
+            value: spend.avg,
+            hint: `over ${spend.months} mo`,
+          },
+          {
+            label: "Spent this month",
+            value: actualSpent,
+            hint:
+              actualSpent === 0
+                ? "no transactions"
+                : `${actualSpent > spend.avg ? "+" : ""}${formatNOK(actualSpent - spend.avg)} vs avg`,
+            hintTone: (actualSpent > spend.avg ? "bad" : "good") as "good" | "bad",
+          },
+          {
+            label: vsBudget >= 0 ? "Under budget" : "Over budget",
+            value: Math.abs(vsBudget),
+            tone:
+              vsBudget >= 0
+                ? "text-emerald-600 dark:text-emerald-400"
+                : "text-rose-600 dark:text-rose-400",
+            hint: `${formatNOK(actualSpent)} of ${formatNOK(budgetBills)}`,
+          },
+        ]
+      : []),
   ]
 
   return (
     <div className="flex flex-col gap-6">
       <div className="bg-background/95 supports-backdrop-filter:backdrop-blur sticky top-14 z-10 -mx-4 flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3 sm:-mx-6 sm:px-6">
         <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-        <div className="flex items-center gap-2">
-          {hasActuals && (
-            <div className="flex items-center rounded-md border p-0.5">
-              {(["budget", "actual"] as View[]).map((v) => (
-                <button
-                  key={v}
-                  onClick={() => setView(v)}
+        <div className="flex items-center rounded-md border">
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Previous month"
+            onClick={() => stepMonth(-1)}
+          >
+            <ChevronLeft className="size-4" />
+          </Button>
+          <span className="w-28 text-center text-sm font-medium">
+            {MONTHS_LONG[month - 1]}
+          </span>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Next month"
+            onClick={() => stepMonth(1)}
+          >
+            <ChevronRight className="size-4" />
+          </Button>
+        </div>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-[1.7fr_1fr]">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          {tiles.map((t) => (
+            <div key={t.label} className="rounded-lg border p-3">
+              <div className="text-muted-foreground text-xs font-medium">
+                {t.label}
+              </div>
+              {loading ? (
+                <Skeleton className="mt-1 h-6 w-20" />
+              ) : (
+                <div
                   className={cn(
-                    "rounded-sm px-2.5 py-1 text-xs font-medium capitalize transition-colors",
-                    view === v
-                      ? "bg-secondary text-secondary-foreground"
-                      : "text-muted-foreground hover:text-foreground",
+                    "mt-0.5 text-xl font-semibold tabular-nums",
+                    t.tone,
                   )}
                 >
-                  {v}
-                </button>
-              ))}
-            </div>
-          )}
-          <div className="flex items-center rounded-md border">
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label="Previous month"
-              onClick={() => stepMonth(-1)}
-            >
-              <ChevronLeft className="size-4" />
-            </Button>
-            <span className="w-28 text-center text-sm font-medium">
-              {MONTHS_LONG[month - 1]}
-            </span>
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label="Next month"
-              onClick={() => stepMonth(1)}
-            >
-              <ChevronRight className="size-4" />
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {cards.map(({ label, value, icon: Icon, tone }) => (
-          <Card key={label}>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-muted-foreground text-sm font-medium">
-                {label}
-              </CardTitle>
-              <Icon className={cn("size-4", tone)} />
-            </CardHeader>
-            <CardContent>
-              {loading ? (
-                <Skeleton className="h-8 w-28" />
-              ) : (
-                <div className={cn("text-2xl font-semibold tabular-nums", tone)}>
-                  {formatNOK(value)}
+                  {formatNOK(t.value)}
                 </div>
               )}
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {hasActuals && (
-        <div className="grid gap-4 sm:grid-cols-3">
-          <StatCard
-            label="Avg spend / month"
-            value={formatNOK(spend.avg)}
-            hint={`over ${spend.months} month${spend.months === 1 ? "" : "s"}`}
-          />
-          <StatCard
-            label="Spent this month"
-            value={formatNOK(actualSpent)}
-            hint={
-              actualSpent === 0
-                ? "no transactions"
-                : `${actualSpent > spend.avg ? "+" : ""}${formatNOK(
-                    actualSpent - spend.avg,
-                  )} vs average`
-            }
-            hintTone={actualSpent > spend.avg ? "bad" : "good"}
-          />
-          <StatCard
-            label={vsBudget >= 0 ? "Under budget" : "Over budget"}
-            value={formatNOK(Math.abs(vsBudget))}
-            hint={`${formatNOK(actualSpent)} of ${formatNOK(budgetBills)} budget`}
-            hintTone={vsBudget >= 0 ? "good" : "bad"}
-            icon={vsBudget >= 0 ? TrendingDown : TrendingUp}
-          />
+              {t.hint && (
+                <div
+                  className={cn(
+                    "mt-0.5 text-[11px]",
+                    t.hintTone === "good"
+                      ? "text-emerald-600 dark:text-emerald-400"
+                      : t.hintTone === "bad"
+                        ? "text-rose-600 dark:text-rose-400"
+                        : "text-muted-foreground",
+                  )}
+                >
+                  {t.hint}
+                </div>
+              )}
+            </div>
+          ))}
         </div>
-      )}
+
+        <Card className="gap-2">
+          <CardHeader className="pb-0">
+            <CardTitle className="text-muted-foreground text-sm font-medium">
+              {MONTHS_LONG[month - 1]} {miniYear}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {hasActuals ? (
+              <MiniMonthCalendar
+                year={miniYear}
+                month={month}
+                events={monthEvents(miniYear, month)}
+                onOpen={() => setMonthCalOpen(true)}
+              />
+            ) : (
+              <div className="text-muted-foreground py-6 text-center text-xs">
+                Import transactions to see daily spending.
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
       <Card>
         <CardHeader className="pb-2">
@@ -378,7 +402,7 @@ export default function DashboardPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-muted-foreground text-sm font-medium">
-                {isActual ? "Income used (actual)" : "Income used"}
+                Income used
               </CardTitle>
               <PiggyBank className="text-muted-foreground size-4" />
             </CardHeader>
@@ -438,7 +462,7 @@ export default function DashboardPage() {
             month={month}
             slices={actualSlices}
             description={
-              isActual
+              hasActuals
                 ? `Actual — ${MONTHS_LONG[month - 1]}${
                     period ? ` ${period.slice(0, 4)}` : ""
                   }`
@@ -472,48 +496,25 @@ export default function DashboardPage() {
           }}
         />
       )}
-    </div>
-  )
-}
 
-function StatCard({
-  label,
-  value,
-  hint,
-  hintTone,
-  icon: Icon,
-}: {
-  label: string
-  value: string
-  hint?: string
-  hintTone?: "good" | "bad"
-  icon?: React.ComponentType<{ className?: string }>
-}) {
-  return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <CardTitle className="text-muted-foreground text-sm font-medium">
-          {label}
-        </CardTitle>
-        {Icon && <Icon className="text-muted-foreground size-4" />}
-      </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-semibold tabular-nums">{value}</div>
-        {hint && (
-          <p
-            className={cn(
-              "mt-1 text-xs",
-              hintTone === "good"
-                ? "text-emerald-600 dark:text-emerald-400"
-                : hintTone === "bad"
-                  ? "text-rose-600 dark:text-rose-400"
-                  : "text-muted-foreground",
-            )}
-          >
-            {hint}
-          </p>
-        )}
-      </CardContent>
-    </Card>
+      {monthCalOpen && (
+        <MonthCalendar
+          open
+          onOpenChange={setMonthCalOpen}
+          initialYear={miniYear}
+          initialMonth={month}
+          subtitle="Spending"
+          getEvents={monthEvents}
+          onEventClick={(e, yy, m) => {
+            const p = `${yy}-${String(m).padStart(2, "0")}`
+            router.push(
+              `/spending?tab=transactions&period=${p}&q=${encodeURIComponent(
+                e.merchant ?? "",
+              )}`,
+            )
+          }}
+        />
+      )}
+    </div>
   )
 }

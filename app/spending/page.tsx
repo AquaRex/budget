@@ -133,12 +133,63 @@ export default function SpendingPage() {
     })
   }, [])
 
+  // Left/right arrow keys step the month (Transactions) or year (Bills/Income).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return
+      const el = e.target as HTMLElement | null
+      if (el && /^(input|textarea|select)$/i.test(el.tagName)) return
+      if (document.querySelector('[role="dialog"]')) return
+      const back = e.key === "ArrowLeft"
+      if (tab === "transactions") {
+        if (isAll || periods.length === 0) return
+        setPeriod(
+          periods[Math.min(Math.max(idx + (back ? 1 : -1), 0), periods.length - 1)],
+        )
+      } else {
+        if (years.length === 0) return
+        const yi = years.indexOf(activeYear)
+        setGridYear(
+          years[Math.min(Math.max(yi + (back ? 1 : -1), 0), years.length - 1)],
+        )
+      }
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [tab, periods, idx, isAll, years, activeYear])
+
   const refresh = () => {
     mutateTx()
     mutateRules()
     mutateTypeCats()
     mutateCategories()
   }
+
+  const monthControls = (
+    <div className="flex items-center rounded-md border">
+      <Button
+        variant="ghost"
+        size="icon"
+        aria-label="Older month"
+        onClick={() => stepPeriod(-1)}
+        disabled={isAll || idx >= periods.length - 1}
+      >
+        <ChevronLeft className="size-4" />
+      </Button>
+      <span className="w-32 text-center text-sm font-medium">
+        {isAll ? "All time" : `${MONTHS_LONG[monthNum - 1]} ${yearNum}`}
+      </span>
+      <Button
+        variant="ghost"
+        size="icon"
+        aria-label="Newer month"
+        onClick={() => stepPeriod(1)}
+        disabled={isAll || idx <= 0}
+      >
+        <ChevronRight className="size-4" />
+      </Button>
+    </div>
+  )
 
   const yearPicker = (
     <div className="flex flex-wrap items-center gap-1">
@@ -177,46 +228,29 @@ export default function SpendingPage() {
         <Skeleton className="h-40 w-full" />
       ) : transactions.length === 0 ? null : (
         <Tabs value={tab} onValueChange={setTab} className="gap-6">
-          <TabsList>
-            <TabsTrigger value="transactions">Transactions</TabsTrigger>
-            <TabsTrigger value="bills">Bills</TabsTrigger>
-            <TabsTrigger value="income">Income</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="transactions" className="flex flex-col gap-6">
-            <div className="flex flex-wrap items-center justify-end gap-2">
-              <div className="flex items-center rounded-md border">
+          <div className="bg-background/95 supports-backdrop-filter:backdrop-blur sticky top-14 z-10 -mx-4 flex flex-wrap items-center justify-between gap-3 border-b px-4 py-2 sm:-mx-6 sm:px-6">
+            <TabsList>
+              <TabsTrigger value="transactions">Transactions</TabsTrigger>
+              <TabsTrigger value="bills">Bills</TabsTrigger>
+              <TabsTrigger value="income">Income</TabsTrigger>
+            </TabsList>
+            {tab === "transactions" ? (
+              <div className="flex flex-wrap items-center gap-2">
+                {monthControls}
                 <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label="Older month"
-                  onClick={() => stepPeriod(-1)}
-                  disabled={isAll || idx >= periods.length - 1}
+                  variant={isAll ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setPeriod(isAll ? periods[0] : "all")}
                 >
-                  <ChevronLeft className="size-4" />
-                </Button>
-                <span className="w-32 text-center text-sm font-medium">
-                  {isAll ? "All time" : `${MONTHS_LONG[monthNum - 1]} ${yearNum}`}
-                </span>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label="Newer month"
-                  onClick={() => stepPeriod(1)}
-                  disabled={isAll || idx <= 0}
-                >
-                  <ChevronRight className="size-4" />
+                  All time
                 </Button>
               </div>
-              <Button
-                variant={isAll ? "default" : "outline"}
-                size="sm"
-                onClick={() => setPeriod(isAll ? periods[0] : "all")}
-              >
-                All time
-              </Button>
-            </div>
+            ) : (
+              yearPicker
+            )}
+          </div>
 
+          <TabsContent value="transactions" className="flex flex-col gap-6">
             <SpendingSummary
               transactions={inPeriod}
               bills={bills}
@@ -247,13 +281,7 @@ export default function SpendingPage() {
             </div>
           </TabsContent>
 
-          <TabsContent value="bills" className="flex flex-col gap-4">
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-muted-foreground text-sm">
-                What you actually spent, by category, per month.
-              </p>
-              {yearPicker}
-            </div>
+          <TabsContent value="bills">
             <ActualsGrid
               transactions={transactions}
               categories={categories}
@@ -264,13 +292,7 @@ export default function SpendingPage() {
             />
           </TabsContent>
 
-          <TabsContent value="income" className="flex flex-col gap-4">
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-muted-foreground text-sm">
-                What actually came in, by category, per month.
-              </p>
-              {yearPicker}
-            </div>
+          <TabsContent value="income">
             <ActualsGrid
               transactions={transactions}
               categories={categories}
