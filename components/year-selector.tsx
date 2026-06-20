@@ -2,12 +2,12 @@
 
 import { cn } from "@/lib/utils"
 import { setYear, useYear } from "@/lib/year"
-import { useBudgetYears } from "@/lib/data/use-budget"
+import { useAvailableYears } from "@/lib/data/use-budget"
 
 /** Nav year switcher — display + select only. Manage years in Settings. */
 export function YearSelector() {
   const year = useYear()
-  const { years } = useBudgetYears()
+  const years = useAvailableYears()
 
   return (
     <div className="flex items-center gap-0.5">

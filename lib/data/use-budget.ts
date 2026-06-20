@@ -46,7 +46,7 @@ export function useAmounts() {
   return { amounts: data ?? [], error, isLoading, mutate }
 }
 
-/** Distinct years that have budget data (newest first), always incl. current. */
+/** Distinct years that have budget entries (newest first), incl. current. */
 export function useBudgetYears() {
   const { data, error, isLoading, mutate } = useSWR<number[]>(
     "entry_years",
@@ -60,6 +60,23 @@ export function useBudgetYears() {
     isLoading,
     mutate,
   }
+}
+
+/**
+ * Every year worth showing in the selector: years with a budget AND years that
+ * only have imported transactions (so you can view a year's actuals before
+ * building its budget). Newest first, always includes the current year.
+ */
+export function useAvailableYears(): number[] {
+  const { years: budgetYears } = useBudgetYears()
+  const { transactions } = useTransactions()
+  const set = new Set<number>(budgetYears)
+  set.add(new Date().getFullYear())
+  for (const t of transactions) {
+    const y = Number((t.tx_date ?? t.booked_date).slice(0, 4))
+    if (Number.isFinite(y)) set.add(y)
+  }
+  return Array.from(set).sort((a, b) => b - a)
 }
 
 export function useCategories() {
