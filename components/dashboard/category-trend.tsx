@@ -34,7 +34,14 @@ export type CatTrend = {
   points: { month: string; budgeted: number; spent: number }[]
 }
 
-export function CategoryTrend({ trends }: { trends: CatTrend[] }) {
+export function CategoryTrend({
+  trends,
+  onMonthClick,
+}: {
+  trends: CatTrend[]
+  /** Click a month on the chart: (categoryId, monthIndex 0-11). */
+  onMonthClick?: (categoryId: string, monthIndex: number) => void
+}) {
   const [activeId, setActiveId] = useState(trends[0]?.id)
   const active = trends.find((t) => t.id === activeId) ?? trends[0]
   if (!active) return null
@@ -67,6 +74,13 @@ export function CategoryTrend({ trends }: { trends: CatTrend[] }) {
           <ComposedChart
             data={active.points}
             margin={{ top: 8, right: 8, bottom: 0, left: 0 }}
+            className={onMonthClick ? "cursor-pointer" : undefined}
+            onClick={(state) => {
+              if (!onMonthClick) return
+              const idx = (state as { activeTooltipIndex?: number })
+                .activeTooltipIndex
+              if (idx != null) onMonthClick(active.id, idx)
+            }}
           >
             <CartesianGrid vertical={false} strokeDasharray="3 3" />
             <XAxis

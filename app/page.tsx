@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import { useRouter } from "next/navigation"
 import {
   ChevronLeft,
   ChevronRight,
@@ -28,6 +29,7 @@ import {
   actualByCategory,
   effectiveCategoryId,
   groupOfCategory,
+  deriveStem,
   isSpending,
   buildTypeMap,
 } from "@/lib/spending"
@@ -51,6 +53,7 @@ import { YearSummary } from "@/components/dashboard/year-summary"
 import { BalanceChart } from "@/components/dashboard/balance-chart"
 import { CategoryBudgetChart } from "@/components/dashboard/category-budget-chart"
 import { CategoryTrend, type CatTrend } from "@/components/dashboard/category-trend"
+import { MonthCalendar, type CalEvent } from "@/components/calendar/month-calendar"
 
 type View = "budget" | "actual"
 
@@ -159,6 +162,48 @@ export default function DashboardPage() {
         .slice(0, 8),
     [categoryTrends, month],
   )
+
+  // Click a month on the category trend -> calendar of that category that month.
+  const router = useRouter()
+  const [catCal, setCatCal] = useState<{
+    categoryId: string
+    month: number
+    year: number
+  } | null>(null)
+  const openCategoryCalendar = (categoryId: string, monthIndex: number) => {
+    const mo = monthIndex + 1
+    const p = latestPeriodByMonth(transactions).get(mo)
+    setCatCal({
+      categoryId,
+      month: mo,
+      year: p ? Number(p.slice(0, 4)) : new Date().getFullYear(),
+    })
+  }
+  const categoryCalEvents = (
+    yy: number,
+    m: number,
+    categoryId: string,
+  ): CalEvent[] => {
+    const groupIds = new Set<string>()
+    for (const b of bills) if (b.category_id) groupIds.add(b.category_id)
+    const catById = new Map(categories.map((c) => [c.id, c]))
+    const key = `${yy}-${String(m).padStart(2, "0")}`
+    return transactions
+      .filter(
+        (t) =>
+          t.booked_date.slice(0, 7) === key &&
+          isSpending(t) &&
+          groupOfCategory(effectiveCategoryId(t, typeMap), groupIds, catById) ===
+            categoryId,
+      )
+      .map((t) => ({
+        day: Number(t.booked_date.slice(8, 10)),
+        name: t.description || t.type || "—",
+        amount: -Number(t.amount),
+        kind: "bill",
+        merchant: deriveStem(t.description) || t.type || "",
+      }))
+  }
 
   // Values the cards show, depending on the toggle.
   const income = isActual ? actualIncome : budgetIncome
@@ -320,7 +365,10 @@ export default function DashboardPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <CategoryTrend trends={categoryTrends} />
+            <CategoryTrend
+              trends={categoryTrends}
+              onMonthClick={openCategoryCalendar}
+            />
           </CardContent>
         </Card>
       )}
@@ -405,6 +453,25 @@ export default function DashboardPage() {
       <Separator className="my-2" />
 
       <YearSummary bills={bills} incomes={incomes} ctx={ctx} />
+
+      {catCal && (
+        <MonthCalendar
+          open
+          onOpenChange={(o) => !o && setCatCal(null)}
+          initialYear={catCal.year}
+          initialMonth={catCal.month}
+          subtitle={categories.find((c) => c.id === catCal.categoryId)?.name}
+          getEvents={(yy, m) => categoryCalEvents(yy, m, catCal.categoryId)}
+          onEventClick={(e, yy, m) => {
+            const period = `${yy}-${String(m).padStart(2, "0")}`
+            router.push(
+              `/spending?tab=transactions&period=${period}&q=${encodeURIComponent(
+                e.merchant ?? "",
+              )}`,
+            )
+          }}
+        />
+      )}
     </div>
   )
 }
