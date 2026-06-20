@@ -4,7 +4,7 @@ import { useMemo, useState } from "react"
 import Link from "next/link"
 import { SlidersHorizontal } from "lucide-react"
 
-import { buildTypeMap } from "@/lib/spending"
+import { buildTypeMap, effectiveDate } from "@/lib/spending"
 import {
   useEntries,
   useAmounts,
@@ -41,7 +41,7 @@ export default function GroupsPage() {
 
   const years = useMemo(() => {
     const set = new Set<string>()
-    for (const t of transactions) set.add(t.booked_date.slice(0, 4))
+    for (const t of transactions) set.add(effectiveDate(t).slice(0, 4))
     return Array.from(set).sort((a, b) => b.localeCompare(a))
   }, [transactions])
   const [gridYear, setGridYear] = useState<string | null>(null)

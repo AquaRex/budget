@@ -14,6 +14,7 @@ import {
 } from "@/lib/data/use-budget"
 import { Skeleton } from "@/components/ui/skeleton"
 import { CategoryGroups } from "@/components/settings/category-groups"
+import { DateModeToggle } from "@/components/settings/date-mode-toggle"
 
 export default function SettingsPage() {
   const { entries: bills } = useEntries("bill")
@@ -38,6 +39,8 @@ export default function SettingsPage() {
   return (
     <div className="flex flex-col gap-6">
       <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
+
+      <DateModeToggle />
 
       {lc ? (
         <Skeleton className="h-40 w-full" />

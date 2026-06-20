@@ -1,8 +1,22 @@
 import type { Category, Transaction, TxRule, TypeCategory } from "@/lib/types"
 import type { ParsedTx } from "@/lib/csv"
+import { getDateMode } from "@/lib/date-mode"
 
 /** bank-type string -> budget category id. */
 export type TypeMap = Map<string, string>
+
+/**
+ * The date to bucket a transaction by. In "bought" mode we use the card's
+ * transaction timestamp (when you actually paid) and fall back to the booked
+ * date for rows without one (transfers, invoices, interest); in "booked" mode
+ * we always use the bank's booking date.
+ */
+export function effectiveDate(t: {
+  booked_date: string
+  tx_date: string | null
+}): string {
+  return getDateMode() === "booked" ? t.booked_date : t.tx_date ?? t.booked_date
+}
 
 export function buildTypeMap(rows: TypeCategory[]): TypeMap {
   return new Map(rows.map((r) => [r.bank_type, r.category_id]))
@@ -209,7 +223,7 @@ export function hasConflict(t: Transaction): boolean {
   return t.pending_amount != null
 }
 
-const periodOf = (t: Transaction) => t.booked_date.slice(0, 7) // YYYY-MM
+const periodOf = (t: Transaction) => effectiveDate(t).slice(0, 7) // YYYY-MM
 
 /** Average actual spend per month, across every month that has spending. */
 export function avgMonthlySpend(transactions: Transaction[]): {

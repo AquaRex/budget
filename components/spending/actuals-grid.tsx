@@ -9,6 +9,7 @@ import { MONTHS_SHORT, MONTHS_LONG } from "@/lib/budget"
 import { MonthCalendar, type CalEvent } from "@/components/calendar/month-calendar"
 import {
   effectiveCategoryId,
+  effectiveDate,
   deriveStem,
   isSpending,
   isInternalTx,
@@ -53,7 +54,7 @@ export function ActualsGrid({
     const map = new Map<string, RawBand>()
 
     for (const t of transactions) {
-      if (t.booked_date.slice(0, 4) !== year || !wanted(t)) continue
+      if (effectiveDate(t).slice(0, 4) !== year || !wanted(t)) continue
       const catId = effectiveCategoryId(t, typeMap)
       const bandKey = catId ?? "uncat"
       let band = map.get(bandKey)
@@ -77,7 +78,7 @@ export function ActualsGrid({
         }
         band.items.set(itemKey, item)
       }
-      const mo = Number(t.booked_date.slice(5, 7)) - 1
+      const mo = Number(effectiveDate(t).slice(5, 7)) - 1
       const v = Math.abs(Number(t.amount))
       item.months[mo] += v
       item.total += v
@@ -120,9 +121,9 @@ export function ActualsGrid({
   const calGetEvents = (yy: number, m: number): CalEvent[] => {
     const key = `${yy}-${String(m).padStart(2, "0")}`
     return transactions
-      .filter((t) => t.booked_date.slice(0, 7) === key && wanted(t))
+      .filter((t) => effectiveDate(t).slice(0, 7) === key && wanted(t))
       .map((t) => ({
-        day: Number(t.booked_date.slice(8, 10)),
+        day: Number(effectiveDate(t).slice(8, 10)),
         name: t.description || t.type || "—",
         amount: Math.abs(Number(t.amount)),
         kind,

@@ -7,6 +7,7 @@ import { ThemeProvider } from "@/components/theme-provider"
 import { AuthProvider } from "@/components/auth/auth-provider"
 import { AuthGate } from "@/components/auth/auth-gate"
 import { AppShell } from "@/components/app-shell"
+import { DateModeBoundary } from "@/components/date-mode-boundary"
 import { Toaster } from "@/components/ui/sonner"
 
 const oxanium = Oxanium({ subsets: ["latin"], variable: "--font-sans" })
@@ -41,7 +42,9 @@ export default function RootLayout({
         <ThemeProvider>
           <AuthProvider>
             <AuthGate>
-              <AppShell>{children}</AppShell>
+              <AppShell>
+              <DateModeBoundary>{children}</DateModeBoundary>
+            </AppShell>
             </AuthGate>
           </AuthProvider>
           <Toaster richColors position="top-center" />

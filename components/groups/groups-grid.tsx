@@ -11,6 +11,7 @@ import { useRouter } from "next/navigation"
 
 import {
   effectiveCategoryId,
+  effectiveDate,
   groupOfCategory,
   deriveStem,
   isSpending,
@@ -58,7 +59,7 @@ export function GroupsGrid({
 }) {
   const bands = useMemo<Band[]>(() => {
     const inYear = transactions.filter(
-      (t) => t.booked_date.slice(0, 4) === year,
+      (t) => effectiveDate(t).slice(0, 4) === year,
     )
     const groupIds = new Set(groups.map((g) => g.id))
     const catById = new Map(categories.map((c) => [c.id, c]))
@@ -81,7 +82,7 @@ export function GroupsGrid({
           row = { key, name, months: zeros(), total: 0 }
           byCat.set(key, row)
         }
-        const mo = Number(t.booked_date.slice(5, 7)) - 1
+        const mo = Number(effectiveDate(t).slice(5, 7)) - 1
         const v = Math.abs(Number(t.amount))
         row.months[mo] += v
         row.total += v
@@ -147,7 +148,7 @@ export function GroupsGrid({
     return transactions
       .filter(
         (t) =>
-          t.booked_date.slice(0, 7) === key &&
+          effectiveDate(t).slice(0, 7) === key &&
           !isInternalTx(t) &&
           Number(t.amount) !== 0,
       )
@@ -155,7 +156,7 @@ export function GroupsGrid({
         const ec = effectiveCategoryId(t, typeMap)
         const amt = Number(t.amount)
         return {
-          day: Number(t.booked_date.slice(8, 10)),
+          day: Number(effectiveDate(t).slice(8, 10)),
           name: (ec && catById.get(ec)?.name) || t.type || "Uncategorised",
           amount: Math.abs(amt),
           kind: amt > 0 ? "income" : "bill",

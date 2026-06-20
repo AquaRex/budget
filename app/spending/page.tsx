@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 import { ChevronLeft, ChevronRight, Tags } from "lucide-react"
 
 import { MONTHS_LONG } from "@/lib/budget"
-import { buildTypeMap } from "@/lib/spending"
+import { buildTypeMap, effectiveDate } from "@/lib/spending"
 import {
   useEntries,
   useAmounts,
@@ -44,7 +44,7 @@ export default function SpendingPage() {
   // Months that actually have data, newest first (for the Transactions tab).
   const periods = useMemo(() => {
     const set = new Set<string>()
-    for (const t of transactions) set.add(t.booked_date.slice(0, 7))
+    for (const t of transactions) set.add(effectiveDate(t).slice(0, 7))
     return Array.from(set).sort((a, b) => b.localeCompare(a))
   }, [transactions])
 
@@ -66,7 +66,7 @@ export default function SpendingPage() {
     () =>
       isAll
         ? transactions
-        : transactions.filter((t) => t.booked_date.slice(0, 7) === active),
+        : transactions.filter((t) => effectiveDate(t).slice(0, 7) === active),
     [transactions, active, isAll],
   )
   const budgetMonths = isAll
@@ -76,7 +76,7 @@ export default function SpendingPage() {
   // Years with data (for the Bills/Income year grids), newest first.
   const years = useMemo(() => {
     const set = new Set<string>()
-    for (const t of transactions) set.add(t.booked_date.slice(0, 4))
+    for (const t of transactions) set.add(effectiveDate(t).slice(0, 4))
     return Array.from(set).sort((a, b) => b.localeCompare(a))
   }, [transactions])
   const [gridYear, setGridYear] = useState<string | null>(null)

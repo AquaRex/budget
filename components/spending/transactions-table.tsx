@@ -13,6 +13,7 @@ import {
   hasConflict,
   isInternalTx,
   effectiveCategoryId,
+  effectiveDate,
   type TypeMap,
 } from "@/lib/spending"
 import {
@@ -112,7 +113,7 @@ export function TransactionsTable({
   // A row is a drill hit when it matches the merchant AND the exact month.
   const isHit = (t: Transaction) =>
     !!highlight &&
-    t.booked_date.slice(0, 7) === highlight.period &&
+    effectiveDate(t).slice(0, 7) === highlight.period &&
     descMatches(t.description, highlight.merchant)
 
   // The first matching row — used to scroll it into view.
@@ -279,7 +280,7 @@ export function TransactionsTable({
                     )}
                   >
                     <td className="text-muted-foreground px-3 py-2 whitespace-nowrap">
-                      {fmtDate(t.booked_date)}
+                      {fmtDate(effectiveDate(t))}
                     </td>
                     <td className="px-2 py-2">
                       <div className="font-medium">{t.description || t.type}</div>

@@ -24,6 +24,7 @@ import {
   deriveStem,
   isSpending,
   buildTypeMap,
+  effectiveDate,
 } from "@/lib/spending"
 import {
   useEntries,
@@ -110,7 +111,7 @@ export default function DashboardPage() {
       if (!isSpending(t)) continue
       const g = groupOfCategory(effectiveCategoryId(t, typeMap), groupIds, catById)
       if (!g) continue
-      const p = t.booked_date.slice(0, 7)
+      const p = effectiveDate(t).slice(0, 7)
       const mo = Number(p.slice(5, 7))
       if (periodByMonth.get(mo) !== p) continue
       const arr = spentByGroup.get(g) ?? Array(12).fill(0)
@@ -190,13 +191,13 @@ export default function DashboardPage() {
     return transactions
       .filter(
         (t) =>
-          t.booked_date.slice(0, 7) === key &&
+          effectiveDate(t).slice(0, 7) === key &&
           isSpending(t) &&
           groupOfCategory(effectiveCategoryId(t, typeMap), groupIds, catById) ===
             categoryId,
       )
       .map((t) => ({
-        day: Number(t.booked_date.slice(8, 10)),
+        day: Number(effectiveDate(t).slice(8, 10)),
         name: t.description || t.type || "—",
         amount: -Number(t.amount),
         kind: "bill",
@@ -227,11 +228,11 @@ export default function DashboardPage() {
   const monthEvents = (yy: number, m: number): CalEvent[] => {
     const key = `${yy}-${String(m).padStart(2, "0")}`
     return transactions
-      .filter((t) => t.booked_date.slice(0, 7) === key && isSpending(t))
+      .filter((t) => effectiveDate(t).slice(0, 7) === key && isSpending(t))
       .map((t) => {
         const ec = effectiveCategoryId(t, typeMap)
         return {
-          day: Number(t.booked_date.slice(8, 10)),
+          day: Number(effectiveDate(t).slice(8, 10)),
           name: t.description || t.type || "—",
           category:
             (ec && categories.find((c) => c.id === ec)?.name) ||
@@ -254,7 +255,7 @@ export default function DashboardPage() {
     income > 0 ? Math.round(((income - outgoing) / income) * 100) : 0
   const monthStats = useMemo(() => {
     const inP = transactions.filter(
-      (t) => !!period && t.booked_date.slice(0, 7) === period && isSpending(t),
+      (t) => !!period && effectiveDate(t).slice(0, 7) === period && isSpending(t),
     )
     let biggest = { amount: 0, name: "—" }
     for (const t of inP) {
