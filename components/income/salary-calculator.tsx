@@ -14,6 +14,7 @@ import { MONTHS_LONG } from "@/lib/budget"
 import { formatNOK, formatNumber } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import { setDragAmount } from "@/lib/dnd"
+import { useYear } from "@/lib/year"
 import { useSalaryProfile } from "@/lib/data/use-budget"
 import { saveSalaryProfile, ensureSalaryEntry } from "@/lib/data/salary"
 import { Button } from "@/components/ui/button"
@@ -42,7 +43,6 @@ type State = {
   yearly: string
   monthlyAfterTax: string
   taxPct: string
-  halfTaxPct: string
   vacationRatePct: string
   feriepengerMonth: number
   halfTaxMonth: number
@@ -57,7 +57,6 @@ function seed(p: SalaryProfile): State {
     yearly: p.yearlySalary ? String(p.yearlySalary) : "",
     monthlyAfterTax: "",
     taxPct: String(p.taxPct),
-    halfTaxPct: String(p.halfTaxPct),
     vacationRatePct: String(p.vacationRatePct),
     feriepengerMonth: p.feriepengerMonth,
     halfTaxMonth: p.halfTaxMonth,
@@ -68,6 +67,7 @@ function seed(p: SalaryProfile): State {
 }
 
 export function SalaryCalculator({ onChanged }: { onChanged: () => void }) {
+  const year = useYear()
   const { profile, mutate } = useSalaryProfile()
 
   const [state, setState] = useState<State>(() =>
@@ -98,7 +98,7 @@ export function SalaryCalculator({ onChanged }: { onChanged: () => void }) {
   const liveProfile: SalaryProfile = {
     yearlySalary,
     taxPct,
-    halfTaxPct: Number(state.halfTaxPct) || 0,
+    halfTaxPct: taxPct / 2, // always half the regular rate
     vacationRatePct: Number(state.vacationRatePct) || 0,
     feriepengerMonth: state.feriepengerMonth,
     halfTaxMonth: state.halfTaxMonth,
@@ -111,8 +111,8 @@ export function SalaryCalculator({ onChanged }: { onChanged: () => void }) {
   async function onSave() {
     setSaving(true)
     try {
-      await saveSalaryProfile(liveProfile)
-      await ensureSalaryEntry()
+      await saveSalaryProfile(year, liveProfile)
+      await ensureSalaryEntry(year)
       await mutate()
       onChanged()
       toast.success("Salary saved. The Salary row now auto-fills every month.")
@@ -237,7 +237,7 @@ export function SalaryCalculator({ onChanged }: { onChanged: () => void }) {
                 </p>
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 gap-3">
                 <div className="grid gap-2">
                   <Label htmlFor="tax">Tax %</Label>
                   <Input
@@ -246,15 +246,9 @@ export function SalaryCalculator({ onChanged }: { onChanged: () => void }) {
                     value={state.taxPct}
                     onChange={(e) => set("taxPct", e.target.value)}
                   />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="half">Half %</Label>
-                  <Input
-                    id="half"
-                    inputMode="decimal"
-                    value={state.halfTaxPct}
-                    onChange={(e) => set("halfTaxPct", e.target.value)}
-                  />
+                  <p className="text-muted-foreground text-xs">
+                    Half-tax month uses {(taxPct / 2).toFixed(1)}%
+                  </p>
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="vac">Ferie %</Label>

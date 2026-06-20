@@ -7,6 +7,7 @@ import type { Entry } from "@/lib/types"
 import { formatNOK } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import { monthlySeries, type BudgetContext } from "@/lib/budget"
+import { useYear } from "@/lib/year"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { BalanceChart } from "@/components/dashboard/balance-chart"
 import { SummaryTable } from "@/components/dashboard/summary-table"
@@ -20,6 +21,7 @@ export function YearSummary({
   incomes: Entry[]
   ctx: BudgetContext
 }) {
+  const year = useYear()
   const data = useMemo(
     () => monthlySeries(incomes, bills, ctx),
     [incomes, bills, ctx],
@@ -56,7 +58,9 @@ export function YearSummary({
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-baseline justify-between">
-        <h2 className="text-lg font-semibold tracking-tight">Annual overview</h2>
+        <h2 className="text-lg font-semibold tracking-tight">
+          Annual overview · {year}
+        </h2>
         <span className="text-muted-foreground text-sm">Full-year totals</span>
       </div>
 

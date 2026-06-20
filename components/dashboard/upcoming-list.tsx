@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import { ArrowDownRight, ArrowUpRight } from "lucide-react"
 
 import type { Entry } from "@/lib/types"
@@ -8,19 +8,17 @@ import { formatNOK } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import { effectiveAmount, type BudgetContext } from "@/lib/budget"
 import { useCategories } from "@/lib/data/use-budget"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+
+type GroupActual = { spent: number; income: number }
+type View = "budget" | "actual"
 
 type Item = {
   id: string
   name: string
   day: number
-  amount: number
+  budget: number
+  actual: number
   kind: "bill" | "income"
   category: string | null
 }
@@ -30,38 +28,67 @@ export function UpcomingList({
   incomes,
   ctx,
   month,
+  actualByGroup,
 }: {
   bills: Entry[]
   incomes: Entry[]
   ctx: BudgetContext
   month: number
+  /** Actual totals this month, keyed by the entry's category (group) id. */
+  actualByGroup?: Map<string, GroupActual>
 }) {
   const { categories } = useCategories()
+  const [view, setView] = useState<View>("budget")
+  const hasActuals = !!actualByGroup && actualByGroup.size > 0
+
   const items = useMemo<Item[]>(() => {
     const nameOf = (id: string | null) =>
       categories.find((c) => c.id === id)?.name ?? null
     const build = (entries: Entry[], kind: "bill" | "income"): Item[] =>
       entries
         .filter((e) => e.is_active)
-        .map((e) => ({
-          id: e.id,
-          name: e.name,
-          day: e.due_day,
-          amount: effectiveAmount(e, ctx, month),
-          kind,
-          category: nameOf(e.category_id),
-        }))
-        .filter((i) => i.amount > 0)
+        .map((e) => {
+          const a = e.category_id ? actualByGroup?.get(e.category_id) : undefined
+          return {
+            id: e.id,
+            name: e.name,
+            day: e.due_day,
+            budget: effectiveAmount(e, ctx, month),
+            actual: a ? (kind === "income" ? a.income : a.spent) : 0,
+            kind,
+            category: nameOf(e.category_id),
+          }
+        })
+        .filter((i) => i.budget > 0)
     return [...build(bills, "bill"), ...build(incomes, "income")].sort(
       (a, z) => a.day - z.day,
     )
-  }, [bills, incomes, ctx, month, categories])
+  }, [bills, incomes, ctx, month, categories, actualByGroup])
+
+  const showActual = view === "actual" && hasActuals
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>Month schedule</CardTitle>
-        <CardDescription>Ordered by day of the month</CardDescription>
+        {hasActuals && (
+          <div className="flex items-center rounded-md border p-0.5">
+            {(["budget", "actual"] as View[]).map((v) => (
+              <button
+                key={v}
+                onClick={() => setView(v)}
+                className={cn(
+                  "rounded-sm px-2.5 py-1 text-xs font-medium capitalize transition-colors",
+                  view === v
+                    ? "bg-secondary text-secondary-foreground"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {v}
+              </button>
+            ))}
+          </div>
+        )}
       </CardHeader>
       <CardContent>
         {items.length === 0 ? (
@@ -72,6 +99,7 @@ export function UpcomingList({
           <ul className="flex flex-col">
             {items.map((item, idx) => {
               const isIncome = item.kind === "income"
+              const amount = showActual ? item.actual : item.budget
               return (
                 <li
                   key={item.id}
@@ -108,13 +136,14 @@ export function UpcomingList({
                   <span
                     className={cn(
                       "text-sm font-semibold tabular-nums",
+                      showActual && amount === 0 && "text-muted-foreground",
                       isIncome
                         ? "text-emerald-600 dark:text-emerald-400"
                         : "text-foreground",
                     )}
                   >
                     {isIncome ? "+" : "−"}
-                    {formatNOK(item.amount)}
+                    {formatNOK(amount)}
                   </span>
                 </li>
               )

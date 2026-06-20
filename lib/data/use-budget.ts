@@ -3,8 +3,9 @@
 import { useMemo } from "react"
 import useSWR from "swr"
 
-import { fetchEntries, fetchAmounts } from "@/lib/data/entries"
+import { fetchEntries, fetchAmounts, fetchEntryYears } from "@/lib/data/entries"
 import { fetchCategories } from "@/lib/data/categories"
+import { useYear } from "@/lib/year"
 import { fetchMethods } from "@/lib/data/methods"
 import { fetchSalaryProfile } from "@/lib/data/salary"
 import {
@@ -28,19 +29,37 @@ import type {
 } from "@/lib/types"
 
 export function useEntries(kind: EntryKind) {
+  const year = useYear()
   const { data, error, isLoading, mutate } = useSWR<Entry[]>(
-    ["entries", kind],
-    () => fetchEntries(kind),
+    ["entries", kind, year],
+    () => fetchEntries(kind, year),
   )
   return { entries: data ?? [], error, isLoading, mutate }
 }
 
 export function useAmounts() {
+  const year = useYear()
   const { data, error, isLoading, mutate } = useSWR<EntryAmount[]>(
-    "amounts",
-    fetchAmounts,
+    ["amounts", year],
+    () => fetchAmounts(year),
   )
   return { amounts: data ?? [], error, isLoading, mutate }
+}
+
+/** Distinct years that have budget data (newest first), always incl. current. */
+export function useBudgetYears() {
+  const { data, error, isLoading, mutate } = useSWR<number[]>(
+    "entry_years",
+    fetchEntryYears,
+  )
+  const years = new Set<number>(data ?? [])
+  years.add(new Date().getFullYear())
+  return {
+    years: Array.from(years).sort((a, b) => b - a),
+    error,
+    isLoading,
+    mutate,
+  }
 }
 
 export function useCategories() {
@@ -60,9 +79,10 @@ export function useMethods() {
 }
 
 export function useSalaryProfile() {
+  const year = useYear()
   const { data, error, isLoading, mutate } = useSWR<SalaryProfile | null>(
-    "salary",
-    fetchSalaryProfile,
+    ["salary", year],
+    () => fetchSalaryProfile(year),
   )
   return { profile: data ?? null, error, isLoading, mutate }
 }

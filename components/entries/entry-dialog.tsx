@@ -9,6 +9,7 @@ import { createEntry, updateEntry, setAmount } from "@/lib/data/entries"
 import { createCategory } from "@/lib/data/categories"
 import { createMethod } from "@/lib/data/methods"
 import { useCategories, useMethods } from "@/lib/data/use-budget"
+import { useYear } from "@/lib/year"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -71,6 +72,7 @@ export function EntryDialog({
   presetCategory,
   onSaved,
 }: Props) {
+  const year = useYear()
   const isBill = kind === "bill"
   const catListId = useId()
   const methodListId = useId()
@@ -175,6 +177,7 @@ export function EntryDialog({
       ])
       const payload = {
         kind,
+        year,
         name: form.name.trim(),
         category_id: categoryId,
         method_id: methodId,
@@ -188,7 +191,7 @@ export function EntryDialog({
       } else {
         const created = await createEntry(payload)
         if (showOneTimeAmount) {
-          await setAmount(created.id, Number(form.month), oneTimeAmount)
+          await setAmount(created.id, year, Number(form.month), oneTimeAmount)
         }
       }
       toast.success(entry ? "Changes saved." : "Added.")

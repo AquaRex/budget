@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight, Tags } from "lucide-react"
 
 import { MONTHS_LONG } from "@/lib/budget"
 import { buildTypeMap, effectiveDate } from "@/lib/spending"
+import { useYear, setYear } from "@/lib/year"
 import {
   useEntries,
   useAmounts,
@@ -73,14 +74,9 @@ export default function SpendingPage() {
     ? periods.map((p) => Number(p.slice(5, 7)))
     : [monthNum]
 
-  // Years with data (for the Bills/Income year grids), newest first.
-  const years = useMemo(() => {
-    const set = new Set<string>()
-    for (const t of transactions) set.add(effectiveDate(t).slice(0, 4))
-    return Array.from(set).sort((a, b) => b.localeCompare(a))
-  }, [transactions])
-  const [gridYear, setGridYear] = useState<string | null>(null)
-  const activeYear = gridYear ?? years[0] ?? String(new Date().getFullYear())
+  // Bills/Income grids follow the global year selector.
+  const globalYear = useYear()
+  const activeYear = String(globalYear)
 
   // Active sub-tab and the transaction-list search (controlled so the Bills/
   // Income grids can drill into a specific merchant + month).
@@ -147,16 +143,12 @@ export default function SpendingPage() {
           periods[Math.min(Math.max(idx + (back ? 1 : -1), 0), periods.length - 1)],
         )
       } else {
-        if (years.length === 0) return
-        const yi = years.indexOf(activeYear)
-        setGridYear(
-          years[Math.min(Math.max(yi + (back ? 1 : -1), 0), years.length - 1)],
-        )
+        setYear(globalYear + (back ? -1 : 1))
       }
     }
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
-  }, [tab, periods, idx, isAll, years, activeYear])
+  }, [tab, periods, idx, isAll, globalYear])
 
   const refresh = () => {
     mutateTx()
@@ -188,21 +180,6 @@ export default function SpendingPage() {
       >
         <ChevronRight className="size-4" />
       </Button>
-    </div>
-  )
-
-  const yearPicker = (
-    <div className="flex flex-wrap items-center gap-1">
-      {years.map((y) => (
-        <Button
-          key={y}
-          variant={y === activeYear ? "default" : "outline"}
-          size="sm"
-          onClick={() => setGridYear(y)}
-        >
-          {y}
-        </Button>
-      ))}
     </div>
   )
 
@@ -246,7 +223,9 @@ export default function SpendingPage() {
                 </Button>
               </div>
             ) : (
-              yearPicker
+              <span className="text-muted-foreground px-1 text-sm font-medium tabular-nums">
+                {activeYear}
+              </span>
             )}
           </div>
 

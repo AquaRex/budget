@@ -77,9 +77,11 @@ export function CategoryTrend({
             className={onMonthClick ? "cursor-pointer" : undefined}
             onClick={(state) => {
               if (!onMonthClick) return
-              const idx = (state as { activeTooltipIndex?: number })
-                .activeTooltipIndex
-              if (idx != null) onMonthClick(active.id, idx)
+              const idx = Number(
+                (state as { activeTooltipIndex?: number | string })
+                  .activeTooltipIndex,
+              )
+              if (Number.isInteger(idx)) onMonthClick(active.id, idx)
             }}
           >
             <CartesianGrid vertical={false} strokeDasharray="3 3" />

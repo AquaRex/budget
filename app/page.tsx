@@ -15,7 +15,6 @@ import {
 } from "@/lib/budget"
 import {
   avgMonthlySpend,
-  latestPeriodByMonth,
   spentInPeriod,
   incomeInPeriod,
   actualByCategory,
@@ -23,6 +22,7 @@ import {
   groupOfCategory,
   deriveStem,
   isSpending,
+  isInternalTx,
   buildTypeMap,
   effectiveDate,
 } from "@/lib/spending"
@@ -47,9 +47,11 @@ import { BalanceChart } from "@/components/dashboard/balance-chart"
 import { CategoryBudgetChart } from "@/components/dashboard/category-budget-chart"
 import { CategoryTrend, type CatTrend } from "@/components/dashboard/category-trend"
 import { MiniMonthCalendar } from "@/components/dashboard/mini-month-calendar"
+import { useYear, setYear } from "@/lib/year"
 import { MonthCalendar, type CalEvent } from "@/components/calendar/month-calendar"
 
 export default function DashboardPage() {
+  const year = useYear()
   const [month, setMonth] = useState(new Date().getMonth() + 1) // 1-12
 
   const { entries: bills, isLoading: lb } = useEntries("bill")
@@ -63,10 +65,24 @@ export default function DashboardPage() {
   const loading = lb || li || la || ls
 
   const typeMap = useMemo(() => buildTypeMap(typeCategories), [typeCategories])
-  const hasActuals = transactions.length > 0
+  const hasActuals = useMemo(
+    () => transactions.some((t) => effectiveDate(t).slice(0, 4) === String(year)),
+    [transactions, year],
+  )
 
-  const stepMonth = (delta: number) =>
-    setMonth((m) => ((m - 1 + delta + 12) % 12) + 1)
+  // Stepping past Dec/Jan rolls into the next/previous year (global selector).
+  const stepMonth = (delta: number) => {
+    const next = month + delta
+    if (next < 1) {
+      setYear(year - 1)
+      setMonth(12)
+    } else if (next > 12) {
+      setYear(year + 1)
+      setMonth(1)
+    } else {
+      setMonth(next)
+    }
+  }
 
   // Left/right arrow keys change the month (unless typing or a dialog is open).
   useEffect(() => {
@@ -75,45 +91,46 @@ export default function DashboardPage() {
       const el = e.target as HTMLElement | null
       if (el && /^(input|textarea|select)$/i.test(el.tagName)) return
       if (document.querySelector('[role="dialog"]')) return
-      setMonth((m) => ((m - 1 + (e.key === "ArrowLeft" ? -1 : 1) + 12) % 12) + 1)
+      stepMonth(e.key === "ArrowLeft" ? -1 : 1)
     }
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [month, year])
 
   const series = monthlySeries(incomes, bills, ctx)
   const budgetIncome = monthTotal(incomes, ctx, month)
   const budgetBills = monthTotal(bills, ctx, month)
 
-  // Actuals for this calendar month use the most recent year that has data.
-  const period = useMemo(
-    () => latestPeriodByMonth(transactions).get(month),
-    [transactions, month],
-  )
+  // Actuals are scoped to the selected year + month.
+  const period = `${year}-${String(month).padStart(2, "0")}`
   const actualSpent = useMemo(
     () => spentInPeriod(transactions, period),
     [transactions, period],
   )
-  const spend = avgMonthlySpend(transactions)
-  const miniYear = period ? Number(period.slice(0, 4)) : new Date().getFullYear()
+  const yearTx = useMemo(
+    () => transactions.filter((t) => effectiveDate(t).slice(0, 4) === String(year)),
+    [transactions, year],
+  )
+  const spend = avgMonthlySpend(yearTx)
+  const miniYear = year
 
-  // Budgeted vs spent, per budget category (group), across the whole year.
-  // Spend for each calendar month uses that month's most recent period.
+  // Budgeted vs spent, per budget category (group), across the selected year.
   const categoryTrends = useMemo<CatTrend[]>(() => {
     const groupIds = new Set<string>()
     for (const b of bills) if (b.category_id) groupIds.add(b.category_id)
     if (groupIds.size === 0) return []
     const catById = new Map(categories.map((c) => [c.id, c]))
-    const periodByMonth = latestPeriodByMonth(transactions)
+    const yearStr = String(year)
 
     const spentByGroup = new Map<string, number[]>()
     for (const t of transactions) {
       if (!isSpending(t)) continue
+      const d = effectiveDate(t)
+      if (d.slice(0, 4) !== yearStr) continue
       const g = groupOfCategory(effectiveCategoryId(t, typeMap), groupIds, catById)
       if (!g) continue
-      const p = effectiveDate(t).slice(0, 7)
-      const mo = Number(p.slice(5, 7))
-      if (periodByMonth.get(mo) !== p) continue
+      const mo = Number(d.slice(5, 7))
       const arr = spentByGroup.get(g) ?? Array(12).fill(0)
       arr[mo - 1] += -Number(t.amount)
       spentByGroup.set(g, arr)
@@ -146,7 +163,7 @@ export default function DashboardPage() {
     return out.sort(
       (a, b) => b.totalSpent + b.totalBudget - (a.totalSpent + a.totalBudget),
     )
-  }, [bills, ctx, transactions, typeMap, categories])
+  }, [bills, ctx, transactions, typeMap, categories, year])
 
   // The bar chart is the selected month sliced out of the same trend data.
   const categoryCompare = useMemo(
@@ -171,13 +188,7 @@ export default function DashboardPage() {
     year: number
   } | null>(null)
   const openCategoryCalendar = (categoryId: string, monthIndex: number) => {
-    const mo = monthIndex + 1
-    const p = latestPeriodByMonth(transactions).get(mo)
-    setCatCal({
-      categoryId,
-      month: mo,
-      year: p ? Number(p.slice(0, 4)) : new Date().getFullYear(),
-    })
+    setCatCal({ categoryId, month: Number(monthIndex) + 1, year })
   }
   const categoryCalEvents = (
     yy: number,
@@ -283,6 +294,29 @@ export default function DashboardPage() {
       top,
     }
   }, [transactions, period, typeMap, categories, actualSpent])
+
+  // Actual spent/received this month per budget category (group), for the
+  // Month schedule's budget/actual toggle.
+  const scheduleActuals = useMemo(() => {
+    const m = new Map<string, { spent: number; income: number }>()
+    if (!period) return m
+    const groupIds = new Set<string>()
+    for (const e of [...bills, ...incomes])
+      if (e.category_id) groupIds.add(e.category_id)
+    const catById = new Map(categories.map((c) => [c.id, c]))
+    for (const t of transactions) {
+      if (effectiveDate(t).slice(0, 7) !== period) continue
+      if (isInternalTx(t) || t.is_excluded) continue
+      const g = groupOfCategory(effectiveCategoryId(t, typeMap), groupIds, catById)
+      if (!g) continue
+      const cur = m.get(g) ?? { spent: 0, income: 0 }
+      const amt = Number(t.amount)
+      if (amt < 0) cur.spent += -amt
+      else cur.income += amt
+      m.set(g, cur)
+    }
+    return m
+  }, [bills, incomes, categories, transactions, typeMap, period])
 
   const up = "text-emerald-600 dark:text-emerald-400"
   const down = "text-rose-600 dark:text-rose-400"
@@ -545,7 +579,13 @@ export default function DashboardPage() {
           />
         </div>
 
-        <UpcomingList bills={bills} incomes={incomes} ctx={ctx} month={month} />
+        <UpcomingList
+          bills={bills}
+          incomes={incomes}
+          ctx={ctx}
+          month={month}
+          actualByGroup={scheduleActuals}
+        />
       </div>
 
       <Separator className="my-2" />

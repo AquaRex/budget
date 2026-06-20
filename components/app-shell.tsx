@@ -17,6 +17,7 @@ import {
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/components/auth/auth-provider"
 import { Button } from "@/components/ui/button"
+import { YearSelector } from "@/components/year-selector"
 
 const nav = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -60,6 +61,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             })}
           </nav>
           <div className="ml-auto flex items-center gap-1">
+            <YearSelector />
+            <div className="bg-border mx-1 h-5 w-px" />
             <Button
               variant="ghost"
               size="icon"

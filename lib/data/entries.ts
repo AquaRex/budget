@@ -1,31 +1,53 @@
 import { getSupabase } from "@/lib/supabase/client"
 import type { Entry, EntryAmount, EntryInput, EntryKind } from "@/lib/types"
 
-export async function fetchEntries(kind: EntryKind): Promise<Entry[]> {
+export async function fetchEntries(
+  kind: EntryKind,
+  year: number,
+): Promise<Entry[]> {
   const supabase = getSupabase()
   const { data, error } = await supabase
     .from("entries")
     .select("*")
     .eq("kind", kind)
+    .eq("year", year)
     .order("sort_order", { ascending: true })
     .order("created_at", { ascending: true })
   if (error) throw error
   return (data ?? []) as Entry[]
 }
 
-export async function fetchAmounts(): Promise<EntryAmount[]> {
+export async function fetchAmounts(year: number): Promise<EntryAmount[]> {
   const supabase = getSupabase()
-  const { data, error } = await supabase.from("entry_amounts").select("*")
+  const { data, error } = await supabase
+    .from("entry_amounts")
+    .select("*")
+    .eq("year", year)
   if (error) throw error
   return (data ?? []) as EntryAmount[]
 }
 
+/** Distinct years that have any budget entries, newest first. */
+export async function fetchEntryYears(): Promise<number[]> {
+  const supabase = getSupabase()
+  const { data, error } = await supabase.from("entries").select("year")
+  if (error) throw error
+  const years = new Set<number>()
+  for (const r of (data ?? []) as { year: number }[]) years.add(r.year)
+  return Array.from(years).sort((a, b) => b - a)
+}
+
 async function nextSortOrder(
   kind: EntryKind,
+  year: number,
   categoryId: string | null,
 ): Promise<number> {
   const supabase = getSupabase()
-  let q = supabase.from("entries").select("sort_order").eq("kind", kind)
+  let q = supabase
+    .from("entries")
+    .select("sort_order")
+    .eq("kind", kind)
+    .eq("year", year)
   q = categoryId === null ? q.is("category_id", null) : q.eq("category_id", categoryId)
   const { data } = await q.order("sort_order", { ascending: false }).limit(1)
   return (data?.[0]?.sort_order ?? -1) + 1
@@ -33,7 +55,7 @@ async function nextSortOrder(
 
 export async function createEntry(input: EntryInput): Promise<Entry> {
   const supabase = getSupabase()
-  const sort_order = await nextSortOrder(input.kind, input.category_id)
+  const sort_order = await nextSortOrder(input.kind, input.year, input.category_id)
   const { data, error } = await supabase
     .from("entries")
     .insert({ ...input, sort_order })
@@ -85,6 +107,7 @@ export async function reorderEntries(
  */
 export async function setAmount(
   entryId: string,
+  year: number,
   month: number,
   amount: number | null,
 ): Promise<void> {
@@ -94,6 +117,7 @@ export async function setAmount(
       .from("entry_amounts")
       .delete()
       .eq("entry_id", entryId)
+      .eq("year", year)
       .eq("month", month)
     if (error) throw error
     return
@@ -101,8 +125,8 @@ export async function setAmount(
   const { error } = await supabase
     .from("entry_amounts")
     .upsert(
-      { entry_id: entryId, month, amount },
-      { onConflict: "entry_id,month" },
+      { entry_id: entryId, year, month, amount },
+      { onConflict: "entry_id,year,month" },
     )
   if (error) throw error
 }

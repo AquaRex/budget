@@ -42,32 +42,39 @@ function toRow(p: SalaryProfile): Row {
   }
 }
 
-export async function fetchSalaryProfile(): Promise<SalaryProfile | null> {
+export async function fetchSalaryProfile(
+  year: number,
+): Promise<SalaryProfile | null> {
   const supabase = getSupabase()
   const { data, error } = await supabase
     .from("salary_settings")
     .select("*")
+    .eq("year", year)
     .maybeSingle()
   if (error) throw error
   return data ? fromRow(data as Row) : null
 }
 
-export async function saveSalaryProfile(p: SalaryProfile): Promise<void> {
+export async function saveSalaryProfile(
+  year: number,
+  p: SalaryProfile,
+): Promise<void> {
   const supabase = getSupabase()
   const { error } = await supabase
     .from("salary_settings")
-    .upsert(toRow(p), { onConflict: "user_id" })
+    .upsert({ ...toRow(p), year }, { onConflict: "user_id,year" })
   if (error) throw error
 }
 
-/** Find the income entry flagged as the salary row, creating it if missing. */
-export async function ensureSalaryEntry(): Promise<Entry> {
+/** Find the salary income entry for a year, creating it if missing. */
+export async function ensureSalaryEntry(year: number): Promise<Entry> {
   const supabase = getSupabase()
   const { data: existing, error: findErr } = await supabase
     .from("entries")
     .select("*")
     .eq("kind", "income")
     .eq("is_salary", true)
+    .eq("year", year)
     .limit(1)
     .maybeSingle()
   if (findErr) throw findErr
@@ -77,6 +84,7 @@ export async function ensureSalaryEntry(): Promise<Entry> {
     .from("entries")
     .insert({
       kind: "income",
+      year,
       name: "Salary",
       category_id: null,
       method_id: null,

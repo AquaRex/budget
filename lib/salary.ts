@@ -2,7 +2,7 @@
 //
 //   monthlyBeforeTax   = yearlySalary / 12
 //   monthlyAfterTax    = monthlyBeforeTax * (1 - tax%)
-//   monthlyAfterHalfTax= monthlyBeforeTax * (1 - halfTax%)
+//   monthlyAfterHalfTax= monthlyBeforeTax * (1 - (tax%/2))  (half the rate)
 //   vacationBasis      = monthlyBeforeTax * (12 - vacationDays/workdaysPerMonth)
 //   feriepenger        = vacationBasis * vacationRate%
 //                        - (monthlyBeforeTax / workdaysPerMonth) * deductionDays
@@ -52,7 +52,8 @@ export type SalaryResult = {
 export function computeSalary(p: SalaryProfile): SalaryResult {
   const monthlyBeforeTax = p.yearlySalary / 12
   const monthlyAfterTax = monthlyBeforeTax * (1 - p.taxPct / 100)
-  const monthlyAfterHalfTax = monthlyBeforeTax * (1 - p.halfTaxPct / 100)
+  // Half-tax month is always taxed at half the regular rate.
+  const monthlyAfterHalfTax = monthlyBeforeTax * (1 - p.taxPct / 2 / 100)
   const vacationBasis =
     monthlyBeforeTax * (12 - p.vacationDays / p.workdaysPerMonth)
   const feriepenger =

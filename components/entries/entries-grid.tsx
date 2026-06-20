@@ -27,6 +27,7 @@ import {
   hasType,
 } from "@/lib/dnd"
 import { reorderCategoryList, moveEntry } from "@/lib/reorder"
+import { useYear } from "@/lib/year"
 import {
   useEntries,
   useAmounts,
@@ -81,6 +82,7 @@ export function EntriesGrid({
   embedded?: boolean
 }) {
   const isBill = kind === "bill"
+  const year = useYear()
 
   const { entries, isLoading: le, mutate: mutateEntries } = useEntries(kind)
   const { amounts, isLoading: la, mutate: mutateAmounts } = useAmounts()
@@ -177,12 +179,13 @@ export function EntriesGrid({
         id: `optimistic-${entry.id}-${month}`,
         user_id: entry.user_id,
         entry_id: entry.id,
+        year,
         month,
         amount,
       })
     }
     mutateAmounts(next, { revalidate: false })
-    setAmount(entry.id, month, amount)
+    setAmount(entry.id, year, month, amount)
       .then(() => mutateAmounts())
       .catch((err) => {
         toast.error(err instanceof Error ? err.message : "Could not save.")
@@ -666,7 +669,7 @@ export function EntriesGrid({
       <MonthCalendar
         open={calMonth != null}
         onOpenChange={(o) => !o && setCalMonth(null)}
-        initialYear={new Date().getFullYear()}
+        initialYear={year}
         initialMonth={calMonth ?? 1}
         subtitle={`Budgeted ${isBill ? "bills" : "income"} on their due day`}
         getEvents={(_y, m) =>

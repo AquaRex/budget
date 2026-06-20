@@ -24,6 +24,7 @@ export type Entry = {
   id: string
   user_id: string
   kind: EntryKind
+  year: number
   name: string
   category_id: string | null
   method_id: string | null
@@ -40,6 +41,7 @@ export type EntryAmount = {
   id: string
   user_id: string
   entry_id: string
+  year: number
   month: number // 1-12
   amount: number
 }
@@ -102,6 +104,7 @@ export type TxRule = {
 // Payload when creating/editing an entry's settings (no amounts/order here).
 export type EntryInput = {
   kind: EntryKind
+  year: number
   name: string
   category_id: string | null
   method_id: string | null

@@ -1,10 +1,11 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useMemo } from "react"
 import Link from "next/link"
 import { SlidersHorizontal } from "lucide-react"
 
-import { buildTypeMap, effectiveDate } from "@/lib/spending"
+import { buildTypeMap } from "@/lib/spending"
+import { useYear } from "@/lib/year"
 import {
   useEntries,
   useAmounts,
@@ -19,6 +20,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { GroupsGrid } from "@/components/groups/groups-grid"
 
 export default function GroupsPage() {
+  const activeYear = String(useYear())
   const { entries: bills } = useEntries("bill")
   const { entries: incomes } = useEntries("income")
   const { amounts } = useAmounts()
@@ -39,14 +41,6 @@ export default function GroupsPage() {
       .sort((a, b) => a.sort_order - b.sort_order)
   }, [categories, bills, incomes])
 
-  const years = useMemo(() => {
-    const set = new Set<string>()
-    for (const t of transactions) set.add(effectiveDate(t).slice(0, 4))
-    return Array.from(set).sort((a, b) => b.localeCompare(a))
-  }, [transactions])
-  const [gridYear, setGridYear] = useState<string | null>(null)
-  const activeYear = gridYear ?? years[0] ?? String(new Date().getFullYear())
-
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -63,20 +57,6 @@ export default function GroupsPage() {
         <Skeleton className="h-40 w-full" />
       ) : (
         <div className="flex flex-col gap-4">
-          {years.length > 0 && (
-            <div className="flex flex-wrap items-center justify-end gap-1">
-              {years.map((y) => (
-                <Button
-                  key={y}
-                  variant={y === activeYear ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setGridYear(y)}
-                >
-                  {y}
-                </Button>
-              ))}
-            </div>
-          )}
           <GroupsGrid
             transactions={transactions}
             groups={groups}
