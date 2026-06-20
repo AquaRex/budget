@@ -4,7 +4,7 @@ import { Fragment, useMemo, useState } from "react"
 
 import type { Category, Entry, Transaction } from "@/lib/types"
 import type { BudgetContext } from "@/lib/budget"
-import { MONTHS_SHORT, monthlySubtotals } from "@/lib/budget"
+import { MONTHS_SHORT, MONTHS_LONG, monthlySubtotals } from "@/lib/budget"
 import { formatNumber, formatNOK } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import {
@@ -14,6 +14,7 @@ import {
   isInternalTx,
   type TypeMap,
 } from "@/lib/spending"
+import { MonthCalendar, type CalEvent } from "@/components/calendar/month-calendar"
 
 // Freeze the first column on ≥sm screens, like the other grids.
 const sticky = "sm:sticky sm:left-0 sm:z-10"
@@ -134,6 +135,30 @@ export function GroupsGrid({
 
   const [hoverCol, setHoverCol] = useState<number | null>(null)
   const colBg = (m: number) => (hoverCol === m ? "bg-primary/5" : "")
+  const [calMonth, setCalMonth] = useState<number | null>(null)
+
+  const calEvents: CalEvent[] = useMemo(() => {
+    if (calMonth == null) return []
+    const catById = new Map(categories.map((c) => [c.id, c]))
+    const key = `${year}-${String(calMonth).padStart(2, "0")}`
+    return transactions
+      .filter(
+        (t) =>
+          t.booked_date.slice(0, 7) === key &&
+          !isInternalTx(t) &&
+          Number(t.amount) !== 0,
+      )
+      .map((t) => {
+        const ec = effectiveCategoryId(t, typeMap)
+        const amt = Number(t.amount)
+        return {
+          day: Number(t.booked_date.slice(8, 10)),
+          name: (ec && catById.get(ec)?.name) || t.type || "Uncategorised",
+          amount: Math.abs(amt),
+          kind: amt > 0 ? "income" : "bill",
+        } as CalEvent
+      })
+  }, [calMonth, transactions, categories, typeMap, year])
   const avg12 = (total: number) => total / 12
   const avgActive = (months: number[], total: number) => {
     const n = months.filter((m) => m > 0).length
@@ -179,8 +204,10 @@ export function GroupsGrid({
                 <th
                   key={m}
                   data-col={i + 1}
+                  onClick={() => setCalMonth(i + 1)}
+                  title={`${MONTHS_LONG[i]} ${year} — day by day`}
                   className={cn(
-                    "text-muted-foreground px-1 py-2 text-right font-medium",
+                    "text-muted-foreground hover:text-foreground cursor-pointer px-1 py-2 text-right font-medium",
                     colBg(i + 1),
                   )}
                 >
@@ -405,8 +432,18 @@ export function GroupsGrid({
               .reduce((s, b) => s + (sum(b.actual) - sum(b.budget)), 0),
           )}
         </span>{" "}
-        net over/under on budgeted spending.
+        net over/under on budgeted spending. Click a month name for a day-by-day
+        calendar.
       </p>
+
+      <MonthCalendar
+        open={calMonth != null}
+        onOpenChange={(o) => !o && setCalMonth(null)}
+        year={Number(year)}
+        month={calMonth ?? 1}
+        subtitle="Actual income & spending"
+        events={calEvents}
+      />
     </div>
   )
 }
