@@ -6,12 +6,7 @@ import { EntriesGrid } from "@/components/entries/entries-grid"
 export default function BudgetPage() {
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Budget</h1>
-        <p className="text-muted-foreground text-sm">
-          Your recurring monthly bills and income.
-        </p>
-      </div>
+      <h1 className="text-2xl font-semibold tracking-tight">Budget</h1>
 
       <Tabs defaultValue="bills" className="gap-6">
         <TabsList>

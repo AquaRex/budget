@@ -5,7 +5,7 @@ import { GripVertical, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react
 import { toast } from "sonner"
 
 import type { Category, Entry, EntryAmount, EntryKind } from "@/lib/types"
-import { formatNOK, formatNumber, dayLabel } from "@/lib/format"
+import { formatNumber, dayLabel } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import {
   MONTHS_SHORT,
@@ -662,15 +662,6 @@ export function EntriesGrid({
           )}
         </table>
       </div>
-
-      <p className="text-muted-foreground text-xs">
-        Drag the ⋮⋮ handle to reorder rows or whole categories (drop a row on a
-        category band to move it there). Click a month cell to type, or drag a
-        cell / salary result onto another. Click a month name for a day-by-day
-        calendar. Annual total:{" "}
-        <span className="text-foreground font-medium">{formatNOK(grandTotal)}</span>
-        .
-      </p>
 
       <MonthCalendar
         open={calMonth != null}

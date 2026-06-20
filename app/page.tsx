@@ -13,7 +13,12 @@ import {
 
 import { formatNOK } from "@/lib/format"
 import { cn } from "@/lib/utils"
-import { MONTHS_LONG, monthTotal, monthlySeries } from "@/lib/budget"
+import {
+  MONTHS_LONG,
+  monthTotal,
+  monthlySeries,
+  effectiveAmount,
+} from "@/lib/budget"
 import {
   avgMonthlySpend,
   latestPeriodByMonth,
@@ -40,6 +45,7 @@ import { CategoryDonut } from "@/components/dashboard/category-donut"
 import { UpcomingList } from "@/components/dashboard/upcoming-list"
 import { YearSummary } from "@/components/dashboard/year-summary"
 import { BalanceChart } from "@/components/dashboard/balance-chart"
+import { CategoryBudgetChart } from "@/components/dashboard/category-budget-chart"
 
 type View = "budget" | "actual"
 
@@ -82,6 +88,34 @@ export default function DashboardPage() {
     [transactions, period],
   )
   const spend = avgMonthlySpend(transactions)
+
+  // Budgeted vs actually spent, per category, for the month.
+  const categoryCompare = useMemo(() => {
+    const budgetByCat = new Map<string, number>()
+    for (const b of bills) {
+      if (!b.is_active || !b.category_id) continue
+      const amt = effectiveAmount(b, ctx, month)
+      if (amt > 0)
+        budgetByCat.set(
+          b.category_id,
+          (budgetByCat.get(b.category_id) ?? 0) + amt,
+        )
+    }
+    const actualByCat = actualByCategory(transactions, period, typeMap)
+    const ids = new Set<string>([
+      ...budgetByCat.keys(),
+      ...[...actualByCat.keys()].filter((k): k is string => k != null),
+    ])
+    return Array.from(ids)
+      .map((id) => ({
+        category: categories.find((c) => c.id === id)?.name ?? "—",
+        budget: Math.round(budgetByCat.get(id) ?? 0),
+        spent: Math.round(actualByCat.get(id) ?? 0),
+      }))
+      .filter((r) => r.budget > 0 || r.spent > 0)
+      .sort((a, b) => b.spent + b.budget - (a.spent + a.budget))
+      .slice(0, 8)
+  }, [bills, ctx, month, transactions, period, typeMap, categories])
 
   // Values the cards show, depending on the toggle.
   const income = isActual ? actualIncome : budgetIncome
@@ -129,14 +163,7 @@ export default function DashboardPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-          <p className="text-muted-foreground text-sm">
-            {MONTHS_LONG[month - 1]}
-            {isActual && period ? ` ${period.slice(0, 4)}` : ""} —{" "}
-            {isActual ? "actual spending vs budget." : "your recurring monthly picture."}
-          </p>
-        </div>
+        <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
         <div className="flex items-center gap-2">
           {hasActuals && (
             <div className="flex items-center rounded-md border p-0.5">
@@ -241,6 +268,20 @@ export default function DashboardPage() {
           <BalanceChart data={series} height={260} highlightMonth={month} />
         </CardContent>
       </Card>
+
+      {categoryCompare.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-muted-foreground text-sm font-medium">
+              Budgeted vs spent by category — {MONTHS_LONG[month - 1]}
+              {period ? ` ${period.slice(0, 4)}` : ""}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <CategoryBudgetChart data={categoryCompare} />
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid items-start gap-6 lg:grid-cols-2">
         <div className="flex flex-col gap-6">

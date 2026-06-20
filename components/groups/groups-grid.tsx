@@ -5,7 +5,7 @@ import { Fragment, useMemo, useState } from "react"
 import type { Category, Entry, Transaction } from "@/lib/types"
 import type { BudgetContext } from "@/lib/budget"
 import { MONTHS_SHORT, MONTHS_LONG, monthlySubtotals } from "@/lib/budget"
-import { formatNumber, formatNOK } from "@/lib/format"
+import { formatNumber } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import { useRouter } from "next/navigation"
 
@@ -425,22 +425,6 @@ export function GroupsGrid({
           </tbody>
         </table>
       </div>
-      <p className="text-muted-foreground text-xs">
-        Budgeted comes from your Bills/Income; actuals are the categories that
-        roll up into each group for {year}.{" "}
-        <span className="text-red-600 dark:text-red-400">Red</span> on Difference
-        means over budget (or below expected income).{" "}
-        <span className="text-foreground font-medium">
-          {formatNOK(
-            bands
-              .filter((b) => b.hasBudget && b.kind === "bill")
-              .reduce((s, b) => s + (sum(b.budget) - sum(b.actual)), 0),
-          )}
-        </span>{" "}
-        net vs budget on spending (positive = saved). Click a month name for a
-        day-by-day calendar.
-      </p>
-
       <MonthCalendar
         open={calMonth != null}
         onOpenChange={(o) => !o && setCalMonth(null)}

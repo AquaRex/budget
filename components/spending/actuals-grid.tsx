@@ -3,7 +3,7 @@
 import { Fragment, useMemo, useRef, useState } from "react"
 
 import type { Category, Transaction } from "@/lib/types"
-import { formatNumber, formatNOK } from "@/lib/format"
+import { formatNumber } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import { MONTHS_SHORT, MONTHS_LONG } from "@/lib/budget"
 import { MonthCalendar, type CalEvent } from "@/components/calendar/month-calendar"
@@ -288,15 +288,6 @@ export function ActualsGrid({
           </tfoot>
         </table>
       </div>
-      <p className="text-muted-foreground text-xs">
-        Actual {kind === "bill" ? "spending" : "income"} for {year}, grouped by
-        category — total{" "}
-        <span className="text-foreground font-medium">
-          {formatNOK(grandTotal)}
-        </span>
-        . Click a month name for a day-by-day calendar.
-      </p>
-
       <MonthCalendar
         open={calMonth != null}
         onOpenChange={(o) => !o && setCalMonth(null)}

@@ -158,12 +158,7 @@ export default function SpendingPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Spending</h1>
-          <p className="text-muted-foreground text-sm">
-            Actual transactions from your bank, against your budget.
-          </p>
-        </div>
+        <h1 className="text-2xl font-semibold tracking-tight">Spending</h1>
         {transactions.length > 0 && (
           <Button variant="outline" size="sm" onClick={() => setMapperOpen(true)}>
             <Tags className="size-4" />

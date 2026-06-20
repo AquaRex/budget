@@ -17,7 +17,6 @@ import { Badge } from "@/components/ui/badge"
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
@@ -123,10 +122,6 @@ export function CategoryGroups({
       <Card>
         <CardHeader>
           <CardTitle>Groups</CardTitle>
-          <CardDescription>
-            Groups are created automatically from the categories your Bills &amp;
-            Income use. Add a budget entry under a category to make it a group.
-          </CardDescription>
         </CardHeader>
         <CardContent>
           {groups.length === 0 ? (
@@ -173,11 +168,6 @@ export function CategoryGroups({
       <Card>
         <CardHeader>
           <CardTitle>Categories</CardTitle>
-          <CardDescription>
-            Every category (the bank&apos;s own plus any you create). Assign each
-            to a group; a payment&apos;s category — changed on the Spending page —
-            decides which group it counts toward.
-          </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           <div className="flex gap-2">
