@@ -3,7 +3,8 @@
     "allow": [
       "Bash(pnpm -v)",
       "Bash(npm -v)",
-      "Bash(pnpm dlx *)"
+      "Bash(pnpm dlx *)",
+      "Bash(pnpm deploy *)"
     ]
   }
 }

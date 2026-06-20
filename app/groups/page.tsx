@@ -1,9 +1,10 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import Link from "next/link"
 import { SlidersHorizontal } from "lucide-react"
 
-import { buildGroupMap } from "@/lib/spending"
+import { buildTypeMap } from "@/lib/spending"
 import {
   useEntries,
   useAmounts,
@@ -11,31 +12,33 @@ import {
   useBudgetContext,
   useCategories,
   useTransactions,
-  useTypeGroups,
+  useTypeCategories,
 } from "@/lib/data/use-budget"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { GroupsGrid } from "@/components/groups/groups-grid"
-import { GroupMapper } from "@/components/groups/group-mapper"
 
 export default function GroupsPage() {
   const { entries: bills } = useEntries("bill")
   const { entries: incomes } = useEntries("income")
   const { amounts } = useAmounts()
   const { profile } = useSalaryProfile()
-  const { categories, mutate: mutateCategories } = useCategories()
+  const { categories } = useCategories()
   const ctx = useBudgetContext(amounts, profile)
-  const { transactions, isLoading: lt, mutate: mutateTx } = useTransactions()
-  const { typeGroups, mutate: mutateTypeGroups } = useTypeGroups()
-  const groupMap = useMemo(() => buildGroupMap(typeGroups), [typeGroups])
-  const [mapperOpen, setMapperOpen] = useState(false)
+  const { transactions, isLoading: lt } = useTransactions()
+  const { typeCategories } = useTypeCategories()
+  const typeMap = useMemo(() => buildTypeMap(typeCategories), [typeCategories])
 
-  const groups = useMemo(
-    () => categories.filter((c) => c.is_group),
-    [categories],
-  )
+  // Groups are auto-derived: any category that a Bills/Income entry uses.
+  const groups = useMemo(() => {
+    const used = new Set<string>()
+    for (const e of [...bills, ...incomes])
+      if (e.category_id) used.add(e.category_id)
+    return categories
+      .filter((c) => used.has(c.id))
+      .sort((a, b) => a.sort_order - b.sort_order)
+  }, [categories, bills, incomes])
 
-  // Years with transaction data, newest first.
   const years = useMemo(() => {
     const set = new Set<string>()
     for (const t of transactions) set.add(t.booked_date.slice(0, 4))
@@ -44,24 +47,20 @@ export default function GroupsPage() {
   const [gridYear, setGridYear] = useState<string | null>(null)
   const activeYear = gridYear ?? years[0] ?? String(new Date().getFullYear())
 
-  const refresh = () => {
-    mutateCategories()
-    mutateTypeGroups()
-    mutateTx()
-  }
-
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Groups</h1>
           <p className="text-muted-foreground text-sm">
-            Budgeted vs actual, rolled up into your own groups.
+            Budgeted vs actual, rolled up into your groups.
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => setMapperOpen(true)}>
-          <SlidersHorizontal className="size-4" />
-          Configure groups
+        <Button asChild variant="outline" size="sm">
+          <Link href="/settings">
+            <SlidersHorizontal className="size-4" />
+            Configure
+          </Link>
         </Button>
       </div>
 
@@ -86,7 +85,8 @@ export default function GroupsPage() {
           <GroupsGrid
             transactions={transactions}
             groups={groups}
-            groupMap={groupMap}
+            categories={categories}
+            typeMap={typeMap}
             billEntries={bills}
             incomeEntries={incomes}
             ctx={ctx}
@@ -94,15 +94,6 @@ export default function GroupsPage() {
           />
         </div>
       )}
-
-      <GroupMapper
-        open={mapperOpen}
-        onOpenChange={setMapperOpen}
-        transactions={transactions}
-        categories={categories}
-        typeGroups={typeGroups}
-        onChanged={refresh}
-      />
     </div>
   )
 }

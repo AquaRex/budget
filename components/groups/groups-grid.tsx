@@ -8,17 +8,18 @@ import { MONTHS_SHORT, monthlySubtotals } from "@/lib/budget"
 import { formatNumber, formatNOK } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import {
-  groupForTx,
+  effectiveCategoryId,
+  groupOfCategory,
   isSpending,
   isInternalTx,
-  type GroupMap,
+  type TypeMap,
 } from "@/lib/spending"
 
 // Freeze the first column on ≥sm screens, like the other grids.
 const sticky = "sm:sticky sm:left-0 sm:z-10"
 const COLS = 15 // name + 12 months + total + avg
 
-type ActualRow = { type: string; months: number[]; total: number }
+type ActualRow = { key: string; name: string; months: number[]; total: number }
 type Band = {
   key: string
   name: string
@@ -35,15 +36,17 @@ const sum = (a: number[]) => a.reduce((s, v) => s + v, 0)
 export function GroupsGrid({
   transactions,
   groups,
-  groupMap,
+  categories,
+  typeMap,
   billEntries,
   incomeEntries,
   ctx,
   year,
 }: {
   transactions: Transaction[]
-  groups: Category[] // categories where is_group, in sort order
-  groupMap: GroupMap
+  groups: Category[] // categories used by Bills/Income, in sort order
+  categories: Category[] // the full pool (for category -> group resolution)
+  typeMap: TypeMap
   billEntries: Entry[]
   incomeEntries: Entry[]
   ctx: BudgetContext
@@ -53,21 +56,26 @@ export function GroupsGrid({
     const inYear = transactions.filter(
       (t) => t.booked_date.slice(0, 4) === year,
     )
+    const groupIds = new Set(groups.map((g) => g.id))
+    const catById = new Map(categories.map((c) => [c.id, c]))
 
-    // Actual bank-type rows for a group, given a sign convention.
+    // Actual rows (one per resolved category) for a group + sign convention.
     const rowsFor = (
       groupId: string | null,
       want: (t: Transaction) => boolean,
     ): { rows: ActualRow[]; totals: number[] } => {
-      const byType = new Map<string, ActualRow>()
+      const byCat = new Map<string, ActualRow>()
       const totals = zeros()
       for (const t of inYear) {
-        if (!want(t) || groupForTx(t, groupMap) !== groupId) continue
-        const type = t.type || "(no type)"
-        let row = byType.get(type)
+        if (!want(t)) continue
+        const ec = effectiveCategoryId(t, typeMap)
+        if (groupOfCategory(ec, groupIds, catById) !== groupId) continue
+        const key = ec ?? `type:${t.type ?? ""}`
+        const name = (ec && catById.get(ec)?.name) || t.type || "Uncategorised"
+        let row = byCat.get(key)
         if (!row) {
-          row = { type, months: zeros(), total: 0 }
-          byType.set(type, row)
+          row = { key, name, months: zeros(), total: 0 }
+          byCat.set(key, row)
         }
         const mo = Number(t.booked_date.slice(5, 7)) - 1
         const v = Math.abs(Number(t.amount))
@@ -75,7 +83,7 @@ export function GroupsGrid({
         row.total += v
         totals[mo] += v
       }
-      const rows = Array.from(byType.values()).sort((a, b) => b.total - a.total)
+      const rows = Array.from(byCat.values()).sort((a, b) => b.total - a.total)
       return { rows, totals }
     }
 
@@ -122,7 +130,7 @@ export function GroupsGrid({
     return out.filter(
       (b) => b.hasBudget || b.rows.length > 0 || b.key === "__unassigned__",
     )
-  }, [transactions, groups, groupMap, billEntries, incomeEntries, ctx, year])
+  }, [transactions, groups, categories, typeMap, billEntries, incomeEntries, ctx, year])
 
   const [hoverCol, setHoverCol] = useState<number | null>(null)
   const colBg = (m: number) => (hoverCol === m ? "bg-primary/5" : "")
@@ -135,8 +143,8 @@ export function GroupsGrid({
   if (groups.length === 0) {
     return (
       <div className="text-muted-foreground rounded-lg border py-10 text-center text-sm">
-        No groups yet. Open <span className="font-medium">Configure groups</span>{" "}
-        to pick which categories act as groups and assign bank types to them.
+        No groups yet. Groups are the categories your Bills and Income use — add
+        an entry under a category to create one.
       </div>
     )
   }
@@ -259,14 +267,14 @@ export function GroupsGrid({
 
                   {/* Actual rows, one per bank type */}
                   {band.rows.map((row) => (
-                    <tr key={row.type} className="border-b">
+                    <tr key={row.key} className="border-b">
                       <td
                         className={cn(
                           sticky,
                           "bg-background px-3 py-1.5 pl-6 whitespace-nowrap",
                         )}
                       >
-                        {row.type}
+                        {row.name}
                       </td>
                       {row.months.map((v, i) => (
                         <td
@@ -386,8 +394,8 @@ export function GroupsGrid({
         </table>
       </div>
       <p className="text-muted-foreground text-xs">
-        Budgeted comes from your Bills/Income; actuals are grouped by the bank&apos;s
-        own transaction type for {year}.{" "}
+        Budgeted comes from your Bills/Income; actuals are the categories that
+        roll up into each group for {year}.{" "}
         <span className="text-red-600 dark:text-red-400">Red</span> on Difference
         means over budget (or below expected income).{" "}
         <span className="text-foreground font-medium">

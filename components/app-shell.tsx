@@ -8,6 +8,7 @@ import {
   Layers,
   Moon,
   Receipt,
+  Settings,
   Sun,
   TrendingUp,
   Wallet,
@@ -24,6 +25,7 @@ const nav = [
   { href: "/income", label: "Income", icon: TrendingUp },
   { href: "/spending", label: "Spending", icon: Wallet },
   { href: "/groups", label: "Groups", icon: Layers },
+  { href: "/settings", label: "Settings", icon: Settings },
 ]
 
 export function AppShell({ children }: { children: React.ReactNode }) {
