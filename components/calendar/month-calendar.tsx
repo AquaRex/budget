@@ -111,7 +111,7 @@ export function MonthCalendar({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex h-[100dvh] max-h-[100dvh] w-screen max-w-none flex-col gap-3 rounded-none sm:max-w-none">
+      <DialogContent className="flex h-[90vh] max-h-[90vh] w-[92vw] max-w-[1600px] flex-col gap-4 sm:max-w-[1600px]">
         <DialogHeader>
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-1">
@@ -200,9 +200,8 @@ function EventBox({
 }) {
   const income = e.kind === "income"
   const cls = cn(
-    "w-full rounded-md border border-l-2 px-1.5 py-1 text-left",
-    income ? "border-l-emerald-500/60" : "border-l-rose-500/60",
-    onClick && "hover:bg-muted cursor-pointer transition-colors",
+    "bg-muted/40 hover:bg-muted w-full rounded-md px-2 py-1 text-left transition-colors",
+    onClick && "cursor-pointer",
   )
   const inner = (
     <>
