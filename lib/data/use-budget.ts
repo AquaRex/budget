@@ -55,7 +55,7 @@ export function useBudgetYears() {
   const years = new Set<number>(data ?? [])
   years.add(new Date().getFullYear())
   return {
-    years: Array.from(years).sort((a, b) => b - a),
+    years: Array.from(years).sort((a, b) => a - b),
     error,
     isLoading,
     mutate,
@@ -76,7 +76,7 @@ export function useAvailableYears(): number[] {
     const y = Number((t.tx_date ?? t.booked_date).slice(0, 4))
     if (Number.isFinite(y)) set.add(y)
   }
-  return Array.from(set).sort((a, b) => b - a)
+  return Array.from(set).sort((a, b) => a - b)
 }
 
 export function useCategories() {

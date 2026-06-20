@@ -63,9 +63,9 @@ export function YearManager() {
   }
 
   function openAdd() {
-    const latest = years[0] ?? new Date().getFullYear()
+    const latest = years.length ? Math.max(...years) : new Date().getFullYear()
     setNewYear(String(latest + 1))
-    setSource(budgetYears[0] ?? latest)
+    setSource(budgetYears.length ? Math.max(...budgetYears) : latest)
     setAdding(true)
   }
 
