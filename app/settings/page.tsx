@@ -16,6 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { CategoryGroups } from "@/components/settings/category-groups"
 import { DateModeToggle } from "@/components/settings/date-mode-toggle"
 import { YearManager } from "@/components/settings/year-manager"
+import { DangerZone } from "@/components/settings/danger-zone"
 
 export default function SettingsPage() {
   const { entries: bills } = useEntries("bill")
@@ -59,6 +60,8 @@ export default function SettingsPage() {
           onChanged={mutateCategories}
         />
       )}
+
+      <DangerZone />
     </div>
   )
 }

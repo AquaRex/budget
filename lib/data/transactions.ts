@@ -142,6 +142,7 @@ export async function importTransactions(
   if (impErr) throw impErr
   const importId = (imp as ImportBatch).id
 
+  let inserted = 0
   if (plan.toInsert.length > 0) {
     const rows = plan.toInsert.map((r) => ({
       import_id: importId,
@@ -159,11 +160,14 @@ export async function importTransactions(
       identity_key: r.identity_key,
       category_id: ruleCategoryFor(r, rules),
     }))
-    // Ignore duplicates that slipped in concurrently.
-    const { error } = await supabase
+    // Rows already present (same user_id + dedup_key) are ignored; `.select()`
+    // returns only the rows that were actually inserted, so the count is true.
+    const { data: insertedRows, error } = await supabase
       .from("transactions")
       .upsert(rows, { onConflict: "user_id,dedup_key", ignoreDuplicates: true })
+      .select("id")
     if (error) throw error
+    inserted = insertedRows?.length ?? 0
   }
 
   // Store the proposed new value on each conflicting existing row.
@@ -180,10 +184,23 @@ export async function importTransactions(
   )
 
   return {
-    inserted: plan.toInsert.length,
+    inserted,
     conflicts: plan.conflicts.length,
-    unchanged: plan.unchangedCount,
+    unchanged: plan.unchangedCount + (plan.toInsert.length - inserted),
   }
+}
+
+/** Delete ALL imported transactions and import batches (irreversible). */
+export async function deleteAllTransactions(): Promise<void> {
+  const supabase = getSupabase()
+  const all = "00000000-0000-0000-0000-000000000000"
+  const { error: e1 } = await supabase
+    .from("transactions")
+    .delete()
+    .neq("id", all)
+  if (e1) throw e1
+  const { error: e2 } = await supabase.from("imports").delete().neq("id", all)
+  if (e2) throw e2
 }
 
 /** Resolve a conflict: keep the newer (pending) value, or discard it. */
