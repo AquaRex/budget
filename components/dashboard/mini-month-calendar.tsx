@@ -55,48 +55,62 @@ export function MiniMonthCalendar({
         ))}
       </div>
       <div className="bg-border grid grid-cols-7 gap-px overflow-hidden rounded-sm border">
-        {cells.map((d, i) => (
-          <div
-            key={i}
-            className={cn(
-              "bg-background min-h-11 p-0.5",
-              d == null && "bg-muted/30",
-            )}
-          >
-            {d != null && (
-              <>
-                <div className="text-muted-foreground text-[9px] leading-none">
-                  {d}
-                </div>
-                <div className="mt-0.5 flex flex-col gap-px">
-                  {(byDay.get(d) ?? []).map((e, j) => {
-                    const income = e.kind === "income"
-                    return (
-                      <div
-                        key={j}
-                        title={`${e.name}: ${formatNOK(e.amount)}`}
-                        className="truncate text-[9px] leading-tight"
-                      >
-                        <span
-                          className={cn(
-                            "font-medium tabular-nums",
-                            income
-                              ? "text-emerald-600 dark:text-emerald-400"
-                              : "text-rose-600 dark:text-rose-400",
-                          )}
+        {cells.map((d, i) => {
+          const all = (d != null ? byDay.get(d) : undefined)
+            ?.slice()
+            .sort((a, b) => b.amount - a.amount)
+          const overflow = !!all && all.length > 6
+          const shown = all ? (overflow ? all.slice(0, 5) : all) : []
+          return (
+            <div
+              key={i}
+              className={cn(
+                "bg-background h-[100px] overflow-hidden p-1",
+                d == null && "bg-muted/30",
+              )}
+            >
+              {d != null && (
+                <>
+                  <div className="text-muted-foreground text-[10px] leading-none">
+                    {d}
+                  </div>
+                  <div className="mt-0.5 flex flex-col gap-px">
+                    {shown.map((e, j) => {
+                      const income = e.kind === "income"
+                      return (
+                        <div
+                          key={j}
+                          title={`${e.category ?? e.name}: ${formatNOK(e.amount)}`}
+                          className="truncate text-[10px] leading-tight"
                         >
-                          {income ? "+" : "−"}
-                          {formatNumber(e.amount)}
-                        </span>{" "}
-                        <span className="text-muted-foreground">{e.name}</span>
+                          <span
+                            className={cn(
+                              "font-medium tabular-nums",
+                              income
+                                ? "text-emerald-600 dark:text-emerald-400"
+                                : "text-rose-600 dark:text-rose-400",
+                            )}
+                          >
+                            {income ? "+" : "−"}
+                            {formatNumber(e.amount)}
+                          </span>{" "}
+                          <span className="text-muted-foreground">
+                            {e.category ?? e.name}
+                          </span>
+                        </div>
+                      )
+                    })}
+                    {overflow && (
+                      <div className="text-muted-foreground text-[10px] leading-tight">
+                        …
                       </div>
-                    )
-                  })}
-                </div>
-              </>
-            )}
-          </div>
-        ))}
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          )
+        })}
       </div>
     </div>
   )

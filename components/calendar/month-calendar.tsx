@@ -22,6 +22,8 @@ export type CalEvent = {
   name: string
   amount: number // magnitude
   kind: "bill" | "income"
+  /** Resolved category name (used by the compact mini-calendar). */
+  category?: string
   /** Drill target for actual transactions (merchant search key). */
   merchant?: string
   /** Drill target for a budgeted entry (its id, on the Budget page). */

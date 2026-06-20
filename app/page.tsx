@@ -227,13 +227,20 @@ export default function DashboardPage() {
     const key = `${yy}-${String(m).padStart(2, "0")}`
     return transactions
       .filter((t) => t.booked_date.slice(0, 7) === key && isSpending(t))
-      .map((t) => ({
-        day: Number(t.booked_date.slice(8, 10)),
-        name: t.description || t.type || "—",
-        amount: -Number(t.amount),
-        kind: "bill",
-        merchant: deriveStem(t.description) || t.type || "",
-      }))
+      .map((t) => {
+        const ec = effectiveCategoryId(t, typeMap)
+        return {
+          day: Number(t.booked_date.slice(8, 10)),
+          name: t.description || t.type || "—",
+          category:
+            (ec && categories.find((c) => c.id === ec)?.name) ||
+            t.type ||
+            "Uncategorised",
+          amount: -Number(t.amount),
+          kind: "bill" as const,
+          merchant: deriveStem(t.description) || t.type || "",
+        }
+      })
   }
   const [monthCalOpen, setMonthCalOpen] = useState(false)
 
@@ -310,7 +317,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[1.7fr_1fr]">
+      <div className="grid gap-4 lg:grid-cols-[1fr_1.7fr]">
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           {tiles.map((t) => (
             <div key={t.label} className="rounded-lg border p-3">
@@ -347,13 +354,13 @@ export default function DashboardPage() {
           ))}
         </div>
 
-        <Card className="gap-2">
-          <CardHeader className="pb-0">
-            <CardTitle className="text-muted-foreground text-sm font-medium">
+        <Card className="gap-1 py-3">
+          <CardHeader className="px-3 pb-0">
+            <CardTitle className="text-muted-foreground text-xs font-medium">
               {MONTHS_LONG[month - 1]} {miniYear}
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-2 pb-1">
             {hasActuals ? (
               <MiniMonthCalendar
                 year={miniYear}
