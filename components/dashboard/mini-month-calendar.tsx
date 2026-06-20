@@ -1,11 +1,10 @@
 "use client"
 
-import { formatNOK } from "@/lib/format"
+import { formatNOK, formatNumber } from "@/lib/format"
 import { cn } from "@/lib/utils"
+import type { CalEvent } from "@/components/calendar/month-calendar"
 
 const WEEKDAYS = ["M", "T", "W", "T", "F", "S", "S"]
-
-export type MiniEvent = { day: number; amount: number; kind: "bill" | "income" }
 
 export function MiniMonthCalendar({
   year,
@@ -15,18 +14,19 @@ export function MiniMonthCalendar({
 }: {
   year: number
   month: number
-  events: MiniEvent[]
+  events: CalEvent[]
   onOpen?: () => void
 }) {
   const daysInMonth = new Date(year, month, 0).getDate()
   const lead = (new Date(year, month - 1, 1).getDay() + 6) % 7
 
-  const outByDay = new Map<number, number>()
+  const byDay = new Map<number, CalEvent[]>()
   for (const e of events) {
-    if (e.kind !== "bill") continue
-    outByDay.set(e.day, (outByDay.get(e.day) ?? 0) + e.amount)
+    const d = Math.min(Math.max(e.day, 1), daysInMonth)
+    const list = byDay.get(d)
+    if (list) list.push(e)
+    else byDay.set(d, [e])
   }
-  const maxOut = Math.max(1, ...outByDay.values())
 
   const cells: (number | null)[] = []
   for (let i = 0; i < lead; i++) cells.push(null)
@@ -34,44 +34,70 @@ export function MiniMonthCalendar({
   while (cells.length % 7 !== 0) cells.push(null)
 
   return (
-    <button
-      type="button"
+    <div
+      role={onOpen ? "button" : undefined}
+      tabIndex={onOpen ? 0 : undefined}
       onClick={onOpen}
-      className="w-full text-left"
-      title="Open full calendar"
+      onKeyDown={(e) => {
+        if (onOpen && (e.key === "Enter" || e.key === " ")) onOpen()
+      }}
+      className={cn("flex flex-col gap-1", onOpen && "cursor-pointer")}
+      title={onOpen ? "Open full calendar" : undefined}
     >
-      <div className="grid grid-cols-7 gap-1">
+      <div className="grid grid-cols-7 gap-px">
         {WEEKDAYS.map((w, i) => (
           <div
             key={i}
-            className="text-muted-foreground text-center text-[10px] font-medium"
+            className="text-muted-foreground text-center text-[9px] font-medium"
           >
             {w}
           </div>
         ))}
-        {cells.map((d, i) => {
-          const out = d ? (outByDay.get(d) ?? 0) : 0
-          const intensity = out > 0 ? 0.12 + (out / maxOut) * 0.45 : 0
-          return (
-            <div
-              key={i}
-              title={d && out > 0 ? `${d}: ${formatNOK(out)}` : undefined}
-              className={cn(
-                "flex aspect-square items-center justify-center rounded-sm text-[11px] tabular-nums",
-                d == null && "opacity-0",
-                out > 0 ? "text-foreground font-medium" : "text-muted-foreground",
-              )}
-              style={
-                out > 0
-                  ? { backgroundColor: `color-mix(in oklab, #f43f5e ${Math.round(intensity * 100)}%, transparent)` }
-                  : undefined
-              }
-            >
-              {d}
-            </div>
-          )
-        })}
       </div>
-    </button>
+      <div className="bg-border grid grid-cols-7 gap-px overflow-hidden rounded-sm border">
+        {cells.map((d, i) => (
+          <div
+            key={i}
+            className={cn(
+              "bg-background min-h-11 p-0.5",
+              d == null && "bg-muted/30",
+            )}
+          >
+            {d != null && (
+              <>
+                <div className="text-muted-foreground text-[9px] leading-none">
+                  {d}
+                </div>
+                <div className="mt-0.5 flex flex-col gap-px">
+                  {(byDay.get(d) ?? []).map((e, j) => {
+                    const income = e.kind === "income"
+                    return (
+                      <div
+                        key={j}
+                        title={`${e.name}: ${formatNOK(e.amount)}`}
+                        className="truncate text-[9px] leading-tight"
+                      >
+                        <span
+                          className={cn(
+                            "font-medium tabular-nums",
+                            income
+                              ? "text-emerald-600 dark:text-emerald-400"
+                              : "text-rose-600 dark:text-rose-400",
+                          )}
+                        >
+                          {income ? "+" : "−"}
+                          {formatNumber(e.amount)}
+                        </span>{" "}
+                        <span className="text-muted-foreground">{e.name}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
   )
 }
