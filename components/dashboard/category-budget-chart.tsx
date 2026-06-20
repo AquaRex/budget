@@ -24,30 +24,30 @@ export type CategoryCompare = {
 }
 
 export function CategoryBudgetChart({ data }: { data: CategoryCompare[] }) {
-  const height = Math.max(160, data.length * 46 + 40)
   return (
-    <ChartContainer config={config} style={{ height }} className="w-full">
+    <ChartContainer config={config} style={{ height: 260 }} className="w-full">
       <BarChart
         data={data}
-        layout="vertical"
-        margin={{ top: 4, right: 12, bottom: 0, left: 4 }}
+        margin={{ top: 4, right: 4, bottom: 0, left: 0 }}
         barGap={2}
       >
-        <CartesianGrid horizontal={false} strokeDasharray="3 3" />
+        <CartesianGrid vertical={false} strokeDasharray="3 3" />
         <XAxis
-          type="number"
-          tickLine={false}
-          axisLine={false}
-          fontSize={11}
-          tickFormatter={(v) => `${Math.round(Number(v) / 1000)}k`}
-        />
-        <YAxis
-          type="category"
           dataKey="category"
           tickLine={false}
           axisLine={false}
-          width={110}
+          fontSize={10}
+          interval={0}
+          angle={-30}
+          textAnchor="end"
+          height={64}
+        />
+        <YAxis
+          tickLine={false}
+          axisLine={false}
+          width={40}
           fontSize={11}
+          tickFormatter={(v) => `${Math.round(Number(v) / 1000)}k`}
         />
         <ChartTooltip
           content={

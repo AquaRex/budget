@@ -15,9 +15,10 @@ import { formatNOK } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import {
   MONTHS_LONG,
+  MONTHS_SHORT,
   monthTotal,
   monthlySeries,
-  effectiveAmount,
+  monthlySubtotals,
 } from "@/lib/budget"
 import {
   avgMonthlySpend,
@@ -25,6 +26,9 @@ import {
   spentInPeriod,
   incomeInPeriod,
   actualByCategory,
+  effectiveCategoryId,
+  groupOfCategory,
+  isSpending,
   buildTypeMap,
 } from "@/lib/spending"
 import {
@@ -46,6 +50,7 @@ import { UpcomingList } from "@/components/dashboard/upcoming-list"
 import { YearSummary } from "@/components/dashboard/year-summary"
 import { BalanceChart } from "@/components/dashboard/balance-chart"
 import { CategoryBudgetChart } from "@/components/dashboard/category-budget-chart"
+import { CategoryTrend, type CatTrend } from "@/components/dashboard/category-trend"
 
 type View = "budget" | "actual"
 
@@ -89,33 +94,71 @@ export default function DashboardPage() {
   )
   const spend = avgMonthlySpend(transactions)
 
-  // Budgeted vs actually spent, per category, for the month.
-  const categoryCompare = useMemo(() => {
-    const budgetByCat = new Map<string, number>()
-    for (const b of bills) {
-      if (!b.is_active || !b.category_id) continue
-      const amt = effectiveAmount(b, ctx, month)
-      if (amt > 0)
-        budgetByCat.set(
-          b.category_id,
-          (budgetByCat.get(b.category_id) ?? 0) + amt,
-        )
+  // Budgeted vs spent, per budget category (group), across the whole year.
+  // Spend for each calendar month uses that month's most recent period.
+  const categoryTrends = useMemo<CatTrend[]>(() => {
+    const groupIds = new Set<string>()
+    for (const b of bills) if (b.category_id) groupIds.add(b.category_id)
+    if (groupIds.size === 0) return []
+    const catById = new Map(categories.map((c) => [c.id, c]))
+    const periodByMonth = latestPeriodByMonth(transactions)
+
+    const spentByGroup = new Map<string, number[]>()
+    for (const t of transactions) {
+      if (!isSpending(t)) continue
+      const g = groupOfCategory(effectiveCategoryId(t, typeMap), groupIds, catById)
+      if (!g) continue
+      const p = t.booked_date.slice(0, 7)
+      const mo = Number(p.slice(5, 7))
+      if (periodByMonth.get(mo) !== p) continue
+      const arr = spentByGroup.get(g) ?? Array(12).fill(0)
+      arr[mo - 1] += -Number(t.amount)
+      spentByGroup.set(g, arr)
     }
-    const actualByCat = actualByCategory(transactions, period, typeMap)
-    const ids = new Set<string>([
-      ...budgetByCat.keys(),
-      ...[...actualByCat.keys()].filter((k): k is string => k != null),
-    ])
-    return Array.from(ids)
-      .map((id) => ({
-        category: categories.find((c) => c.id === id)?.name ?? "—",
-        budget: Math.round(budgetByCat.get(id) ?? 0),
-        spent: Math.round(actualByCat.get(id) ?? 0),
-      }))
-      .filter((r) => r.budget > 0 || r.spent > 0)
-      .sort((a, b) => b.spent + b.budget - (a.spent + a.budget))
-      .slice(0, 8)
-  }, [bills, ctx, month, transactions, period, typeMap, categories])
+
+    const out: CatTrend[] = []
+    for (const id of groupIds) {
+      const cat = catById.get(id)
+      if (!cat) continue
+      const budgeted = monthlySubtotals(
+        bills.filter((b) => b.category_id === id),
+        ctx,
+      )
+      const spent = spentByGroup.get(id) ?? Array(12).fill(0)
+      const totalBudget = budgeted.reduce((s, v) => s + v, 0)
+      const totalSpent = spent.reduce((s, v) => s + v, 0)
+      if (totalBudget === 0 && totalSpent === 0) continue
+      out.push({
+        id,
+        name: cat.name,
+        totalBudget: Math.round(totalBudget),
+        totalSpent: Math.round(totalSpent),
+        points: MONTHS_SHORT.map((mLabel, i) => ({
+          month: mLabel,
+          budgeted: Math.round(budgeted[i]),
+          spent: Math.round(spent[i]),
+        })),
+      })
+    }
+    return out.sort(
+      (a, b) => b.totalSpent + b.totalBudget - (a.totalSpent + a.totalBudget),
+    )
+  }, [bills, ctx, transactions, typeMap, categories])
+
+  // The bar chart is the selected month sliced out of the same trend data.
+  const categoryCompare = useMemo(
+    () =>
+      categoryTrends
+        .map((t) => ({
+          category: t.name,
+          budget: t.points[month - 1].budgeted,
+          spent: t.points[month - 1].spent,
+        }))
+        .filter((r) => r.budget > 0 || r.spent > 0)
+        .sort((a, b) => b.spent + b.budget - (a.spent + a.budget))
+        .slice(0, 8),
+    [categoryTrends, month],
+  )
 
   // Values the cards show, depending on the toggle.
   const income = isActual ? actualIncome : budgetIncome
@@ -269,16 +312,15 @@ export default function DashboardPage() {
         </CardContent>
       </Card>
 
-      {categoryCompare.length > 0 && (
+      {categoryTrends.length > 0 && (
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-muted-foreground text-sm font-medium">
-              Budgeted vs spent by category — {MONTHS_LONG[month - 1]}
-              {period ? ` ${period.slice(0, 4)}` : ""}
+              Budgeted vs spent — by category
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <CategoryBudgetChart data={categoryCompare} />
+            <CategoryTrend trends={categoryTrends} />
           </CardContent>
         </Card>
       )}
@@ -341,6 +383,20 @@ export default function DashboardPage() {
                 : "Active bills this month"
             }
           />
+
+          {categoryCompare.length > 0 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-muted-foreground text-sm font-medium">
+                  Budgeted vs spent — {MONTHS_LONG[month - 1]}
+                  {period ? ` ${period.slice(0, 4)}` : ""}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <CategoryBudgetChart data={categoryCompare} />
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         <UpcomingList bills={bills} incomes={incomes} ctx={ctx} month={month} />
