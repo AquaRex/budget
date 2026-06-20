@@ -90,6 +90,7 @@ export default function SpendingPage() {
     merchant: string
     period: string
   } | null>(null)
+  const [catFilter, setCatFilter] = useState<string | null>(null)
   // Drill from a Bills/Income cell. "filter" (quick click) shows just that
   // cell's items (merchant + month). "full" (click-and-hold) opens the All-time
   // list and scrolls to / highlights that item.
@@ -117,12 +118,14 @@ export default function SpendingPage() {
     const p = sp.get("period")
     const q = sp.get("q")
     const tb = sp.get("tab")
-    if (!p && q == null && !tb) return
+    const cat = sp.get("cat")
+    if (!p && q == null && !tb && !cat) return
     window.history.replaceState(null, "", window.location.pathname)
     // Defer so we're not setting state synchronously inside the effect.
     queueMicrotask(() => {
       if (tb) setTab(tb)
       if (p) setPeriod(p)
+      if (cat) setCatFilter(cat)
       if (q != null) {
         setTxQuery(q)
         setHighlight(null)
@@ -242,6 +245,8 @@ export default function SpendingPage() {
                 query={txQuery}
                 onQueryChange={handleQueryChange}
                 highlight={highlight}
+                categoryFilter={catFilter}
+                onClearCategoryFilter={() => setCatFilter(null)}
                 onChanged={refresh}
               />
             </div>

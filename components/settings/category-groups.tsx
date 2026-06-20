@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import { useRouter } from "next/navigation"
 import { Plus } from "lucide-react"
 import { toast } from "sonner"
 
@@ -49,9 +50,14 @@ export function CategoryGroups({
   ctx: BudgetContext
   onChanged: () => void
 }) {
+  const router = useRouter()
   const [newName, setNewName] = useState("")
   const [adding, setAdding] = useState(false)
   const [savingId, setSavingId] = useState<string | null>(null)
+
+  // See what's actually in a category: open the Spending list filtered to it.
+  const viewCategory = (categoryId: string) =>
+    router.push(`/spending?tab=transactions&period=all&cat=${categoryId}`)
 
   const groupIds = useMemo(() => new Set(groups.map((g) => g.id)), [groups])
 
@@ -144,9 +150,14 @@ export function CategoryGroups({
                         </span>
                       ) : (
                         members.map((c) => (
-                          <Badge key={c.id} variant="secondary" className="font-normal">
-                            {c.name}
-                          </Badge>
+                          <button key={c.id} type="button" onClick={() => viewCategory(c.id)}>
+                            <Badge
+                              variant="secondary"
+                              className="hover:bg-muted cursor-pointer font-normal"
+                            >
+                              {c.name}
+                            </Badge>
+                          </button>
                         ))
                       )}
                     </div>
@@ -194,7 +205,14 @@ export function CategoryGroups({
                   className="flex items-center justify-between gap-3 py-2"
                 >
                   <div className="min-w-0">
-                    <div className="truncate text-sm font-medium">{c.name}</div>
+                    <button
+                      type="button"
+                      onClick={() => viewCategory(c.id)}
+                      className="hover:text-primary truncate text-left text-sm font-medium hover:underline"
+                      title="View matching transactions"
+                    >
+                      {c.name}
+                    </button>
                     <div className="text-muted-foreground text-xs">
                       {u ? `${u.count} tx · ${formatNOK(u.spent)}` : "no activity"}
                     </div>

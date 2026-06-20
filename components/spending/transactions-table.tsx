@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
-import { Check, MoreHorizontal, Search, Wand2 } from "lucide-react"
+import { Check, MoreHorizontal, Search, Wand2, X } from "lucide-react"
 import { toast } from "sonner"
 
 import type { Category, Transaction } from "@/lib/types"
@@ -68,6 +68,8 @@ export function TransactionsTable({
   query,
   onQueryChange,
   highlight,
+  categoryFilter,
+  onClearCategoryFilter,
   onChanged,
 }: {
   transactions: Transaction[]
@@ -77,6 +79,9 @@ export function TransactionsTable({
   onQueryChange: (q: string) => void
   /** A Bills/Income drill target: highlight this merchant in this exact month. */
   highlight?: { merchant: string; period: string } | null
+  /** Show only transactions whose resolved category is this one. */
+  categoryFilter?: string | null
+  onClearCategoryFilter?: () => void
   onChanged: () => void
 }) {
   const [showInternal, setShowInternal] = useState(false)
@@ -91,6 +96,8 @@ export function TransactionsTable({
     const q = query.trim().toLowerCase()
     return transactions.filter((t) => {
       if (!showInternal && isInternalTx(t)) return false
+      if (categoryFilter && effectiveCategoryId(t, typeMap) !== categoryFilter)
+        return false
       if (!q) return true
       return (
         // descMatches is stem-aware so a drilled merchant key (e.g. "compass
@@ -100,7 +107,7 @@ export function TransactionsTable({
         (t.message ?? "").toLowerCase().includes(q)
       )
     })
-  }, [transactions, query, showInternal])
+  }, [transactions, query, showInternal, categoryFilter, typeMap])
 
   // A row is a drill hit when it matches the merchant AND the exact month.
   const isHit = (t: Transaction) =>
@@ -198,6 +205,21 @@ export function TransactionsTable({
           />
         </div>
         <div className="flex items-center gap-3 text-sm">
+          {categoryFilter && (
+            <Badge variant="secondary" className="gap-1 font-normal">
+              {catName(categoryFilter) ?? "Category"}
+              {onClearCategoryFilter && (
+                <button
+                  type="button"
+                  aria-label="Clear category filter"
+                  onClick={onClearCategoryFilter}
+                  className="hover:text-foreground"
+                >
+                  <X className="size-3" />
+                </button>
+              )}
+            </Badge>
+          )}
           {conflictCount > 0 && (
             <Badge
               variant="outline"
