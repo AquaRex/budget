@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { ChevronLeft, ChevronRight, Tags } from "lucide-react"
 
 import { MONTHS_LONG } from "@/lib/budget"
@@ -109,6 +109,26 @@ export default function SpendingPage() {
     setTxQuery(q)
     setHighlight(null) // typing a search clears the drill highlight
   }
+
+  // Honour a drill from another page (e.g. the Groups calendar):
+  // /spending?tab=transactions&period=YYYY-MM&q=<merchant>.
+  useEffect(() => {
+    const sp = new URLSearchParams(window.location.search)
+    const p = sp.get("period")
+    const q = sp.get("q")
+    const tb = sp.get("tab")
+    if (!p && q == null && !tb) return
+    window.history.replaceState(null, "", window.location.pathname)
+    // Defer so we're not setting state synchronously inside the effect.
+    queueMicrotask(() => {
+      if (tb) setTab(tb)
+      if (p) setPeriod(p)
+      if (q != null) {
+        setTxQuery(q)
+        setHighlight(null)
+      }
+    })
+  }, [])
 
   const refresh = () => {
     mutateTx()

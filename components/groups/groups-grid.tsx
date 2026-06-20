@@ -7,9 +7,12 @@ import type { BudgetContext } from "@/lib/budget"
 import { MONTHS_SHORT, MONTHS_LONG, monthlySubtotals } from "@/lib/budget"
 import { formatNumber, formatNOK } from "@/lib/format"
 import { cn } from "@/lib/utils"
+import { useRouter } from "next/navigation"
+
 import {
   effectiveCategoryId,
   groupOfCategory,
+  deriveStem,
   isSpending,
   isInternalTx,
   type TypeMap,
@@ -136,6 +139,7 @@ export function GroupsGrid({
   const [hoverCol, setHoverCol] = useState<number | null>(null)
   const colBg = (m: number) => (hoverCol === m ? "bg-primary/5" : "")
   const [calMonth, setCalMonth] = useState<number | null>(null)
+  const router = useRouter()
 
   const calGetEvents = (yy: number, m: number): CalEvent[] => {
     const catById = new Map(categories.map((c) => [c.id, c]))
@@ -155,6 +159,7 @@ export function GroupsGrid({
           name: (ec && catById.get(ec)?.name) || t.type || "Uncategorised",
           amount: Math.abs(amt),
           kind: amt > 0 ? "income" : "bill",
+          merchant: deriveStem(t.description) || t.type || "",
         } as CalEvent
       })
   }
@@ -442,6 +447,11 @@ export function GroupsGrid({
         initialMonth={calMonth ?? 1}
         subtitle="Actual income & spending"
         getEvents={calGetEvents}
+        onEventClick={(e, yy, m) => {
+          const period = `${yy}-${String(m).padStart(2, "0")}`
+          const q = encodeURIComponent(e.merchant ?? "")
+          router.push(`/spending?tab=transactions&period=${period}&q=${q}`)
+        }}
       />
     </div>
   )

@@ -22,8 +22,10 @@ export type CalEvent = {
   name: string
   amount: number // magnitude
   kind: "bill" | "income"
-  /** When set (and onEventClick given), the box is a button that drills in. */
+  /** Drill target for actual transactions (merchant search key). */
   merchant?: string
+  /** Drill target for a budgeted entry (its id, on the Budget page). */
+  entryId?: string
 }
 
 type Cursor = { y: number; m: number }
@@ -175,9 +177,7 @@ export function MonthCalendar({
                       key={j}
                       event={e}
                       onClick={
-                        onEventClick && e.merchant
-                          ? () => onEventClick(e, y, m)
-                          : undefined
+                        onEventClick ? () => onEventClick(e, y, m) : undefined
                       }
                     />
                   ))}

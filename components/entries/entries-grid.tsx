@@ -99,6 +99,20 @@ export function EntriesGrid({
   const [dropTarget, setDropTarget] = useState<string | null>(null)
   const [hoverCol, setHoverCol] = useState<number | null>(null)
   const [calMonth, setCalMonth] = useState<number | null>(null)
+  const [highlightEntry, setHighlightEntry] = useState<string | null>(null)
+  const highlightRef = useRef<HTMLTableRowElement | null>(null)
+
+  // Scroll to + briefly highlight an entry when picked from the calendar.
+  useEffect(() => {
+    if (!highlightEntry) return
+    const el = highlightRef.current
+    if (el)
+      requestAnimationFrame(() =>
+        el.scrollIntoView({ behavior: "smooth", block: "center" }),
+      )
+    const t = setTimeout(() => setHighlightEntry(null), 2500)
+    return () => clearTimeout(t)
+  }, [highlightEntry])
 
   // Float the header to the top of the page as the table scrolls past, without
   // turning the list into its own scroll box. (A horizontal-scroll wrapper can't
@@ -268,7 +282,12 @@ export function EntriesGrid({
     return (
       <tr
         key={entry.id}
-        className={cn("border-b last:border-0", !entry.is_active && "opacity-50")}
+        ref={entry.id === highlightEntry ? highlightRef : undefined}
+        className={cn(
+          "border-b last:border-0",
+          !entry.is_active && "opacity-50",
+          entry.id === highlightEntry && "bg-primary/10",
+        )}
       >
         <td
           className={cn(
@@ -661,15 +680,21 @@ export function EntriesGrid({
         subtitle={`Budgeted ${isBill ? "bills" : "income"} on their due day`}
         getEvents={(_y, m) =>
           entries
-            .filter((e) => e.is_active)
-            .map<CalEvent>((e) => ({
-              day: e.due_day,
-              name: e.name,
-              amount: Math.abs(effectiveAmount(e, ctx, m)),
+            .filter((en) => en.is_active)
+            .map<CalEvent>((en) => ({
+              day: en.due_day,
+              name: en.name,
+              amount: Math.abs(effectiveAmount(en, ctx, m)),
               kind,
+              entryId: en.id,
             }))
             .filter((e) => e.amount > 0)
         }
+        onEventClick={(e) => {
+          if (!e.entryId) return
+          setCalMonth(null)
+          setHighlightEntry(e.entryId)
+        }}
       />
 
       <EntryDialog
