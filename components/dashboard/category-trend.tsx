@@ -1,7 +1,14 @@
 "use client"
 
 import { useState } from "react"
-import { CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts"
+import {
+  Area,
+  CartesianGrid,
+  ComposedChart,
+  Line,
+  XAxis,
+  YAxis,
+} from "recharts"
 
 import { formatNOK, formatNumber } from "@/lib/format"
 import { cn } from "@/lib/utils"
@@ -57,7 +64,7 @@ export function CategoryTrend({ trends }: { trends: CatTrend[] }) {
 
       <div className="min-w-0 flex-1">
         <ChartContainer config={config} style={{ height: 300 }} className="w-full">
-          <LineChart
+          <ComposedChart
             data={active.points}
             margin={{ top: 8, right: 8, bottom: 0, left: 0 }}
           >
@@ -100,15 +107,17 @@ export function CategoryTrend({ trends }: { trends: CatTrend[] }) {
               dot={false}
               animationDuration={250}
             />
-            <Line
+            <Area
               dataKey="spent"
               stroke="var(--color-spent)"
+              fill="var(--color-spent)"
+              fillOpacity={0.15}
               strokeWidth={2}
               dot={false}
               animationDuration={250}
             />
             <ChartLegend content={<ChartLegendContent />} />
-          </LineChart>
+          </ComposedChart>
         </ChartContainer>
       </div>
     </div>
