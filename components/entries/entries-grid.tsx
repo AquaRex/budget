@@ -73,7 +73,13 @@ const COLS = 18
 
 type Confirm = { type: "entry" | "category"; id: string; name: string }
 
-export function EntriesGrid({ kind }: { kind: EntryKind }) {
+export function EntriesGrid({
+  kind,
+  embedded = false,
+}: {
+  kind: EntryKind
+  embedded?: boolean
+}) {
   const isBill = kind === "bill"
 
   const { entries, isLoading: le, mutate: mutateEntries } = useEntries(kind)
@@ -499,17 +505,24 @@ export function EntriesGrid({ kind }: { kind: EntryKind }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            {isBill ? "Bills" : "Income"}
-          </h1>
-          <p className="text-muted-foreground text-sm">
-            {isBill
-              ? "Recurring monthly template — grouped, reorderable, with one-time months."
-              : "Salary, feriepenger and any other income."}
-          </p>
-        </div>
+      <div
+        className={cn(
+          "flex flex-wrap items-center gap-3",
+          embedded ? "justify-end" : "justify-between",
+        )}
+      >
+        {!embedded && (
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">
+              {isBill ? "Bills" : "Income"}
+            </h1>
+            <p className="text-muted-foreground text-sm">
+              {isBill
+                ? "Recurring monthly template — grouped, reorderable, with one-time months."
+                : "Salary, feriepenger and any other income."}
+            </p>
+          </div>
+        )}
         <Button onClick={() => openAdd("")}>
           <Plus className="size-4" />
           Add
@@ -643,21 +656,19 @@ export function EntriesGrid({ kind }: { kind: EntryKind }) {
       <MonthCalendar
         open={calMonth != null}
         onOpenChange={(o) => !o && setCalMonth(null)}
-        year={new Date().getFullYear()}
-        month={calMonth ?? 1}
+        initialYear={new Date().getFullYear()}
+        initialMonth={calMonth ?? 1}
         subtitle={`Budgeted ${isBill ? "bills" : "income"} on their due day`}
-        events={
-          calMonth == null
-            ? []
-            : entries
-                .filter((e) => e.is_active)
-                .map<CalEvent>((e) => ({
-                  day: e.due_day,
-                  name: e.name,
-                  amount: Math.abs(effectiveAmount(e, ctx, calMonth)),
-                  kind,
-                }))
-                .filter((e) => e.amount > 0)
+        getEvents={(_y, m) =>
+          entries
+            .filter((e) => e.is_active)
+            .map<CalEvent>((e) => ({
+              day: e.due_day,
+              name: e.name,
+              amount: Math.abs(effectiveAmount(e, ctx, m)),
+              kind,
+            }))
+            .filter((e) => e.amount > 0)
         }
       />
 

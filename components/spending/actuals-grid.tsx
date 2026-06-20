@@ -117,21 +117,18 @@ export function ActualsGrid({
 
   const wanted = (t: Transaction) =>
     kind === "bill" ? isSpending(t) : !isInternalTx(t) && Number(t.amount) > 0
-  const calEvents: CalEvent[] =
-    calMonth == null
-      ? []
-      : transactions
-          .filter(
-            (t) =>
-              t.booked_date.slice(0, 7) ===
-                `${year}-${String(calMonth).padStart(2, "0")}` && wanted(t),
-          )
-          .map((t) => ({
-            day: Number(t.booked_date.slice(8, 10)),
-            name: t.description || t.type || "—",
-            amount: Math.abs(Number(t.amount)),
-            kind,
-          }))
+  const calGetEvents = (yy: number, m: number): CalEvent[] => {
+    const key = `${yy}-${String(m).padStart(2, "0")}`
+    return transactions
+      .filter((t) => t.booked_date.slice(0, 7) === key && wanted(t))
+      .map((t) => ({
+        day: Number(t.booked_date.slice(8, 10)),
+        name: t.description || t.type || "—",
+        amount: Math.abs(Number(t.amount)),
+        kind,
+        merchant: deriveStem(t.description) || t.type || "",
+      }))
+  }
 
   if (bands.length === 0) {
     return (
@@ -303,10 +300,23 @@ export function ActualsGrid({
       <MonthCalendar
         open={calMonth != null}
         onOpenChange={(o) => !o && setCalMonth(null)}
-        year={Number(year)}
-        month={calMonth ?? 1}
+        initialYear={Number(year)}
+        initialMonth={calMonth ?? 1}
         subtitle={`Actual ${kind === "bill" ? "spending" : "income"}`}
-        events={calEvents}
+        getEvents={calGetEvents}
+        onEventClick={
+          onDrill
+            ? (e, yy, m) => {
+                if (!e.merchant) return
+                onDrill(
+                  `${yy}-${String(m).padStart(2, "0")}`,
+                  e.merchant,
+                  "filter",
+                )
+                setCalMonth(null)
+              }
+            : undefined
+        }
       />
     </div>
   )

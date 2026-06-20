@@ -10,7 +10,6 @@ import {
   Receipt,
   Settings,
   Sun,
-  TrendingUp,
   Wallet,
   LogOut,
 } from "lucide-react"
@@ -21,8 +20,7 @@ import { Button } from "@/components/ui/button"
 
 const nav = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/bills", label: "Bills", icon: Receipt },
-  { href: "/income", label: "Income", icon: TrendingUp },
+  { href: "/budget", label: "Budget", icon: Receipt },
   { href: "/spending", label: "Spending", icon: Wallet },
   { href: "/groups", label: "Groups", icon: Layers },
   { href: "/settings", label: "Settings", icon: Settings },

@@ -137,10 +137,9 @@ export function GroupsGrid({
   const colBg = (m: number) => (hoverCol === m ? "bg-primary/5" : "")
   const [calMonth, setCalMonth] = useState<number | null>(null)
 
-  const calEvents: CalEvent[] = useMemo(() => {
-    if (calMonth == null) return []
+  const calGetEvents = (yy: number, m: number): CalEvent[] => {
     const catById = new Map(categories.map((c) => [c.id, c]))
-    const key = `${year}-${String(calMonth).padStart(2, "0")}`
+    const key = `${yy}-${String(m).padStart(2, "0")}`
     return transactions
       .filter(
         (t) =>
@@ -158,7 +157,7 @@ export function GroupsGrid({
           kind: amt > 0 ? "income" : "bill",
         } as CalEvent
       })
-  }, [calMonth, transactions, categories, typeMap, year])
+  }
   const avg12 = (total: number) => total / 12
   const avgActive = (months: number[], total: number) => {
     const n = months.filter((m) => m > 0).length
@@ -439,10 +438,10 @@ export function GroupsGrid({
       <MonthCalendar
         open={calMonth != null}
         onOpenChange={(o) => !o && setCalMonth(null)}
-        year={Number(year)}
-        month={calMonth ?? 1}
+        initialYear={Number(year)}
+        initialMonth={calMonth ?? 1}
         subtitle="Actual income & spending"
-        events={calEvents}
+        getEvents={calGetEvents}
       />
     </div>
   )

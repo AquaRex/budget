@@ -1,8 +1,12 @@
 "use client"
 
+import { useEffect, useState } from "react"
+import { ChevronLeft, ChevronRight } from "lucide-react"
+
 import { formatNOK, formatNumber } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import { MONTHS_LONG } from "@/lib/budget"
+import { Button } from "@/components/ui/button"
 import {
   Dialog,
   DialogContent,
@@ -18,26 +22,75 @@ export type CalEvent = {
   name: string
   amount: number // magnitude
   kind: "bill" | "income"
+  /** When set (and onEventClick given), the box is a button that drills in. */
+  merchant?: string
+}
+
+type Cursor = { y: number; m: number }
+const step = (delta: number) => (c: Cursor): Cursor => {
+  let m = c.m + delta
+  let y = c.y
+  if (m < 1) {
+    m = 12
+    y--
+  } else if (m > 12) {
+    m = 1
+    y++
+  }
+  return { y, m }
 }
 
 export function MonthCalendar({
   open,
   onOpenChange,
-  year,
-  month, // 1-12
-  events,
+  initialYear,
+  initialMonth, // 1-12
+  getEvents,
   subtitle,
+  onEventClick,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
-  year: number
-  month: number
-  events: CalEvent[]
+  initialYear: number
+  initialMonth: number
+  getEvents: (year: number, month: number) => CalEvent[]
   subtitle?: string
+  onEventClick?: (event: CalEvent, year: number, month: number) => void
 }) {
-  const daysInMonth = new Date(year, month, 0).getDate()
-  const lead = (new Date(year, month - 1, 1).getDay() + 6) % 7 // Monday-first
+  const [cursor, setCursor] = useState<Cursor>({
+    y: initialYear,
+    m: initialMonth,
+  })
 
+  // Reset to the clicked month each time the dialog opens (render-time sync).
+  const openSig = open ? `${initialYear}-${initialMonth}` : "closed"
+  const [lastSig, setLastSig] = useState(openSig)
+  if (openSig !== lastSig) {
+    setLastSig(openSig)
+    if (open) setCursor({ y: initialYear, m: initialMonth })
+  }
+
+  // Arrow keys step months while the calendar is open.
+  useEffect(() => {
+    if (!open) return
+    const onKey = (ev: KeyboardEvent) => {
+      if (ev.key === "ArrowLeft") {
+        ev.preventDefault()
+        setCursor(step(-1))
+      } else if (ev.key === "ArrowRight") {
+        ev.preventDefault()
+        setCursor(step(1))
+      }
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [open])
+
+  const { y, m } = cursor
+  const events = getEvents(y, m)
+
+  const daysInMonth = new Date(y, m, 0).getDate()
+  const lead = (new Date(y, m - 1, 1).getDay() + 6) % 7 // Monday-first
   const byDay = new Map<number, CalEvent[]>()
   for (const e of events) {
     const d = Math.min(Math.max(e.day, 1), daysInMonth)
@@ -45,7 +98,6 @@ export function MonthCalendar({
     if (list) list.push(e)
     else byDay.set(d, [e])
   }
-
   const cells: (number | null)[] = []
   for (let i = 0; i < lead; i++) cells.push(null)
   for (let d = 1; d <= daysInMonth; d++) cells.push(d)
@@ -61,14 +113,36 @@ export function MonthCalendar({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex h-[100dvh] max-h-[100dvh] w-screen max-w-none flex-col gap-3 rounded-none sm:max-w-none">
         <DialogHeader>
-          <DialogTitle>
-            {MONTHS_LONG[month - 1]} {year}
-          </DialogTitle>
-          <DialogDescription>
-            {subtitle ? `${subtitle} · ` : ""}
-            Net {formatNOK(net)} across {events.length} item
-            {events.length === 1 ? "" : "s"}.
-          </DialogDescription>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1">
+              <Button
+                variant="outline"
+                size="icon"
+                aria-label="Previous month"
+                onClick={() => setCursor(step(-1))}
+              >
+                <ChevronLeft className="size-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                aria-label="Next month"
+                onClick={() => setCursor(step(1))}
+              >
+                <ChevronRight className="size-4" />
+              </Button>
+            </div>
+            <div className="min-w-0">
+              <DialogTitle>
+                {MONTHS_LONG[m - 1]} {y}
+              </DialogTitle>
+              <DialogDescription>
+                {subtitle ? `${subtitle} · ` : ""}
+                Net {formatNOK(net)} across {events.length} item
+                {events.length === 1 ? "" : "s"} · ←/→ to change month
+              </DialogDescription>
+            </div>
+          </div>
         </DialogHeader>
 
         <div
@@ -96,36 +170,17 @@ export function MonthCalendar({
                   <div className="text-muted-foreground text-[11px] font-medium">
                     {d}
                   </div>
-                  {(byDay.get(d) ?? []).map((e, j) => {
-                    const income = e.kind === "income"
-                    return (
-                      <div
-                        key={j}
-                        title={`${e.name}: ${formatNOK(e.amount)}`}
-                        className={cn(
-                          "border-l-2 pl-1.5",
-                          income
-                            ? "border-emerald-500/50"
-                            : "border-rose-500/50",
-                        )}
-                      >
-                        <div
-                          className={cn(
-                            "text-sm font-semibold tabular-nums",
-                            income
-                              ? "text-emerald-600 dark:text-emerald-400"
-                              : "text-rose-600 dark:text-rose-400",
-                          )}
-                        >
-                          {income ? "+" : "−"}
-                          {formatNumber(e.amount)}
-                        </div>
-                        <div className="text-muted-foreground truncate text-[11px] leading-tight">
-                          {e.name}
-                        </div>
-                      </div>
-                    )
-                  })}
+                  {(byDay.get(d) ?? []).map((e, j) => (
+                    <EventBox
+                      key={j}
+                      event={e}
+                      onClick={
+                        onEventClick && e.merchant
+                          ? () => onEventClick(e, y, m)
+                          : undefined
+                      }
+                    />
+                  ))}
                 </>
               )}
             </div>
@@ -133,5 +188,48 @@ export function MonthCalendar({
         </div>
       </DialogContent>
     </Dialog>
+  )
+}
+
+function EventBox({
+  event: e,
+  onClick,
+}: {
+  event: CalEvent
+  onClick?: () => void
+}) {
+  const income = e.kind === "income"
+  const cls = cn(
+    "w-full rounded-md border border-l-2 px-1.5 py-1 text-left",
+    income ? "border-l-emerald-500/60" : "border-l-rose-500/60",
+    onClick && "hover:bg-muted cursor-pointer transition-colors",
+  )
+  const inner = (
+    <>
+      <div
+        className={cn(
+          "text-sm font-semibold tabular-nums",
+          income
+            ? "text-emerald-600 dark:text-emerald-400"
+            : "text-rose-600 dark:text-rose-400",
+        )}
+      >
+        {income ? "+" : "−"}
+        {formatNumber(e.amount)}
+      </div>
+      <div className="text-muted-foreground truncate text-[11px] leading-tight">
+        {e.name}
+      </div>
+    </>
+  )
+  const title = `${e.name}: ${formatNOK(e.amount)}`
+  return onClick ? (
+    <button type="button" onClick={onClick} title={title} className={cls}>
+      {inner}
+    </button>
+  ) : (
+    <div title={title} className={cls}>
+      {inner}
+    </div>
   )
 }
