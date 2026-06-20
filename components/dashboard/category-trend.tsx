@@ -43,13 +43,13 @@ export function CategoryTrend({ trends }: { trends: CatTrend[] }) {
             onFocus={() => setActiveId(t.id)}
             onClick={() => setActiveId(t.id)}
             className={cn(
-              "rounded-md px-3 py-2 text-left transition-colors",
+              "rounded-md px-3 py-1 text-left transition-colors",
               t.id === active.id ? "bg-muted" : "hover:bg-muted/60",
             )}
           >
             <div className="truncate text-sm font-medium">{t.name}</div>
-            <div className="text-muted-foreground text-xs tabular-nums">
-              {formatNOK(t.totalSpent)} spent / {formatNOK(t.totalBudget)} budget
+            <div className="text-muted-foreground text-[11px] tabular-nums">
+              {formatNOK(t.totalSpent)} / {formatNOK(t.totalBudget)}
             </div>
           </button>
         ))}
@@ -98,12 +98,14 @@ export function CategoryTrend({ trends }: { trends: CatTrend[] }) {
               strokeWidth={2}
               strokeDasharray="4 4"
               dot={false}
+              animationDuration={250}
             />
             <Line
               dataKey="spent"
               stroke="var(--color-spent)"
               strokeWidth={2}
               dot={false}
+              animationDuration={250}
             />
             <ChartLegend content={<ChartLegendContent />} />
           </LineChart>

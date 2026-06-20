@@ -25,7 +25,7 @@ export type CategoryCompare = {
 
 export function CategoryBudgetChart({ data }: { data: CategoryCompare[] }) {
   return (
-    <ChartContainer config={config} style={{ height: 260 }} className="w-full">
+    <ChartContainer config={config} style={{ height: 360 }} className="w-full">
       <BarChart
         data={data}
         margin={{ top: 4, right: 4, bottom: 0, left: 0 }}
