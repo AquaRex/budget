@@ -4,10 +4,10 @@ import { useRef, useState } from "react"
 import { Upload, FileText, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 
-import type { Transaction, TxRule } from "@/lib/types"
+import type { TxRule } from "@/lib/types"
 import { parseBankCsvFile, type ParsedTx } from "@/lib/csv"
 import { classifyImport } from "@/lib/spending"
-import { importTransactions } from "@/lib/data/transactions"
+import { fetchTransactions, importTransactions } from "@/lib/data/transactions"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -34,16 +34,14 @@ type Preview = {
   filename: string
   parsed: ParsedTx[]
   insert: number
-  conflicts: number
+  update: number
   unchanged: number
 }
 
 export function CsvDropzone({
-  transactions,
   rules,
   onImported,
 }: {
-  transactions: Transaction[]
   rules: TxRule[]
   onImported: () => void
 }) {
@@ -65,12 +63,13 @@ export function CsvDropzone({
         toast.error("No transactions found in that file.")
         return
       }
-      const plan = classifyImport(rows, transactions)
+      const existing = await fetchTransactions()
+      const plan = classifyImport(rows, existing)
       setPreview({
         filename: file.name,
         parsed: rows,
         insert: plan.toInsert.length,
-        conflicts: plan.conflicts.length,
+        update: plan.toUpdate.length,
         unchanged: plan.unchangedCount,
       })
       setLabel(defaultLabel())
@@ -87,12 +86,12 @@ export function CsvDropzone({
     if (!preview) return
     setBusy(true)
     try {
-      const res = await importTransactions(preview.parsed, transactions, rules, {
+      const res = await importTransactions(preview.parsed, rules, {
         label,
         filename: preview.filename,
       })
       toast.success(
-        `Imported ${res.inserted} new · ${res.conflicts} to review · ${res.unchanged} unchanged.`,
+        `Imported ${res.inserted} new · ${res.updated} updated · ${res.unchanged} unchanged.`,
       )
       setPreview(null)
       onImported()
@@ -177,9 +176,9 @@ export function CsvDropzone({
               </span>
               <span>
                 <span className="font-semibold text-amber-600 dark:text-amber-400">
-                  {preview.conflicts}
+                  {preview.update}
                 </span>{" "}
-                changed (to review)
+                updated
               </span>
               <span className="text-muted-foreground">
                 {preview.unchanged} already imported

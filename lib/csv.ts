@@ -9,6 +9,8 @@
 export type ParsedTx = {
   booked_date: string // ISO yyyy-mm-dd
   tx_date: string | null
+  tx_at: string | null // full purchase timestamp "yyyy-mm-ddThh:mm" (cards)
+  is_booked: boolean // false while pending (Rentedato empty)
   type: string | null
   description: string | null
   message: string | null
@@ -87,6 +89,15 @@ function parseDate(raw: string): string | null {
   return `${m[3]}-${m[2]}-${m[1]}`
 }
 
+/** "18.06.2026 20.51" -> "2026-06-18T20:51" (null if no time component). */
+function parseTimestamp(raw: string): string | null {
+  const m = (raw ?? "")
+    .trim()
+    .match(/^(\d{2})\.(\d{2})\.(\d{4})\s+(\d{2})\.(\d{2})/)
+  if (!m) return null
+  return `${m[3]}-${m[2]}-${m[1]}T${m[4]}:${m[5]}`
+}
+
 // Small stable string hash (djb2) -> base36, for dedup across re-uploads.
 function hashKey(parts: (string | number | null)[]): string {
   const s = parts.map((p) => (p == null ? "" : String(p))).join("|")
@@ -112,6 +123,7 @@ export function parseBankCsv(text: string): ParseResult {
   const headers = splitLine(lines[0], delim)
 
   const iBooked = headerIndex(headers, "bokf")
+  const iRente = headerIndex(headers, "rente")
   const iTx = headerIndex(headers, "transaksjonstid")
   const iType = headerIndex(headers, "type")
   const iDesc = headerIndex(headers, "beskriv")
@@ -123,6 +135,9 @@ export function parseBankCsv(text: string): ParseResult {
   const iTo = headerIndex(headers, "til konto")
 
   const rows: ParsedTx[] = []
+  // Occurrence counter so two truly identical lines (same minute, merchant and
+  // amount) get distinct dedup keys and can both be stored.
+  const dedupSeen = new Map<string, number>()
   let skipped = 0
   let total = 0
 
@@ -152,6 +167,10 @@ export function parseBankCsv(text: string): ParseResult {
     const from_account = get(iFrom) || null
     const to_account = get(iTo) || null
     const tx_date = parseDate(get(iTx))
+    const tx_at = parseTimestamp(get(iTx))
+    // A row is booked once the bank assigns it a value date (Rentedato). While
+    // pending (weekend card purchases), Rentedato is empty.
+    const is_booked = get(iRente) !== ""
     const currency = get(iCur) || "NOK"
 
     // A transfer between your own accounts isn't real spending. These appear as
@@ -164,17 +183,26 @@ export function parseBankCsv(text: string): ParseResult {
       internalHay.includes("mellom egne kontoer") ||
       internalHay.includes("nettbank")
 
-    // Identity ignores amount + booking date so a pending card charge that
-    // later settles (re-priced / re-booked) matches its earlier version. For
-    // card purchases the transaction timestamp is the stable anchor; transfers
-    // (no timestamp) keep the amount in the identity since they don't re-price.
-    const identityParts = tx_date
-      ? [tx_date, description, currency, from_account, to_account]
-      : [booked, type, message, from_account, to_account, amount]
+    // Exact fingerprint of the line; the occurrence suffix keeps identical
+    // lines distinct so the (user_id, dedup_key) unique constraint allows both.
+    const dedupBase = hashKey([
+      booked,
+      tx_at ?? tx_date,
+      amount,
+      description,
+      message,
+      from_account,
+      to_account,
+      type,
+    ])
+    const occ = dedupSeen.get(dedupBase) ?? 0
+    dedupSeen.set(dedupBase, occ + 1)
 
     rows.push({
       booked_date: booked,
       tx_date,
+      tx_at,
+      is_booked,
       type,
       description,
       message,
@@ -183,17 +211,9 @@ export function parseBankCsv(text: string): ParseResult {
       from_account,
       to_account,
       is_internal: isInternal,
-      dedup_key: hashKey([
-        booked,
-        tx_date,
-        amount,
-        description,
-        message,
-        from_account,
-        to_account,
-        type,
-      ]),
-      identity_key: hashKey(identityParts),
+      dedup_key: `${dedupBase}:${occ}`,
+      // Legacy column; matching now recomputes a fingerprint from the row.
+      identity_key: hashKey([tx_at ?? "", currency, from_account, to_account]),
     })
   }
 

@@ -64,6 +64,8 @@ export type Transaction = {
   import_id: string | null
   booked_date: string // ISO date
   tx_date: string | null
+  tx_at: string | null // full purchase timestamp "yyyy-mm-ddThh:mm"
+  is_booked: boolean
   type: string | null
   description: string | null
   message: string | null

@@ -42,7 +42,7 @@ export async function fetchTxRules(): Promise<TxRule[]> {
 
 export type ImportSummary = {
   inserted: number
-  conflicts: number
+  updated: number
   unchanged: number
 }
 
@@ -118,11 +118,12 @@ async function ensureCategoriesForTypes(types: (string | null)[]): Promise<void>
  */
 export async function importTransactions(
   parsed: ParsedTx[],
-  existing: Transaction[],
   rules: TxRule[],
   meta: { label: string; filename: string },
 ): Promise<ImportSummary> {
   const supabase = getSupabase()
+  // Always reconcile against the latest stored rows, never a stale snapshot.
+  const existing = await fetchTransactions()
   const plan: ImportPlan = classifyImport(parsed, existing)
 
   // Promote any new bank types into our shared category pool first, so the
@@ -148,6 +149,8 @@ export async function importTransactions(
       import_id: importId,
       booked_date: r.booked_date,
       tx_date: r.tx_date,
+      tx_at: r.tx_at,
+      is_booked: r.is_booked,
       type: r.type,
       description: r.description,
       message: r.message,
@@ -170,22 +173,35 @@ export async function importTransactions(
     inserted = insertedRows?.length ?? 0
   }
 
-  // Store the proposed new value on each conflicting existing row.
+  // A pending row that settled (or otherwise changed) is updated in place so it
+  // never duplicates. The user's category choice is preserved.
   await Promise.all(
-    plan.conflicts.map((c) =>
+    plan.toUpdate.map((u) =>
       supabase
         .from("transactions")
         .update({
-          pending_amount: c.incoming.amount,
-          pending_booked_date: c.incoming.booked_date,
+          booked_date: u.incoming.booked_date,
+          tx_date: u.incoming.tx_date,
+          tx_at: u.incoming.tx_at,
+          is_booked: u.incoming.is_booked,
+          type: u.incoming.type,
+          description: u.incoming.description,
+          message: u.incoming.message,
+          amount: u.incoming.amount,
+          currency: u.incoming.currency,
+          is_internal: u.incoming.is_internal,
+          dedup_key: u.incoming.dedup_key,
+          identity_key: u.incoming.identity_key,
+          pending_amount: null,
+          pending_booked_date: null,
         })
-        .eq("id", c.existing.id),
+        .eq("id", u.existing.id),
     ),
   )
 
   return {
     inserted,
-    conflicts: plan.conflicts.length,
+    updated: plan.toUpdate.length,
     unchanged: plan.unchangedCount + (plan.toInsert.length - inserted),
   }
 }

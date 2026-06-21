@@ -195,11 +195,7 @@ export default function SpendingPage() {
         )}
       </div>
 
-      <CsvDropzone
-        transactions={transactions}
-        rules={rules}
-        onImported={refresh}
-      />
+      <CsvDropzone rules={rules} onImported={refresh} />
 
       {lt ? (
         <Skeleton className="h-40 w-full" />

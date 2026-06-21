@@ -132,64 +132,127 @@ export function ruleCategoryFor(tx: TxLike, rules: TxRule[]): string | null {
   return null
 }
 
-export type ImportConflict = { existing: Transaction; incoming: ParsedTx }
+export type ImportUpdate = { existing: Transaction; incoming: ParsedTx }
 
 export type ImportPlan = {
   toInsert: ParsedTx[]
-  conflicts: ImportConflict[]
+  toUpdate: ImportUpdate[]
   unchangedCount: number
 }
 
+type FpRow = {
+  booked_date: string
+  tx_at: string | null
+  amount: number
+  currency: string
+  from_account: string | null
+  to_account: string | null
+  type: string | null
+  description: string | null
+  message: string | null
+}
+
+/** Identical-looking line (skip if unchanged). */
+function fpExact(t: FpRow): string {
+  return [
+    t.booked_date,
+    t.tx_at ?? "",
+    t.amount,
+    t.currency,
+    t.from_account ?? "",
+    t.to_account ?? "",
+    t.type ?? "",
+    t.description ?? "",
+    t.message ?? "",
+  ].join("|")
+}
+
 /**
- * Compare freshly parsed rows against what's already stored:
- *  - exact match (dedup_key) -> already imported, no-op
- *  - same identity but different amount/date -> a conflict to resolve
- *  - otherwise -> a brand-new row to insert
+ * Stable identity of the underlying transaction. For card purchases the
+ * purchase timestamp + amount + account is the anchor (booking date, type and
+ * description all change when it settles). Bank rows have no timestamp, so they
+ * use the booking date + counterparty + amount.
+ */
+function fpStable(t: FpRow): string {
+  if (t.tx_at) {
+    return `c|${t.tx_at}|${t.amount}|${t.currency}|${t.from_account ?? ""}|${t.to_account ?? ""}`
+  }
+  return `b|${t.booked_date}|${t.amount}|${t.currency}|${t.from_account ?? ""}|${t.to_account ?? ""}|${t.type ?? ""}|${t.message ?? ""}`
+}
+
+/**
+ * Looser key used only to settle a *pending* row whose amount also moved (e.g.
+ * a foreign-currency charge re-priced on settlement). Ignores the amount.
+ */
+function fpLoose(t: FpRow): string {
+  if (t.tx_at) {
+    return `c|${t.tx_at}|${t.currency}|${t.from_account ?? ""}|${t.to_account ?? ""}`
+  }
+  return `b|${t.currency}|${t.from_account ?? ""}|${t.to_account ?? ""}|${t.type ?? ""}|${t.message ?? ""}`
+}
+
+function pushTo<T>(map: Map<string, T[]>, key: string, value: T): void {
+  const list = map.get(key)
+  if (list) list.push(value)
+  else map.set(key, [value])
+}
+
+/**
+ * Reconcile freshly parsed rows against what's already stored:
+ *  - identical line                       -> unchanged (skip)
+ *  - same stable identity, details moved  -> update in place (e.g. settled)
+ *  - pending row whose amount also moved  -> settle in place
+ *  - otherwise                            -> insert
+ * Matching is list/count based, so two genuinely identical same-minute charges
+ * are both preserved.
  */
 export function classifyImport(
   parsed: ParsedTx[],
   existing: Transaction[],
 ): ImportPlan {
-  const byDedup = new Set(existing.map((t) => t.dedup_key))
-  const byIdentity = new Map<string, Transaction[]>()
+  const byExact = new Map<string, Transaction[]>()
+  const byStable = new Map<string, Transaction[]>()
+  const byLoosePending = new Map<string, Transaction[]>()
   for (const t of existing) {
-    const list = byIdentity.get(t.identity_key)
-    if (list) list.push(t)
-    else byIdentity.set(t.identity_key, [t])
+    pushTo(byExact, fpExact(t), t)
+    pushTo(byStable, fpStable(t), t)
+    if (!t.is_booked) pushTo(byLoosePending, fpLoose(t), t)
   }
 
-  const usedExisting = new Set<string>()
-  const seenDedup = new Set<string>()
+  const used = new Set<string>()
+  const take = (list: Transaction[] | undefined) =>
+    list?.find((t) => !used.has(t.id))
+
   const toInsert: ParsedTx[] = []
-  const conflicts: ImportConflict[] = []
+  const toUpdate: ImportUpdate[] = []
   let unchangedCount = 0
 
   for (const row of parsed) {
-    if (byDedup.has(row.dedup_key) || seenDedup.has(row.dedup_key)) {
-      unchangedCount++
+    const exact = take(byExact.get(fpExact(row)))
+    if (exact) {
+      used.add(exact.id)
+      if (exact.is_booked !== row.is_booked) toUpdate.push({ existing: exact, incoming: row })
+      else unchangedCount++
       continue
     }
-    seenDedup.add(row.dedup_key)
-
-    const candidates = (byIdentity.get(row.identity_key) ?? []).filter(
-      (t) => !usedExisting.has(t.id),
-    )
-    const match = candidates[0]
-    if (match) {
-      usedExisting.add(match.id)
-      const sameAmount = Number(match.amount) === row.amount
-      const sameDate = match.booked_date === row.booked_date
-      if (sameAmount && sameDate) {
-        unchangedCount++
-      } else {
-        conflicts.push({ existing: match, incoming: row })
-      }
-    } else {
-      toInsert.push(row)
+    const stable = take(byStable.get(fpStable(row)))
+    if (stable) {
+      used.add(stable.id)
+      toUpdate.push({ existing: stable, incoming: row })
+      continue
     }
+    if (row.is_booked) {
+      const settled = take(byLoosePending.get(fpLoose(row)))
+      if (settled) {
+        used.add(settled.id)
+        toUpdate.push({ existing: settled, incoming: row })
+        continue
+      }
+    }
+    toInsert.push(row)
   }
 
-  return { toInsert, conflicts, unchangedCount }
+  return { toInsert, toUpdate, unchangedCount }
 }
 
 /**
