@@ -157,7 +157,7 @@ function fpExact(t: FpRow): string {
   return [
     t.booked_date,
     t.tx_at ?? "",
-    t.amount,
+    Number(t.amount), // DB returns numeric as a string; normalise both sides
     t.currency,
     t.from_account ?? "",
     t.to_account ?? "",
@@ -174,10 +174,11 @@ function fpExact(t: FpRow): string {
  * use the booking date + counterparty + amount.
  */
 function fpStable(t: FpRow): string {
+  const amt = Number(t.amount)
   if (t.tx_at) {
-    return `c|${t.tx_at}|${t.amount}|${t.currency}|${t.from_account ?? ""}|${t.to_account ?? ""}`
+    return `c|${t.tx_at}|${amt}|${t.currency}|${t.from_account ?? ""}|${t.to_account ?? ""}`
   }
-  return `b|${t.booked_date}|${t.amount}|${t.currency}|${t.from_account ?? ""}|${t.to_account ?? ""}|${t.type ?? ""}|${t.message ?? ""}`
+  return `b|${t.booked_date}|${amt}|${t.currency}|${t.from_account ?? ""}|${t.to_account ?? ""}|${t.type ?? ""}|${t.message ?? ""}`
 }
 
 /**
