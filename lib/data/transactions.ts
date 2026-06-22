@@ -11,13 +11,23 @@ import {
 
 export async function fetchTransactions(): Promise<Transaction[]> {
   const supabase = getSupabase()
-  const { data, error } = await supabase
-    .from("transactions")
-    .select("*")
-    .order("booked_date", { ascending: false })
-    .order("created_at", { ascending: false })
-  if (error) throw error
-  return (data ?? []) as Transaction[]
+  // PostgREST returns at most 1000 rows per request, so page through all of
+  // them — both the import de-dup and every view need the complete set.
+  const PAGE = 1000
+  const all: Transaction[] = []
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabase
+      .from("transactions")
+      .select("*")
+      .order("booked_date", { ascending: false })
+      .order("created_at", { ascending: false })
+      .range(from, from + PAGE - 1)
+    if (error) throw error
+    const page = (data ?? []) as Transaction[]
+    all.push(...page)
+    if (page.length < PAGE) break
+  }
+  return all
 }
 
 export async function fetchImports(): Promise<ImportBatch[]> {
