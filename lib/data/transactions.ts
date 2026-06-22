@@ -21,6 +21,10 @@ export async function fetchTransactions(): Promise<Transaction[]> {
       .select("*")
       .order("booked_date", { ascending: false })
       .order("created_at", { ascending: false })
+      // Unique tiebreaker: without it the sort isn't a total order (many rows
+      // share booked_date + created_at), so paging with .range() could skip or
+      // repeat rows at the 1000-row boundaries non-deterministically.
+      .order("id", { ascending: true })
       .range(from, from + PAGE - 1)
     if (error) throw error
     const page = (data ?? []) as Transaction[]
