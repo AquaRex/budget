@@ -53,6 +53,24 @@ export function effectiveCategoryId(
   return null
 }
 
+/**
+ * Where a transaction lands in the group view. A labelled charge rolls up under
+ * its label's *home* category (so e.g. every "Path of Exile 2" payment totals
+ * under Games regardless of how it was paid); otherwise it uses its own resolved
+ * category. `labelHome` maps label id -> its category id (or null).
+ */
+export function placementCategoryId(
+  t: { category_id: string | null; type: string | null; label_id: string | null },
+  typeMap: TypeMap,
+  labelHome: Map<string, string | null>,
+): string | null {
+  if (t.label_id) {
+    const home = labelHome.get(t.label_id)
+    if (home) return home
+  }
+  return effectiveCategoryId(t, typeMap)
+}
+
 /** Lowercase + collapse whitespace, for stable rule matching. */
 export function normalizeText(s: string | null | undefined): string {
   return (s ?? "").toLowerCase().replace(/\s+/g, " ").trim()
@@ -130,6 +148,50 @@ export function ruleCategoryFor(tx: TxLike, rules: TxRule[]): string | null {
     }
   }
   return null
+}
+
+/**
+ * A merchant — the unit you triage in the Organize workspace. All transactions
+ * sharing a source (merchant stem or counterparty account) are folded together
+ * so one category decision covers every past and future charge from them.
+ */
+export type MerchantGroup = {
+  key: string
+  matchType: "description" | "account"
+  pattern: string
+  name: string // representative description for display
+  txns: Transaction[]
+  count: number
+  spent: number // sum of outflows (|amount| for money out)
+  sample: Transaction // representative row to categorise the whole source by
+}
+
+export function groupByMerchant(transactions: Transaction[]): MerchantGroup[] {
+  const m = new Map<string, MerchantGroup>()
+  for (const t of transactions) {
+    const src = sourceKeyFor(t)
+    const key = src
+      ? `${src.matchType}:${src.pattern}`
+      : `type:${t.type ?? "?"}`
+    let g = m.get(key)
+    if (!g) {
+      g = {
+        key,
+        matchType: src?.matchType ?? "description",
+        pattern: src?.pattern ?? "",
+        name: t.description || t.type || "—",
+        txns: [],
+        count: 0,
+        spent: 0,
+        sample: t,
+      }
+      m.set(key, g)
+    }
+    g.txns.push(t)
+    g.count++
+    if (Number(t.amount) < 0) g.spent += -Number(t.amount)
+  }
+  return Array.from(m.values()).sort((a, b) => b.spent - a.spent)
 }
 
 export type ImportUpdate = { existing: Transaction; incoming: ParsedTx }

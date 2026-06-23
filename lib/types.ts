@@ -90,6 +90,9 @@ export type Label = {
   id: string
   user_id: string
   name: string
+  // The label's "home" category — where its (cross-channel) total rolls up in
+  // the group view. Null = fall back to each transaction's own category.
+  category_id: string | null
   created_at: string
 }
 

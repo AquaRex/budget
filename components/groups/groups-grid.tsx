@@ -14,6 +14,7 @@ import {
   effectiveCategoryId,
   effectiveDate,
   groupOfCategory,
+  placementCategoryId,
   deriveStem,
   isSpending,
   isInternalTx,
@@ -75,6 +76,7 @@ export function GroupsGrid({
     const groupIds = new Set(groups.map((g) => g.id))
     const catById = new Map(categories.map((c) => [c.id, c]))
     const labelById = new Map(labels.map((l) => [l.id, l]))
+    const labelHome = new Map(labels.map((l) => [l.id, l.category_id]))
 
     // Actual rows (one per resolved category) for a group + sign convention.
     // Each category row also carries a per-label breakdown for drill-down.
@@ -87,7 +89,9 @@ export function GroupsGrid({
       const totals = zeros()
       for (const t of inYear) {
         if (!want(t)) continue
-        const ec = effectiveCategoryId(t, typeMap)
+        // Labelled charges roll up under the label's home category, so a label's
+        // total spans every payment channel it was bought through.
+        const ec = placementCategoryId(t, typeMap, labelHome)
         if (groupOfCategory(ec, groupIds, catById) !== groupId) continue
         const key = ec ?? `type:${t.type ?? ""}`
         const name = (ec && catById.get(ec)?.name) || t.type || "Uncategorised"

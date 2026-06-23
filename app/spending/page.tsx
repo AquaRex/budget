@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { ChevronLeft, ChevronRight, Tags } from "lucide-react"
+import { ChevronLeft, ChevronRight } from "lucide-react"
 
 import { MONTHS_LONG } from "@/lib/budget"
 import { buildTypeMap, effectiveDate } from "@/lib/spending"
@@ -24,7 +24,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CsvDropzone } from "@/components/spending/csv-dropzone"
 import { SpendingSummary } from "@/components/spending/spending-summary"
 import { TransactionsTable } from "@/components/spending/transactions-table"
-import { TypeMapper } from "@/components/spending/type-mapper"
 import { ActualsGrid, type DrillMode } from "@/components/spending/actuals-grid"
 
 function monthKey(d: Date): string {
@@ -42,7 +41,6 @@ export default function SpendingPage() {
   const { rules, mutate: mutateRules } = useTxRules()
   const { typeCategories, mutate: mutateTypeCats } = useTypeCategories()
   const typeMap = useMemo(() => buildTypeMap(typeCategories), [typeCategories])
-  const [mapperOpen, setMapperOpen] = useState(false)
 
   // Months that actually have data, newest first (for the Transactions tab).
   const periods = useMemo(() => {
@@ -193,12 +191,6 @@ export default function SpendingPage() {
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold tracking-tight">Spending</h1>
-        {transactions.length > 0 && (
-          <Button variant="outline" size="sm" onClick={() => setMapperOpen(true)}>
-            <Tags className="size-4" />
-            Bank categories
-          </Button>
-        )}
       </div>
 
       <CsvDropzone rules={rules} onImported={refresh} />
@@ -289,15 +281,6 @@ export default function SpendingPage() {
           </TabsContent>
         </Tabs>
       )}
-
-      <TypeMapper
-        open={mapperOpen}
-        onOpenChange={setMapperOpen}
-        transactions={transactions}
-        categories={categories}
-        typeCategories={typeCategories}
-        onChanged={refresh}
-      />
     </div>
   )
 }
