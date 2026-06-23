@@ -260,6 +260,7 @@ export function GroupsGrid({
               >
                 Group
               </th>
+              <th className="px-2 py-2 text-right font-semibold">Total</th>
               {MONTHS_SHORT.map((m, i) => (
                 <th
                   key={m}
@@ -274,7 +275,6 @@ export function GroupsGrid({
                   {m}
                 </th>
               ))}
-              <th className="px-2 py-2 text-right font-semibold">Total</th>
               <th className="text-muted-foreground px-2 py-2 text-right font-medium">
                 Avg
               </th>
@@ -333,6 +333,9 @@ export function GroupsGrid({
                     >
                       Budgeted
                     </td>
+                    <td className="px-2 py-1.5 text-right font-semibold tabular-nums whitespace-nowrap">
+                      {formatNumber(budgetTotal)}
+                    </td>
                     {band.budget.map((v, i) => (
                       <td
                         key={i}
@@ -345,9 +348,6 @@ export function GroupsGrid({
                         {v ? formatNumber(v) : "–"}
                       </td>
                     ))}
-                    <td className="px-2 py-1.5 text-right font-semibold tabular-nums whitespace-nowrap">
-                      {formatNumber(budgetTotal)}
-                    </td>
                     <td className="text-muted-foreground px-2 py-1.5 text-right tabular-nums whitespace-nowrap">
                       {formatNumber(avg12(budgetTotal))}
                     </td>
@@ -385,6 +385,9 @@ export function GroupsGrid({
                               row.name
                             )}
                           </td>
+                          <td className="px-2 py-1.5 text-right font-medium tabular-nums whitespace-nowrap">
+                            {formatNumber(row.total)}
+                          </td>
                           {row.months.map((v, i) => (
                             <td
                               key={i}
@@ -398,9 +401,6 @@ export function GroupsGrid({
                               {v ? formatNumber(v) : "–"}
                             </td>
                           ))}
-                          <td className="px-2 py-1.5 text-right font-medium tabular-nums whitespace-nowrap">
-                            {formatNumber(row.total)}
-                          </td>
                           <td className="text-muted-foreground px-2 py-1.5 text-right tabular-nums whitespace-nowrap">
                             {formatNumber(avgActive(row.months, row.total))}
                           </td>
@@ -429,6 +429,9 @@ export function GroupsGrid({
                                   {sub.name}
                                 </button>
                               </td>
+                              <td className="text-muted-foreground px-2 py-1 text-right text-xs tabular-nums whitespace-nowrap">
+                                {formatNumber(sub.total)}
+                              </td>
                               {sub.months.map((v, i) => (
                                 <td
                                   key={i}
@@ -442,9 +445,6 @@ export function GroupsGrid({
                                   {v ? formatNumber(v) : "–"}
                                 </td>
                               ))}
-                              <td className="text-muted-foreground px-2 py-1 text-right text-xs tabular-nums whitespace-nowrap">
-                                {formatNumber(sub.total)}
-                              </td>
                               <td />
                             </tr>
                           ))}
@@ -475,6 +475,9 @@ export function GroupsGrid({
                     >
                       Actual total
                     </td>
+                    <td className="px-2 py-1.5 text-right font-semibold tabular-nums whitespace-nowrap">
+                      {formatNumber(actualTotal)}
+                    </td>
                     {band.actual.map((v, i) => (
                       <td
                         key={i}
@@ -487,9 +490,6 @@ export function GroupsGrid({
                         {v ? formatNumber(v) : "–"}
                       </td>
                     ))}
-                    <td className="px-2 py-1.5 text-right font-semibold tabular-nums whitespace-nowrap">
-                      {formatNumber(actualTotal)}
-                    </td>
                     <td className="text-muted-foreground px-2 py-1.5 text-right tabular-nums whitespace-nowrap">
                       {formatNumber(avg12(actualTotal))}
                     </td>
@@ -505,6 +505,19 @@ export function GroupsGrid({
                         )}
                       >
                         Difference
+                      </td>
+                      <td
+                        className={cn(
+                          "px-2 py-1.5 text-right font-semibold tabular-nums whitespace-nowrap",
+                          diffTotal === 0
+                            ? "text-muted-foreground"
+                            : badSign(diffTotal)
+                              ? "text-red-600 dark:text-red-400"
+                              : "text-emerald-600 dark:text-emerald-400",
+                        )}
+                      >
+                        {diffTotal > 0 ? "+" : ""}
+                        {formatNumber(diffTotal)}
                       </td>
                       {diff.map((v, i) => (
                         <td
@@ -525,19 +538,6 @@ export function GroupsGrid({
                             : `${v > 0 ? "+" : ""}${formatNumber(v)}`}
                         </td>
                       ))}
-                      <td
-                        className={cn(
-                          "px-2 py-1.5 text-right font-semibold tabular-nums whitespace-nowrap",
-                          diffTotal === 0
-                            ? "text-muted-foreground"
-                            : badSign(diffTotal)
-                              ? "text-red-600 dark:text-red-400"
-                              : "text-emerald-600 dark:text-emerald-400",
-                        )}
-                      >
-                        {diffTotal > 0 ? "+" : ""}
-                        {formatNumber(diffTotal)}
-                      </td>
                       <td />
                     </tr>
                   )}
