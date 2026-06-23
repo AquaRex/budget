@@ -108,6 +108,11 @@ export function TransactionsTable({
     categories.find((c) => c.id === id)?.name ?? null
   const labelName = (id: string | null) =>
     labels.find((l) => l.id === id)?.name ?? null
+  // Alphabetical for the pickers (categories are stored in sort_order).
+  const sortedCategories = useMemo(
+    () => [...categories].sort((a, b) => a.name.localeCompare(b.name)),
+    [categories],
+  )
 
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -453,7 +458,7 @@ export function TransactionsTable({
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value={NONE}>Uncategorised</SelectItem>
-                          {categories.map((c) => (
+                          {sortedCategories.map((c) => (
                             <SelectItem key={c.id} value={c.id}>
                               {c.name}
                             </SelectItem>
@@ -604,7 +609,7 @@ export function TransactionsTable({
                     <SelectValue placeholder="Choose a category" />
                   </SelectTrigger>
                   <SelectContent>
-                    {categories.map((c) => (
+                    {sortedCategories.map((c) => (
                       <SelectItem key={c.id} value={c.id}>
                         {c.name}
                       </SelectItem>

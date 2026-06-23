@@ -48,9 +48,9 @@ export function LabelCombobox({
   }, [open])
 
   const query = q.trim()
-  const filtered = labels.filter((l) =>
-    l.name.toLowerCase().includes(query.toLowerCase()),
-  )
+  const filtered = labels
+    .filter((l) => l.name.toLowerCase().includes(query.toLowerCase()))
+    .sort((a, b) => a.name.localeCompare(b.name))
   const canCreate =
     query.length > 0 &&
     !labels.some((l) => l.name.toLowerCase() === query.toLowerCase())
