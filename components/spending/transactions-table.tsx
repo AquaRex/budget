@@ -1,10 +1,10 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
-import { Check, MoreHorizontal, Search, Wand2, X } from "lucide-react"
+import { Check, MoreHorizontal, Plus, Search, Tag, Wand2, X } from "lucide-react"
 import { toast } from "sonner"
 
-import type { Category, Transaction } from "@/lib/types"
+import type { Category, Label as TxLabel, Transaction } from "@/lib/types"
 import { formatNOK } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import {
@@ -19,9 +19,13 @@ import {
 import {
   categorizeBySource,
   setTransactionExcluded,
+  setTransactionLabel,
+  setTransactionsLabel,
   resolveConflict,
   saveRuleAndApply,
 } from "@/lib/data/transactions"
+import { createLabel } from "@/lib/data/labels"
+import { LabelCombobox } from "@/components/spending/label-combobox"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
@@ -65,16 +69,21 @@ type RuleDraft = {
 export function TransactionsTable({
   transactions,
   categories,
+  labels,
   typeMap,
   query,
   onQueryChange,
   highlight,
   categoryFilter,
+  labelFilter,
   onClearCategoryFilter,
+  onClearLabelFilter,
   onChanged,
+  onLabelsChanged,
 }: {
   transactions: Transaction[]
   categories: Category[]
+  labels: TxLabel[]
   typeMap: TypeMap
   query: string
   onQueryChange: (q: string) => void
@@ -82,22 +91,32 @@ export function TransactionsTable({
   highlight?: { merchant: string; period: string } | null
   /** Show only transactions whose resolved category is this one. */
   categoryFilter?: string | null
+  /** Show only transactions with this label ("__none__" = unlabeled). */
+  labelFilter?: string | null
   onClearCategoryFilter?: () => void
+  onClearLabelFilter?: () => void
   onChanged: () => void
+  onLabelsChanged: () => void
 }) {
   const [showInternal, setShowInternal] = useState(false)
   const [rule, setRule] = useState<RuleDraft | null>(null)
   const [savingRule, setSavingRule] = useState(false)
+  const [selected, setSelected] = useState<Set<string>>(new Set())
   const firstHitRef = useRef<HTMLTableRowElement | null>(null)
 
   const catName = (id: string | null) =>
     categories.find((c) => c.id === id)?.name ?? null
+  const labelName = (id: string | null) =>
+    labels.find((l) => l.id === id)?.name ?? null
 
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase()
     return transactions.filter((t) => {
       if (!showInternal && isInternalTx(t)) return false
       if (categoryFilter && effectiveCategoryId(t, typeMap) !== categoryFilter)
+        return false
+      if (labelFilter === NONE && t.label_id) return false
+      if (labelFilter && labelFilter !== NONE && t.label_id !== labelFilter)
         return false
       if (!q) return true
       return (
@@ -108,7 +127,7 @@ export function TransactionsTable({
         (t.message ?? "").toLowerCase().includes(q)
       )
     })
-  }, [transactions, query, showInternal, categoryFilter, typeMap])
+  }, [transactions, query, showInternal, categoryFilter, labelFilter, typeMap])
 
   // A row is a drill hit when it matches the merchant AND the exact month.
   const isHit = (t: Transaction) =>
@@ -147,6 +166,45 @@ export function TransactionsTable({
       toast.error(e instanceof Error ? e.message : "Could not update category.")
     }
   }
+
+  async function createAndGetId(name: string): Promise<string> {
+    const l = await createLabel(name)
+    onLabelsChanged()
+    return l.id
+  }
+
+  async function assignLabel(t: Transaction, labelId: string | null) {
+    try {
+      await setTransactionLabel(t.id, labelId)
+      onChanged()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not set label.")
+    }
+  }
+
+  async function bulkAssignLabel(labelId: string | null) {
+    const ids = Array.from(selected)
+    try {
+      await setTransactionsLabel(ids, labelId)
+      setSelected(new Set())
+      onChanged()
+      toast.success(
+        labelId
+          ? `Labelled ${ids.length} transaction(s).`
+          : `Cleared label on ${ids.length} transaction(s).`,
+      )
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not apply label.")
+    }
+  }
+
+  const toggleSelected = (id: string) =>
+    setSelected((s) => {
+      const next = new Set(s)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
 
   async function toggleExcluded(t: Transaction) {
     try {
@@ -221,6 +279,22 @@ export function TransactionsTable({
               )}
             </Badge>
           )}
+          {labelFilter && (
+            <Badge variant="secondary" className="gap-1 font-normal">
+              <Tag className="size-3" />
+              {labelFilter === NONE ? "No label" : labelName(labelFilter) ?? "Label"}
+              {onClearLabelFilter && (
+                <button
+                  type="button"
+                  aria-label="Clear label filter"
+                  onClick={onClearLabelFilter}
+                  className="hover:text-foreground"
+                >
+                  <X className="size-3" />
+                </button>
+              )}
+            </Badge>
+          )}
           {conflictCount > 0 && (
             <Badge
               variant="outline"
@@ -240,13 +314,56 @@ export function TransactionsTable({
         </div>
       </div>
 
+      {selected.size > 0 && (
+        <div className="bg-muted/40 flex flex-wrap items-center gap-2 rounded-md border px-3 py-2 text-sm">
+          <span className="font-medium">{selected.size} selected</span>
+          <LabelCombobox
+            labels={labels}
+            onPick={(id) => bulkAssignLabel(id)}
+            onCreate={createAndGetId}
+            trigger={
+              <span className="border-input hover:bg-accent inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-xs font-medium">
+                <Tag className="size-3.5" />
+                Apply label
+              </span>
+            }
+          />
+          <Button variant="ghost" size="sm" onClick={() => bulkAssignLabel(null)}>
+            Clear label
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setSelected(new Set())}
+          >
+            Deselect
+          </Button>
+        </div>
+      )}
+
       <div className="overflow-x-auto rounded-lg border">
         <table className="w-full border-collapse text-sm">
           <thead>
             <tr className="bg-muted/50 text-muted-foreground border-b text-xs">
+              <th className="w-8 px-2 py-2">
+                <input
+                  type="checkbox"
+                  aria-label="Select all"
+                  checked={rows.length > 0 && rows.every((r) => selected.has(r.id))}
+                  onChange={(e) =>
+                    setSelected((s) => {
+                      const next = new Set(s)
+                      if (e.target.checked) rows.forEach((r) => next.add(r.id))
+                      else rows.forEach((r) => next.delete(r.id))
+                      return next
+                    })
+                  }
+                />
+              </th>
               <th className="px-3 py-2 text-left font-medium">Date</th>
               <th className="px-2 py-2 text-left font-medium">Description</th>
               <th className="px-2 py-2 text-left font-medium">Category</th>
+              <th className="px-2 py-2 text-left font-medium">Label</th>
               <th className="px-2 py-2 text-right font-medium">Amount</th>
               <th className="w-8" />
             </tr>
@@ -255,7 +372,7 @@ export function TransactionsTable({
             {rows.length === 0 ? (
               <tr>
                 <td
-                  colSpan={5}
+                  colSpan={7}
                   className="text-muted-foreground py-10 text-center"
                 >
                   No transactions. Import a CSV above to get started.
@@ -277,8 +394,17 @@ export function TransactionsTable({
                       t.is_excluded && "opacity-50",
                       conflict && "bg-amber-500/5",
                       hit && "bg-primary/10",
+                      selected.has(t.id) && "bg-primary/5",
                     )}
                   >
+                    <td className="px-2 py-2">
+                      <input
+                        type="checkbox"
+                        aria-label="Select transaction"
+                        checked={selected.has(t.id)}
+                        onChange={() => toggleSelected(t.id)}
+                      />
+                    </td>
                     <td className="text-muted-foreground px-3 py-2 whitespace-nowrap">
                       {fmtDate(effectiveDate(t))}
                     </td>
@@ -323,6 +449,30 @@ export function TransactionsTable({
                           ))}
                         </SelectContent>
                       </Select>
+                    </td>
+                    <td className="px-2 py-2">
+                      <LabelCombobox
+                        labels={labels}
+                        value={t.label_id}
+                        onPick={(id) => assignLabel(t, id)}
+                        onCreate={createAndGetId}
+                        trigger={
+                          t.label_id ? (
+                            <Badge
+                              variant="secondary"
+                              className="gap-1 font-normal"
+                            >
+                              <Tag className="size-3" />
+                              {labelName(t.label_id) ?? "Label"}
+                            </Badge>
+                          ) : (
+                            <span className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs">
+                              <Plus className="size-3" />
+                              Label
+                            </span>
+                          )
+                        }
+                      />
                     </td>
                     <td className="px-2 py-2 text-right whitespace-nowrap">
                       {conflict ? (

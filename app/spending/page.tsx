@@ -12,6 +12,7 @@ import {
   useSalaryProfile,
   useBudgetContext,
   useCategories,
+  useLabels,
   useTransactions,
   useTxRules,
   useTypeCategories,
@@ -35,6 +36,7 @@ export default function SpendingPage() {
   const { amounts } = useAmounts()
   const { profile } = useSalaryProfile()
   const { categories, mutate: mutateCategories } = useCategories()
+  const { labels, mutate: mutateLabels } = useLabels()
   const ctx = useBudgetContext(amounts, profile)
   const { transactions, isLoading: lt, mutate: mutateTx } = useTransactions()
   const { rules, mutate: mutateRules } = useTxRules()
@@ -87,6 +89,7 @@ export default function SpendingPage() {
     period: string
   } | null>(null)
   const [catFilter, setCatFilter] = useState<string | null>(null)
+  const [labelFilter, setLabelFilter] = useState<string | null>(null)
   // Drill from a Bills/Income cell. "filter" (quick click) shows just that
   // cell's items (merchant + month). "full" (click-and-hold) opens the All-time
   // list and scrolls to / highlights that item.
@@ -115,13 +118,15 @@ export default function SpendingPage() {
     const q = sp.get("q")
     const tb = sp.get("tab")
     const cat = sp.get("cat")
-    if (!p && q == null && !tb && !cat) return
+    const label = sp.get("label")
+    if (!p && q == null && !tb && !cat && !label) return
     window.history.replaceState(null, "", window.location.pathname)
     // Defer so we're not setting state synchronously inside the effect.
     queueMicrotask(() => {
       if (tb) setTab(tb)
       if (p) setPeriod(p)
       if (cat) setCatFilter(cat)
+      if (label) setLabelFilter(label)
       if (q != null) {
         setTxQuery(q)
         setHighlight(null)
@@ -155,6 +160,7 @@ export default function SpendingPage() {
     mutateRules()
     mutateTypeCats()
     mutateCategories()
+    mutateLabels()
   }
 
   const monthControls = (
@@ -245,13 +251,17 @@ export default function SpendingPage() {
               <TransactionsTable
                 transactions={inPeriod}
                 categories={categories}
+                labels={labels}
                 typeMap={typeMap}
                 query={txQuery}
                 onQueryChange={handleQueryChange}
                 highlight={highlight}
                 categoryFilter={catFilter}
+                labelFilter={labelFilter}
                 onClearCategoryFilter={() => setCatFilter(null)}
+                onClearLabelFilter={() => setLabelFilter(null)}
                 onChanged={refresh}
+                onLabelsChanged={mutateLabels}
               />
             </div>
           </TabsContent>

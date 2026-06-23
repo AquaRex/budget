@@ -5,6 +5,7 @@ import useSWR from "swr"
 
 import { fetchEntries, fetchAmounts, fetchEntryYears } from "@/lib/data/entries"
 import { fetchCategories } from "@/lib/data/categories"
+import { fetchLabels } from "@/lib/data/labels"
 import { useYear } from "@/lib/year"
 import { fetchMethods } from "@/lib/data/methods"
 import { fetchSalaryProfile } from "@/lib/data/salary"
@@ -22,6 +23,7 @@ import type {
   EntryAmount,
   EntryKind,
   ImportBatch,
+  Label,
   PaymentMethod,
   Transaction,
   TxRule,
@@ -85,6 +87,14 @@ export function useCategories() {
     fetchCategories,
   )
   return { categories: data ?? [], error, isLoading, mutate }
+}
+
+export function useLabels() {
+  const { data, error, isLoading, mutate } = useSWR<Label[]>(
+    "labels",
+    fetchLabels,
+  )
+  return { labels: data ?? [], error, isLoading, mutate }
 }
 
 export function useMethods() {

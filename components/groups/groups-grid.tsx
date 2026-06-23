@@ -1,8 +1,9 @@
 "use client"
 
 import { Fragment, useMemo, useState } from "react"
+import { ChevronRight } from "lucide-react"
 
-import type { Category, Entry, Transaction } from "@/lib/types"
+import type { Category, Entry, Label, Transaction } from "@/lib/types"
 import type { BudgetContext } from "@/lib/budget"
 import { MONTHS_SHORT, MONTHS_LONG, monthlySubtotals } from "@/lib/budget"
 import { formatNumber } from "@/lib/format"
@@ -23,8 +24,16 @@ import { MonthCalendar, type CalEvent } from "@/components/calendar/month-calend
 // Freeze the first column on ≥sm screens, like the other grids.
 const sticky = "sm:sticky sm:left-0 sm:z-10"
 const COLS = 15 // name + 12 months + total + avg
+const NO_LABEL = "__nolabel__"
 
-type ActualRow = { key: string; name: string; months: number[]; total: number }
+type ActualRow = {
+  key: string
+  name: string
+  months: number[]
+  total: number
+  // Per-label breakdown of this category's spend (empty when nothing is labelled).
+  subRows?: ActualRow[]
+}
 type Band = {
   key: string
   name: string
@@ -42,6 +51,7 @@ export function GroupsGrid({
   transactions,
   groups,
   categories,
+  labels,
   typeMap,
   billEntries,
   incomeEntries,
@@ -51,6 +61,7 @@ export function GroupsGrid({
   transactions: Transaction[]
   groups: Category[] // categories used by Bills/Income, in sort order
   categories: Category[] // the full pool (for category -> group resolution)
+  labels: Label[]
   typeMap: TypeMap
   billEntries: Entry[]
   incomeEntries: Entry[]
@@ -63,13 +74,16 @@ export function GroupsGrid({
     )
     const groupIds = new Set(groups.map((g) => g.id))
     const catById = new Map(categories.map((c) => [c.id, c]))
+    const labelById = new Map(labels.map((l) => [l.id, l]))
 
     // Actual rows (one per resolved category) for a group + sign convention.
+    // Each category row also carries a per-label breakdown for drill-down.
     const rowsFor = (
       groupId: string | null,
       want: (t: Transaction) => boolean,
     ): { rows: ActualRow[]; totals: number[] } => {
       const byCat = new Map<string, ActualRow>()
+      const subByCat = new Map<string, Map<string, ActualRow>>()
       const totals = zeros()
       for (const t of inYear) {
         if (!want(t)) continue
@@ -81,12 +95,34 @@ export function GroupsGrid({
         if (!row) {
           row = { key, name, months: zeros(), total: 0 }
           byCat.set(key, row)
+          subByCat.set(key, new Map())
         }
         const mo = Number(effectiveDate(t).slice(5, 7)) - 1
         const v = Math.abs(Number(t.amount))
         row.months[mo] += v
         row.total += v
         totals[mo] += v
+
+        // Per-label sub-row within this category.
+        const subMap = subByCat.get(key)!
+        const lkey = t.label_id ?? NO_LABEL
+        const lname = t.label_id
+          ? labelById.get(t.label_id)?.name ?? "Label"
+          : "No label"
+        let sub = subMap.get(lkey)
+        if (!sub) {
+          sub = { key: lkey, name: lname, months: zeros(), total: 0 }
+          subMap.set(lkey, sub)
+        }
+        sub.months[mo] += v
+        sub.total += v
+      }
+      for (const [key, row] of byCat) {
+        const subs = Array.from(subByCat.get(key)!.values()).sort(
+          (a, b) => b.total - a.total,
+        )
+        // Only worth expanding when something here is actually labelled.
+        row.subRows = subs.some((s) => s.key !== NO_LABEL) ? subs : []
       }
       const rows = Array.from(byCat.values()).sort((a, b) => b.total - a.total)
       return { rows, totals }
@@ -135,12 +171,27 @@ export function GroupsGrid({
     return out.filter(
       (b) => b.hasBudget || b.rows.length > 0 || b.key === "__unassigned__",
     )
-  }, [transactions, groups, categories, typeMap, billEntries, incomeEntries, ctx, year])
+  }, [transactions, groups, categories, labels, typeMap, billEntries, incomeEntries, ctx, year])
 
   const [hoverCol, setHoverCol] = useState<number | null>(null)
   const colBg = (m: number) => (hoverCol === m ? "bg-primary/5" : "")
   const [calMonth, setCalMonth] = useState<number | null>(null)
+  const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const router = useRouter()
+
+  const toggleExpand = (key: string) =>
+    setExpanded((s) => {
+      const next = new Set(s)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+
+  // Drill from a label sub-row into the matching transactions.
+  const openLabel = (subKey: string) => {
+    const q = subKey === NO_LABEL ? "__none__" : subKey
+    router.push(`/spending?tab=transactions&period=all&label=${q}`)
+  }
 
   const calGetEvents = (yy: number, m: number): CalEvent[] => {
     const catById = new Map(categories.map((c) => [c.id, c]))
@@ -298,38 +349,104 @@ export function GroupsGrid({
                     </td>
                   </tr>
 
-                  {/* Actual rows, one per bank type */}
-                  {band.rows.map((row) => (
-                    <tr key={row.key} className="border-b">
-                      <td
-                        className={cn(
-                          sticky,
-                          "bg-background px-3 py-1.5 pl-6 whitespace-nowrap",
-                        )}
-                      >
-                        {row.name}
-                      </td>
-                      {row.months.map((v, i) => (
-                        <td
-                          key={i}
-                          data-col={i + 1}
-                          className={cn(
-                            "px-1 py-1.5 text-right tabular-nums whitespace-nowrap",
-                            colBg(i + 1),
-                            v ? "" : "text-muted-foreground/40",
-                          )}
-                        >
-                          {v ? formatNumber(v) : "–"}
-                        </td>
-                      ))}
-                      <td className="px-2 py-1.5 text-right font-medium tabular-nums whitespace-nowrap">
-                        {formatNumber(row.total)}
-                      </td>
-                      <td className="text-muted-foreground px-2 py-1.5 text-right tabular-nums whitespace-nowrap">
-                        {formatNumber(avgActive(row.months, row.total))}
-                      </td>
-                    </tr>
-                  ))}
+                  {/* Actual rows, one per resolved category (expandable into labels) */}
+                  {band.rows.map((row) => {
+                    const expandable = (row.subRows?.length ?? 0) > 0
+                    const ekey = `${band.key}:${row.key}`
+                    const isOpen = expanded.has(ekey)
+                    return (
+                      <Fragment key={row.key}>
+                        <tr className="border-b">
+                          <td
+                            className={cn(
+                              sticky,
+                              "bg-background px-3 py-1.5 pl-6 whitespace-nowrap",
+                            )}
+                          >
+                            {expandable ? (
+                              <button
+                                type="button"
+                                onClick={() => toggleExpand(ekey)}
+                                className="hover:text-foreground -ml-4 inline-flex items-center gap-1 text-left"
+                              >
+                                <ChevronRight
+                                  className={cn(
+                                    "size-3.5 shrink-0 transition-transform",
+                                    isOpen && "rotate-90",
+                                  )}
+                                />
+                                {row.name}
+                              </button>
+                            ) : (
+                              row.name
+                            )}
+                          </td>
+                          {row.months.map((v, i) => (
+                            <td
+                              key={i}
+                              data-col={i + 1}
+                              className={cn(
+                                "px-1 py-1.5 text-right tabular-nums whitespace-nowrap",
+                                colBg(i + 1),
+                                v ? "" : "text-muted-foreground/40",
+                              )}
+                            >
+                              {v ? formatNumber(v) : "–"}
+                            </td>
+                          ))}
+                          <td className="px-2 py-1.5 text-right font-medium tabular-nums whitespace-nowrap">
+                            {formatNumber(row.total)}
+                          </td>
+                          <td className="text-muted-foreground px-2 py-1.5 text-right tabular-nums whitespace-nowrap">
+                            {formatNumber(avgActive(row.months, row.total))}
+                          </td>
+                        </tr>
+
+                        {/* Per-label breakdown */}
+                        {isOpen &&
+                          row.subRows!.map((sub) => (
+                            <tr key={sub.key} className="border-b">
+                              <td
+                                className={cn(
+                                  sticky,
+                                  "bg-background px-3 py-1 pl-12 whitespace-nowrap",
+                                )}
+                              >
+                                <button
+                                  type="button"
+                                  onClick={() => openLabel(sub.key)}
+                                  className={cn(
+                                    "inline-flex items-center text-xs hover:underline",
+                                    sub.key === NO_LABEL
+                                      ? "text-muted-foreground/60 italic"
+                                      : "text-muted-foreground hover:text-foreground",
+                                  )}
+                                >
+                                  {sub.name}
+                                </button>
+                              </td>
+                              {sub.months.map((v, i) => (
+                                <td
+                                  key={i}
+                                  data-col={i + 1}
+                                  className={cn(
+                                    "px-1 py-1 text-right text-xs tabular-nums whitespace-nowrap",
+                                    colBg(i + 1),
+                                    v ? "text-muted-foreground" : "text-muted-foreground/30",
+                                  )}
+                                >
+                                  {v ? formatNumber(v) : "–"}
+                                </td>
+                              ))}
+                              <td className="text-muted-foreground px-2 py-1 text-right text-xs tabular-nums whitespace-nowrap">
+                                {formatNumber(sub.total)}
+                              </td>
+                              <td />
+                            </tr>
+                          ))}
+                      </Fragment>
+                    )
+                  })}
                   {band.rows.length === 0 && (
                     <tr className="border-b">
                       <td

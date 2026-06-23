@@ -320,6 +320,33 @@ export async function categorizeBySource(
   return ids.size
 }
 
+/** Set (or clear, with null) the manual label on one transaction. */
+export async function setTransactionLabel(
+  id: string,
+  labelId: string | null,
+): Promise<void> {
+  const supabase = getSupabase()
+  const { error } = await supabase
+    .from("transactions")
+    .update({ label_id: labelId })
+    .eq("id", id)
+  if (error) throw error
+}
+
+/** Set (or clear) the manual label on many transactions at once. */
+export async function setTransactionsLabel(
+  ids: string[],
+  labelId: string | null,
+): Promise<void> {
+  if (ids.length === 0) return
+  const supabase = getSupabase()
+  const { error } = await supabase
+    .from("transactions")
+    .update({ label_id: labelId })
+    .in("id", ids)
+  if (error) throw error
+}
+
 export async function setTransactionExcluded(
   id: string,
   excluded: boolean,

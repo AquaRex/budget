@@ -12,6 +12,7 @@ import {
   useSalaryProfile,
   useBudgetContext,
   useCategories,
+  useLabels,
   useTransactions,
   useTypeCategories,
 } from "@/lib/data/use-budget"
@@ -26,6 +27,7 @@ export default function GroupsPage() {
   const { amounts } = useAmounts()
   const { profile } = useSalaryProfile()
   const { categories } = useCategories()
+  const { labels } = useLabels()
   const ctx = useBudgetContext(amounts, profile)
   const { transactions, isLoading: lt } = useTransactions()
   const { typeCategories } = useTypeCategories()
@@ -61,6 +63,7 @@ export default function GroupsPage() {
             transactions={transactions}
             groups={groups}
             categories={categories}
+            labels={labels}
             typeMap={typeMap}
             billEntries={bills}
             incomeEntries={incomes}

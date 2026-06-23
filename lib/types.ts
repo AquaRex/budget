@@ -74,12 +74,22 @@ export type Transaction = {
   from_account: string | null
   to_account: string | null
   category_id: string | null
+  label_id: string | null
   is_internal: boolean
   is_excluded: boolean
   dedup_key: string
   identity_key: string
   pending_amount: number | null
   pending_booked_date: string | null
+  created_at: string
+}
+
+// A manual, per-transaction tag below the category (e.g. a specific game under
+// "Steam"). Never auto-assigned; set by hand and reused by name.
+export type Label = {
+  id: string
+  user_id: string
+  name: string
   created_at: string
 }
 
