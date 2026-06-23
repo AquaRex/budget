@@ -9,7 +9,11 @@ import {
 } from "react"
 import type { Session } from "@supabase/supabase-js"
 
-import { getSupabase, isSupabaseConfigured } from "@/lib/supabase/client"
+import {
+  getSupabase,
+  isDemoEmail,
+  isSupabaseConfigured,
+} from "@/lib/supabase/client"
 
 // The auth flow as a small state machine:
 // - "loading":      checking the current session
@@ -63,6 +67,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return
     }
 
+    // The demo account is exempt from 2FA (RLS lets it read its fake data at
+    // aal1), so it goes straight in without enroll/challenge.
+    if (isDemoEmail(current.user.email)) {
+      setStatus("ready")
+      return
+    }
+
     // Determine MFA assurance level.
     const { data: aal, error: aalError } =
       await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
@@ -91,6 +102,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     setSession(null)
     setStatus("password")
+    // Hard reload so no other user's cached SWR data survives the switch.
+    if (typeof window !== "undefined") window.location.reload()
   }, [])
 
   useEffect(() => {

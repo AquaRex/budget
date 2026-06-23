@@ -27,6 +27,20 @@ export function getSupabase(): SupabaseClient {
 
 export const AUTH_EMAIL = process.env.NEXT_PUBLIC_AUTH_EMAIL || ""
 
+// The demo account: a normal Supabase user holding fake data, exempt from the
+// 2FA (aal2) requirement in RLS so it can be shown without a TOTP app. Keep this
+// email in sync with the exemption in migration 0014.
+export const DEMO_EMAIL = (
+  process.env.NEXT_PUBLIC_DEMO_EMAIL || "demo@demo.com"
+).toLowerCase()
+// Optional: set to enable a one-click "View demo" sign-in (public by design —
+// the account only ever holds fake data).
+export const DEMO_PASSWORD = process.env.NEXT_PUBLIC_DEMO_PASSWORD || ""
+
+export function isDemoEmail(email: string | null | undefined): boolean {
+  return !!email && email.toLowerCase() === DEMO_EMAIL
+}
+
 export function isSupabaseConfigured(): boolean {
   return Boolean(url && anonKey)
 }
