@@ -111,22 +111,33 @@ export function TransactionsTable({
 
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase()
-    return transactions.filter((t) => {
-      if (!showInternal && isInternalTx(t)) return false
-      if (categoryFilter && effectiveCategoryId(t, typeMap) !== categoryFilter)
-        return false
-      if (labelFilter === NONE && t.label_id) return false
-      if (labelFilter && labelFilter !== NONE && t.label_id !== labelFilter)
-        return false
-      if (!q) return true
-      return (
-        // descMatches is stem-aware so a drilled merchant key (e.g. "compass
-        // hi") matches "COMPASS 5105 HI" with interior digits.
-        descMatches(t.description, q) ||
-        (t.type ?? "").toLowerCase().includes(q) ||
-        (t.message ?? "").toLowerCase().includes(q)
-      )
-    })
+    // Order by the date we actually display (effectiveDate honours the date
+    // mode), newest first, so the visible dates read top-to-bottom. The fetch
+    // orders by booking date, which differs from the bought date shown here.
+    // Append the purchase time only when it falls on the displayed day, so
+    // same-day card buys order by time without breaking the other date mode.
+    const sortKey = (t: Transaction) => {
+      const d = effectiveDate(t)
+      return t.tx_at && t.tx_at.slice(0, 10) === d ? t.tx_at : d
+    }
+    return transactions
+      .filter((t) => {
+        if (!showInternal && isInternalTx(t)) return false
+        if (categoryFilter && effectiveCategoryId(t, typeMap) !== categoryFilter)
+          return false
+        if (labelFilter === NONE && t.label_id) return false
+        if (labelFilter && labelFilter !== NONE && t.label_id !== labelFilter)
+          return false
+        if (!q) return true
+        return (
+          // descMatches is stem-aware so a drilled merchant key (e.g. "compass
+          // hi") matches "COMPASS 5105 HI" with interior digits.
+          descMatches(t.description, q) ||
+          (t.type ?? "").toLowerCase().includes(q) ||
+          (t.message ?? "").toLowerCase().includes(q)
+        )
+      })
+      .sort((a, b) => sortKey(b).localeCompare(sortKey(a)))
   }, [transactions, query, showInternal, categoryFilter, labelFilter, typeMap])
 
   // A row is a drill hit when it matches the merchant AND the exact month.
