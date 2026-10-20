@@ -40,6 +40,7 @@ type Band = {
   key: string
   name: string
   kind: "bill" | "income"
+  savings: boolean // saving more than budgeted is good, like income
   budget: number[] // 12 monthly budgeted amounts (0s for the Unassigned band)
   hasBudget: boolean
   rows: ActualRow[] // one per bank type, actuals
@@ -154,6 +155,7 @@ export function GroupsGrid({
         key: g.id,
         name: g.name,
         kind,
+        savings: g.is_savings,
         budget,
         hasBudget: budgetItems.length > 0,
         rows,
@@ -168,6 +170,7 @@ export function GroupsGrid({
         key: "__unassigned__",
         name: "Unassigned",
         kind: "bill",
+        savings: false,
         budget: zeros(),
         hasBudget: false,
         rows: unRows,
@@ -289,9 +292,10 @@ export function GroupsGrid({
               const budgetTotal = sum(band.budget)
               const actualTotal = sum(band.actual)
               // Difference is signed so positive is always good: money saved
-              // (bills under budget) or extra income; negative is over budget
-              // / short on income. So red is always "−", green always "+".
-              const dsign = band.kind === "income" ? 1 : -1
+              // (bills under budget), extra income or extra savings; negative is
+              // over budget / short on income or savings. So red is always "−",
+              // green always "+".
+              const dsign = band.kind === "income" || band.savings ? 1 : -1
               const diff = band.budget.map((b, i) => dsign * (band.actual[i] - b))
               const diffTotal = dsign * (actualTotal - budgetTotal)
               const badSign = (v: number) => v < 0

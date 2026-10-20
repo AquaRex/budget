@@ -40,6 +40,12 @@ export type GroupIndex = {
 
 export const UNASSIGNED_NAME = "Unassigned"
 
+/** Placed in a savings group: set aside, never spending or income. */
+export function isSavingsTx(t: Transaction, index: GroupIndex): boolean {
+  const groupId = index.groupOf(t)
+  return !!groupId && index.savings.has(groupId)
+}
+
 /** Groups exactly as the Groups page derives and places them. */
 export function buildGroupIndex(
   categories: Category[],
@@ -78,12 +84,14 @@ export function buildGroupIndex(
  *   spent    — any other money out.
  *   refund   — money in whose description stem equals a stem you've paid, or
  *              starts with one followed by a word break ("kiwi retur" matches
- *              "kiwi", "kiwiburger" doesn't), unless placed in an income-only
- *              group. Netted against spending on the day it lands so the savings
- *              rate isn't overstated. Deliberately conservative, since netting
- *              salary would wreck every figure: returns from a merchant never
- *              paid within the data, or under a different description, count
- *              as income.
+ *              "kiwi", "kiwiburger" doesn't), and whose amount is at most the
+ *              largest single payment to that merchant (so salary from an
+ *              employer you also shop at stays income), unless placed in an
+ *              income-only group. Netted against spending on the day it lands
+ *              so the savings rate isn't overstated. Deliberately conservative,
+ *              since netting salary would wreck every figure: returns from a
+ *              merchant never paid within the data, or under a different
+ *              description, count as income.
  *   income   — any other money in.
  */
 export function classifyTransactions(transactions: Transaction[], index: GroupIndex): ClassifiedTx[] {
@@ -91,17 +99,18 @@ export function classifyTransactions(transactions: Transaction[], index: GroupIn
   const rows = transactions
     .filter((t) => !t.is_excluded && Number(t.amount) !== 0)
     .map((t) => ({ t, amount: Number(t.amount), groupId: index.groupOf(t), internal: isInternalTx(t) }))
-  const stemsPaid = new Set<string>()
+  const largestPaid = new Map<string, number>() // stem -> largest single payment
   for (const r of rows) {
     if (r.amount < 0 && !r.internal && !(r.groupId && index.savings.has(r.groupId))) {
-      stemsPaid.add(deriveStem(r.t.description))
+      const stem = deriveStem(r.t.description)
+      largestPaid.set(stem, Math.max(largestPaid.get(stem) ?? 0, -r.amount))
     }
   }
-  stemsPaid.delete("")
-  const isPaidStem = (stem: string) => {
+  largestPaid.delete("")
+  const isRefundAmount = (stem: string, amount: number) => {
     const words = stem.split(" ")
     for (let n = 1; n <= words.length; n++) {
-      if (stemsPaid.has(words.slice(0, n).join(" "))) {
+      if (amount <= (largestPaid.get(words.slice(0, n).join(" ")) ?? 0)) {
         return true
       }
     }
@@ -117,7 +126,7 @@ export function classifyTransactions(transactions: Transaction[], index: GroupIn
     if (r.amount < 0) {
       return "spent"
     }
-    if (isPaidStem(deriveStem(r.t.description)) && !(r.groupId && index.incomeOnly.has(r.groupId))) {
+    if (isRefundAmount(deriveStem(r.t.description), r.amount) && !(r.groupId && index.incomeOnly.has(r.groupId))) {
       return "refund"
     }
     return "income"

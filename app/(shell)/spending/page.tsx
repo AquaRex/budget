@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react"
 
 import { MONTHS_LONG } from "@/lib/budget"
 import { buildTypeMap, effectiveDate } from "@/lib/spending"
+import { buildGroupIndex, isSavingsTx } from "@/lib/stats/flows"
 import { useYear, setYear } from "@/lib/year"
 import {
   useEntries,
@@ -41,6 +42,22 @@ export default function SpendingPage() {
   const { rules, mutate: mutateRules } = useTxRules()
   const { typeCategories, mutate: mutateTypeCats } = useTypeCategories()
   const typeMap = useMemo(() => buildTypeMap(typeCategories), [typeCategories])
+  const { entries: incomes } = useEntries("income")
+
+  // Savings-group rows and budgets are set aside, not spent — same rule as the
+  // dashboard — so the spending/income views leave them out.
+  const groupIndex = useMemo(
+    () => buildGroupIndex(categories, labels, typeMap, bills, incomes),
+    [categories, labels, typeMap, bills, incomes],
+  )
+  const unsaved = useMemo(
+    () => transactions.filter((t) => !isSavingsTx(t, groupIndex)),
+    [transactions, groupIndex],
+  )
+  const spendingBills = useMemo(
+    () => bills.filter((e) => !e.category_id || !groupIndex.savings.has(e.category_id)),
+    [bills, groupIndex],
+  )
 
   // Months that actually have data, newest first (for the Transactions tab).
   const periods = useMemo(() => {
@@ -69,6 +86,10 @@ export default function SpendingPage() {
         ? transactions
         : transactions.filter((t) => effectiveDate(t).slice(0, 7) === active),
     [transactions, active, isAll],
+  )
+  const unsavedInPeriod = useMemo(
+    () => inPeriod.filter((t) => !isSavingsTx(t, groupIndex)),
+    [inPeriod, groupIndex],
   )
   const budgetMonths = isAll
     ? periods.map((p) => Number(p.slice(5, 7)))
@@ -225,8 +246,8 @@ export default function SpendingPage() {
 
           <TabsContent value="transactions" className="flex flex-col gap-6">
             <SpendingSummary
-              transactions={inPeriod}
-              bills={bills}
+              transactions={unsavedInPeriod}
+              bills={spendingBills}
               ctx={ctx}
               months={budgetMonths}
               categories={categories}
@@ -260,7 +281,7 @@ export default function SpendingPage() {
 
           <TabsContent value="bills">
             <ActualsGrid
-              transactions={transactions}
+              transactions={unsaved}
               categories={categories}
               typeMap={typeMap}
               kind="bill"
@@ -271,7 +292,7 @@ export default function SpendingPage() {
 
           <TabsContent value="income">
             <ActualsGrid
-              transactions={transactions}
+              transactions={unsaved}
               categories={categories}
               typeMap={typeMap}
               kind="income"
