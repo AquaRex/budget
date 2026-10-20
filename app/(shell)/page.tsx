@@ -46,6 +46,7 @@ import {
   YearTable,
 } from "@/components/stats/period-numbers"
 import { useVizData } from "@/components/stats/use-viz-data"
+import { leftThisMonth } from "@/components/stats/display"
 
 export default function DashboardPage() {
   const year = useYear()
@@ -123,17 +124,17 @@ export default function DashboardPage() {
   const savingsPanel = (
     <Panel
       key="savings"
-      title={monthInProgress ? "Savings rate · so far" : "Savings rate"}
+      title={monthInProgress ? "Savings rate · expected" : "Savings rate"}
       subtitle={
         monthInProgress
-          ? "Month in progress"
+          ? "Month in progress · after income and bills still to come"
           : "Share of this month's income left unspent"
       }
     >
       <SavingsKpi
         summary={stats.summary}
         baselineLabel={baselineLabel}
-        month={focus}
+        left={leftThisMonth(focus, stats.summary, stats)}
       />
     </Panel>
   )

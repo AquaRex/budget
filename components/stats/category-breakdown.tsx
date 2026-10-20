@@ -6,6 +6,7 @@ import {
   down,
   kr,
   pct,
+  signedKr,
   signedPct,
   up,
   type CategoryPalette,
@@ -27,8 +28,9 @@ export function CategoryBreakdown({
   compareBaseline: boolean
   limit?: number
 }) {
-  // Rows that only exist in the baseline (nothing spent now) are noise here.
-  const spent = categories.filter((c) => c.amount > 0)
+  // Baseline-only rows (nothing spent, nothing budgeted) are noise here;
+  // budgeted-but-unspent and refund-net rows stay so the list sums to spent.
+  const spent = categories.filter((c) => c.amount !== 0 || c.budget > 0)
   if (spent.length === 0) {
     return (
       <p className="text-muted-foreground py-8 text-center text-sm">
@@ -36,8 +38,11 @@ export function CategoryBreakdown({
       </p>
     )
   }
-  const shown = spent.slice(0, limit)
-  const rest = spent.slice(limit)
+  // Refund-net rows are always listed so the budget and sum stay visible.
+  const outflow = spent.filter((c) => c.amount >= 0)
+  const refunds = spent.filter((c) => c.amount < 0)
+  const shown = [...outflow.slice(0, limit), ...refunds]
+  const rest = outflow.slice(limit)
   const restAmount = rest.reduce((s, c) => s + c.amount, 0)
   const anyBudget = shown.some((c) => c.budget > 0)
   const max = Math.max(
@@ -52,7 +57,9 @@ export function CategoryBreakdown({
     <ul className="flex min-w-0 flex-col gap-3">
       {shown.map((c) => {
         const delta =
-          c.baseline > 0 ? (c.amount - c.baseline) / c.baseline : null
+          c.baseline > 0 && c.amount > 0
+            ? (c.amount - c.baseline) / c.baseline
+            : null
         const over = c.budget > 0 ? c.amount - c.budget : 0
         return (
           <li key={c.id ?? "none"} className="flex min-w-0 flex-col gap-1">
@@ -80,8 +87,15 @@ export function CategoryBreakdown({
                       {signedPct(delta)}
                     </span>
                   )}
-                <span className="font-semibold tabular-nums">
-                  {kr(c.amount)}
+                <span
+                  className={cn(
+                    "font-semibold tabular-nums",
+                    c.amount < 0 && up,
+                  )}
+                >
+                  {c.amount < 0
+                    ? `${signedKr(c.amount)} · net refund`
+                    : kr(c.amount)}
                 </span>
               </span>
             </div>
@@ -93,7 +107,7 @@ export function CategoryBreakdown({
               <div
                 className="absolute inset-y-0 left-0 transition-[width] duration-700 ease-out motion-reduce:transition-none"
                 style={{
-                  width: `${(c.amount / max) * 100}%`,
+                  width: `${(Math.max(0, c.amount) / max) * 100}%`,
                   background: palette.color(c.id),
                 }}
               />
@@ -115,7 +129,9 @@ export function CategoryBreakdown({
                 {!compareBaseline && `${kr(c.baseline)} / month · `}
                 {c.budget > 0 && (
                   <>
-                    budget {kr(c.budget)}
+                    {c.amount > 0
+                      ? `budget ${kr(c.budget)}`
+                      : `nothing spent of ${kr(c.budget)} budget`}
                     {over > 0 && (
                       <span className={down}> · {kr(over)} over</span>
                     )}
@@ -130,8 +146,20 @@ export function CategoryBreakdown({
       })}
       {rest.length > 0 && (
         <li className="text-muted-foreground flex justify-between text-xs">
-          <span>+ {rest.length} more</span>
-          <span className="tabular-nums">{kr(restAmount)}</span>
+          <span>
+            + {rest.length} more
+            {restAmount === 0 ? " (budgeted, nothing spent)" : ""}
+          </span>
+          {restAmount !== 0 && (
+            <span className="tabular-nums">
+              {restAmount < 0 ? signedKr(restAmount) : kr(restAmount)}
+            </span>
+          )}
+        </li>
+      )}
+      {refunds.length > 0 && (
+        <li className="text-muted-foreground text-[11px]">
+          Shares of net spending (after refunds)
         </li>
       )}
       {(compareBaseline || anyBudget) && (

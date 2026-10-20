@@ -65,34 +65,38 @@ export function buildGroupIndex(
 }
 
 /**
- * Card credits are refunds: money in on a card row (purchase timestamp) or
- * under a bank type your card purchases use (a return booked as a bank row),
- * plus money in from a merchant description you also pay. Refunds net against
- * spending on the day they land instead of inflating income, so the savings
- * rate isn't overstated. Salary and transfers from people are never card rows,
- * so they stay income; so does anything placed under an income-only group.
+ * Money in is a refund (netted against spending on the day it lands, so the
+ * savings rate isn't overstated) when its description stem equals a stem you've
+ * paid, or starts with one followed by a word break ("kiwi retur" matches
+ * "kiwi", "kiwiburger" doesn't). Anything placed under an income-only group is
+ * always income. Deliberately conservative, since netting salary would wreck
+ * every figure: returns from a merchant never paid within the data, or booked
+ * under a different description, count as income.
  */
 export function buildFlows(transactions: Transaction[], index: GroupIndex): Flow[] {
   const counted = transactions.filter(isCounted)
   const stemsPaid = new Set<string>()
-  const cardTypes = new Set<string | null>()
   for (const t of counted) {
     if (Number(t.amount) < 0) {
       stemsPaid.add(deriveStem(t.description))
-      if (t.tx_at !== null) {
-        cardTypes.add(t.type)
-      }
     }
   }
   stemsPaid.delete("")
-  cardTypes.delete(null)
+  const isPaidStem = (stem: string) => {
+    const words = stem.split(" ")
+    for (let n = 1; n <= words.length; n++) {
+      if (stemsPaid.has(words.slice(0, n).join(" "))) {
+        return true
+      }
+    }
+    return false
+  }
   return counted.map((t) => {
     const amount = Number(t.amount)
     const groupId = index.groupOf(t)
-    const isCardCredit = t.tx_at !== null || cardTypes.has(t.type)
     const isRefund =
       amount > 0 &&
-      (isCardCredit || stemsPaid.has(deriveStem(t.description))) &&
+      isPaidStem(deriveStem(t.description)) &&
       !(groupId && index.incomeOnly.has(groupId))
     const isIncome = amount > 0 && !isRefund
     return {

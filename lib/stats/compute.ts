@@ -1,6 +1,6 @@
 import type { Category, Entry, ImportBatch, Label, Transaction } from "@/lib/types"
 import { effectiveDate, type TypeMap } from "@/lib/spending"
-import { monthTotal, type BudgetContext } from "@/lib/budget"
+import { effectiveAmount, monthTotal, type BudgetContext } from "@/lib/budget"
 import type {
   CategoryHistory,
   CategorySlice,
@@ -168,6 +168,7 @@ export function computeDashboardStats(
     dataThrough: coverage.through,
     dataFrom: coverage.start,
     ...recentSpend(todayKey, coverage, dayStats),
+    ...monthOutlook(focused, data, coverage.through),
     hasData: months.some((m) => m.txCount > 0),
     months,
     days,
@@ -202,6 +203,40 @@ function recentSpend(
   }
   const todayCovered = start <= today && through >= today
   return { todaySpent: todayCovered ? spentOn(today) : null, weekSpent }
+}
+
+/**
+ * Current month only. An entry is still to come when its due day (clamped to
+ * the month's length) is after the last covered day of this month; with no
+ * data in this month yet, every entry is still to come. Inactive entries are
+ * ignored and amounts are this month's effective amounts.
+ *   upcomingBills  = Σ bills still to come.
+ *   expectedIncome = actual income so far + the income entries still to come,
+ *                    capped at max(0, budgeted income − actual income) so pay
+ *                    that arrived before its due day isn't counted twice.
+ */
+function monthOutlook(
+  focused: MonthStat,
+  data: StatsData,
+  dataThrough: string | null,
+): { expectedIncome: number | null; upcomingBills: number | null } {
+  if (focused.status !== "current") {
+    return { expectedIncome: null, upcomingBills: null }
+  }
+  const { year, month } = focused
+  const dim = daysInMonth(year, month)
+  const coveredDay =
+    dataThrough && dataThrough.slice(0, 7) === ymKey(year, month) ? Number(dataThrough.slice(8, 10)) : 0
+  const stillToCome = (entries: Entry[]) =>
+    sumBy(
+      entries.filter((e) => e.is_active && Math.min(e.due_day, dim) > coveredDay),
+      (e) => effectiveAmount(e, data.ctx, month),
+    )
+  const incomeGap = Math.max(0, focused.budgetIncome - focused.income)
+  return {
+    expectedIncome: focused.income + Math.min(stillToCome(data.incomes), incomeGap),
+    upcomingBills: stillToCome(data.bills),
+  }
 }
 
 function summarize(totalMonths: MonthStat[], avgMonths: MonthStat[]): PeriodSummary {

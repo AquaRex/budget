@@ -166,27 +166,45 @@ export function coverage(dataFrom: string | null, dataThrough: string | null) {
 }
 
 /**
- * The month's glance number. Before the month's income has landed, actual
- * income − spent is a scary, meaningless deficit, so show what's expected to
- * be left against the budgeted income instead.
+ * The month's glance number. Mid-month, actual income − spent is misleading
+ * (salary and bills still to come), so the current month shows what's
+ * expected to be left after pending income and bills.
  */
 export function leftThisMonth(
   month: MonthStat | undefined,
   summary: PeriodSummary,
+  pending: { expectedIncome: number | null; upcomingBills: number | null },
 ) {
-  const current = month?.status === "current"
-  if (current && summary.income < summary.budgetIncome) {
+  if (month?.status === "current") {
+    const income = pending.expectedIncome ?? summary.income
+    const bills = pending.upcomingBills ?? 0
+    const incomeToCome = Math.max(0, income - summary.income)
+    const value = income - summary.spent - bills
+    const notes = [
+      incomeToCome > 0 ? `${kr(incomeToCome)} income to come` : null,
+      bills > 0 ? `${kr(bills)} bills to come` : null,
+    ].filter(Boolean)
+    const isPending = notes.length > 0
     return {
-      label: "Left (expected)",
-      note: "income not in yet",
-      value: summary.budgetIncome - summary.spent,
-      expected: true,
+      label: isPending ? "Left after bills (expected)" : "Left this month",
+      note: isPending ? notes.join(" · ") : null,
+      value,
+      rate: income > 0 ? value / income : null,
+      expected: isPending,
     }
   }
   return {
-    label: current ? "Left this month" : "Kept this month",
+    label:
+      month?.status === "complete"
+        ? "Kept this month"
+        : month?.status === "partial"
+          ? "Net (partial data)"
+          : "Net",
     note: null,
     value: summary.net,
+    rate: summary.savingsRate,
     expected: false,
   }
 }
+
+export type MonthLeft = ReturnType<typeof leftThisMonth>

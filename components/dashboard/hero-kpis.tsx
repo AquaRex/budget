@@ -7,7 +7,7 @@ import { WealthChart } from "@/components/stats/wealth-chart"
 import {
   down,
   kr,
-  leftThisMonth,
+  type MonthLeft,
   pct,
   signedKr,
   up,
@@ -15,36 +15,35 @@ import {
 
 const big = "text-4xl font-semibold tracking-tight"
 
-/** Savings rate ring with what was kept and the usual rate for context. */
+/** Savings rate ring with what was kept (or, mid-month, what's expected to be). */
 export function SavingsKpi({
   summary,
   baselineLabel,
-  month,
+  left,
 }: {
   summary: PeriodSummary
   baselineLabel: string
-  month?: MonthStat // month scope: the focused month
+  left?: MonthLeft // month scope: the focused month's glance figure
 }) {
-  const inProgress = month?.status === "current"
-  const left = leftThisMonth(month, summary)
+  const value = left ? left.value : summary.net
   return (
     <div className="flex items-center gap-4">
       <SavingsRing
-        rate={summary.savingsRate}
+        rate={left ? left.rate : summary.savingsRate}
         size={104}
-        inProgress={inProgress}
+        expected={left?.expected}
       />
       <div className="flex min-w-0 flex-col gap-1">
         <span
           className={cn(
             "text-2xl font-semibold tracking-tight whitespace-nowrap",
-            inProgress ? "text-foreground" : summary.net >= 0 ? up : down,
+            value >= 0 ? up : down,
           )}
         >
-          {signedKr(inProgress ? left.value : summary.net)}
+          {signedKr(value)}
         </span>
         <span className="text-muted-foreground text-xs">
-          {inProgress
+          {left
             ? [left.label, left.note].filter(Boolean).join(" · ")
             : `kept of ${kr(summary.income)} income`}
         </span>

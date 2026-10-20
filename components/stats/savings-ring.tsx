@@ -4,37 +4,35 @@ import { cn } from "@/lib/utils"
 
 /**
  * Radial gauge for the savings rate: arc = share of income kept, clamped to
- * 0-100% while the label prints the true value. `inProgress` mutes it for a
- * month whose income may not have landed yet.
+ * 0-100% while the label prints the true value. `expected` marks a forecast
+ * (current month) rather than a settled rate.
  */
 export function SavingsRing({
   rate,
   size = 128,
   stroke = 10,
-  inProgress = false,
+  expected = false,
   className,
 }: {
   rate: number | null
   size?: number
   stroke?: number
-  inProgress?: boolean
+  expected?: boolean
   className?: string
 }) {
   const r = (size - stroke) / 2
   const c = 2 * Math.PI * r
   const negative = rate != null && rate < 0
-  // A finished overspent month fills rose; an in-progress deficit shows no arc.
-  const shown =
-    rate == null || (inProgress && negative) ? 0 : Math.min(1, Math.abs(rate))
+  const shown = rate == null ? 0 : Math.min(1, Math.abs(rate))
   const value = rate == null ? "—" : `${Math.round(rate * 100)}%`
-  const label = inProgress ? "so far" : negative ? "overspent" : "saved"
+  const label = expected ? "expected" : negative ? "overspent" : "saved"
 
   return (
     <div
       className={cn("relative shrink-0", className)}
       style={{ width: size, height: size }}
       role="img"
-      aria-label={`Savings rate ${value}${inProgress ? " so far" : ""}`}
+      aria-label={`Savings rate ${value}${expected ? " expected" : ""}`}
     >
       <svg width={size} height={size} className="-rotate-90">
         <circle
@@ -55,20 +53,13 @@ export function SavingsRing({
           strokeDashoffset={c * (1 - shown)}
           className={cn(
             "transition-[stroke-dashoffset] duration-700 ease-out motion-reduce:transition-none",
-            inProgress
-              ? "stroke-muted-foreground/50"
-              : negative
-                ? "stroke-(--viz-spent)"
-                : "stroke-(--viz-income)",
+            negative ? "stroke-(--viz-spent)" : "stroke-(--viz-income)",
           )}
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         <span
-          className={cn(
-            "font-semibold tracking-tight",
-            inProgress && "text-muted-foreground",
-          )}
+          className="font-semibold tracking-tight"
           style={{ fontSize: size * (value.length > 5 ? 0.18 : 0.24) }}
         >
           {value}

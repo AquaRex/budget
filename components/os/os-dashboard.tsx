@@ -112,7 +112,7 @@ export function OsDashboard() {
   const monthDays = heatMonths[month - 1]
   const { summary, pace } = stats
 
-  const left = leftThisMonth(focus, summary)
+  const left = leftThisMonth(focus, summary, stats)
   const biggestDay = monthDays.reduce(
     (best, d) => (d.spent > best.spent ? d : best),
     { date: "", spent: 0 },
@@ -244,16 +244,15 @@ export function OsDashboard() {
                     {signedKr(left.value)}
                   </span>
                   <span className="text-muted-foreground text-xs tabular-nums">
-                    {left.note
-                      ? `${left.note} · spent ${kr(summary.spent)}`
-                      : `in ${kr(summary.income)} · out ${kr(summary.spent)}`}
+                    {left.note ??
+                      `in ${kr(summary.income)} · out ${kr(summary.spent)}`}
                   </span>
                 </div>
                 <SavingsRing
-                  rate={summary.savingsRate}
+                  rate={left.rate}
                   size={92}
                   stroke={8}
-                  inProgress={isCurrent}
+                  expected={left.expected}
                 />
               </section>
 

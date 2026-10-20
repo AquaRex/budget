@@ -162,7 +162,7 @@ export function YearHeatmap({
               type="button"
               disabled={!onSelectMonth}
               onClick={() => onSelectMonth?.(i + 1)}
-              className="hover:text-foreground flex min-h-11 items-center justify-between text-left disabled:cursor-default sm:min-h-0"
+              className="hover:text-foreground flex min-h-11 items-center justify-between text-left disabled:cursor-default sm:min-h-8"
               title={onSelectMonth ? `Open ${MONTHS_LONG[i]}` : undefined}
             >
               <span className="text-xs font-semibold tracking-widest uppercase">
@@ -230,12 +230,13 @@ export function HeatLegend({
   return (
     <div
       className={cn(
-        "text-muted-foreground flex flex-wrap items-center gap-x-4 gap-y-2 text-[11px]",
+        "text-muted-foreground flex flex-wrap items-center gap-y-2 text-[11px]",
+        short ? "gap-x-3" : "gap-x-4",
         className,
       )}
     >
       <span className="flex items-center gap-1.5">
-        <span>Less</span>
+        <span className={cn(short && "sr-only")}>Less</span>
         {[1, 2, 3, 4, 5].map((i) => (
           <span
             key={i}
@@ -244,7 +245,7 @@ export function HeatLegend({
             title={ranges[i - 1]}
           />
         ))}
-        <span>More</span>
+        <span className={cn(short && "sr-only")}>More</span>
       </span>
       <span className="flex items-center gap-1.5">
         <span className="size-3" style={{ background: "var(--heat-0)" }} /> No

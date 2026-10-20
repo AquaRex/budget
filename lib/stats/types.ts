@@ -103,6 +103,10 @@ export type DashboardStats = {
   dataFrom: string | null // first date the imported data covers
   todaySpent: number | null // null when today isn't covered by imported data yet
   weekSpent: number | null // Monday..min(today, dataThrough), across year boundaries; null when no day of it is covered
+  // Current month only (null otherwise): best estimate of this month's income and
+  // of budgeted bills not yet paid after dataThrough, for an honest "left" figure.
+  expectedIncome: number | null
+  upcomingBills: number | null
   hasData: boolean
   months: MonthStat[] // always the 12 months of `year`
   days: DayStat[] // every day of `year` (for the calendar heatmap)
