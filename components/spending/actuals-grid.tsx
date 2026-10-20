@@ -12,7 +12,7 @@ import {
   effectiveDate,
   deriveStem,
   isSpending,
-  isInternalTx,
+  isIncome,
   type TypeMap,
 } from "@/lib/spending"
 
@@ -49,7 +49,7 @@ export function ActualsGrid({
     const wanted = (t: Transaction) =>
       kind === "bill"
         ? isSpending(t)
-        : !isInternalTx(t) && !t.is_excluded && Number(t.amount) > 0
+        : isIncome(t)
     type RawBand = { name: string; order: number; items: Map<string, Item> }
     const map = new Map<string, RawBand>()
 
@@ -117,7 +117,7 @@ export function ActualsGrid({
   const [calMonth, setCalMonth] = useState<number | null>(null)
 
   const wanted = (t: Transaction) =>
-    kind === "bill" ? isSpending(t) : !isInternalTx(t) && !t.is_excluded && Number(t.amount) > 0
+    kind === "bill" ? isSpending(t) : isIncome(t)
   const calGetEvents = (yy: number, m: number): CalEvent[] => {
     const key = `${yy}-${String(m).padStart(2, "0")}`
     return transactions

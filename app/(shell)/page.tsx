@@ -9,6 +9,7 @@ import { useDashboardStats } from "@/lib/stats/use-dashboard-stats"
 import { MONTHS_LONG } from "@/lib/budget"
 import { cn } from "@/lib/utils"
 import { useYear, setYear } from "@/lib/year"
+import { useCountTransfers } from "@/lib/count-transfers"
 import {
   useAmounts,
   useBudgetContext,
@@ -43,10 +44,12 @@ import { DaySheet } from "@/components/stats/day-sheet"
 import {
   DataThrough,
   MonthFigures,
+  TransfersCountedChip,
   YearTable,
 } from "@/components/stats/period-numbers"
 import { useVizData } from "@/components/stats/use-viz-data"
 import { leftThisMonth } from "@/components/stats/display"
+import { SetAside } from "@/components/stats/set-aside"
 
 export default function DashboardPage() {
   const year = useYear()
@@ -56,6 +59,7 @@ export default function DashboardPage() {
   const [selectedDay, setSelectedDay] = useState<string | null>(null)
 
   const stats = useDashboardStats({ year, month, scope, includeIncomplete })
+  const countTransfers = useCountTransfers()
   const { heatMonths, scale, palette } = useVizData(stats)
 
   const { entries: bills } = useEntries("bill")
@@ -167,7 +171,13 @@ export default function DashboardPage() {
             {scope === "month" ? monthLabel : year}
           </h1>
           {!stats.loading && (
-            <DataThrough dataThrough={stats.dataThrough} today={stats.today} />
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <DataThrough
+                dataThrough={stats.dataThrough}
+                today={stats.today}
+              />
+              {countTransfers && <TransfersCountedChip />}
+            </div>
           )}
         </div>
         <div className="flex flex-wrap items-center gap-3">
@@ -267,6 +277,11 @@ export default function DashboardPage() {
                   ? (focus?.budgetBills ?? 0)
                   : stats.months.reduce((s, m) => s + m.budgetBills, 0)
               }
+              savings={
+                scope === "month"
+                  ? (focus?.budgetSavings ?? 0)
+                  : stats.months.reduce((s, m) => s + m.budgetSavings, 0)
+              }
             />
           </Panel>
           {scope === "month" && (
@@ -317,11 +332,17 @@ export default function DashboardPage() {
               title="Where it went"
               subtitle="By category, vs your usual month"
             >
-              <CategoryBreakdown
-                categories={stats.categories}
-                palette={palette}
-                compareBaseline
-              />
+              <div className="flex flex-col gap-6">
+                <CategoryBreakdown
+                  categories={stats.categories}
+                  palette={palette}
+                  compareBaseline
+                />
+                <SetAside
+                  savings={stats.savings}
+                  inProgress={monthInProgress}
+                />
+              </div>
             </Panel>
             <Panel title="Top merchants" subtitle={monthLabel}>
               <TopMerchants merchants={stats.topMerchants} />
@@ -468,11 +489,14 @@ export default function DashboardPage() {
 
           <div className="grid gap-4 lg:grid-cols-2">
             <Panel title="Where it went" subtitle={`By category · ${year}`}>
-              <CategoryBreakdown
-                categories={stats.categories}
-                palette={palette}
-                compareBaseline={false}
-              />
+              <div className="flex flex-col gap-6">
+                <CategoryBreakdown
+                  categories={stats.categories}
+                  palette={palette}
+                  compareBaseline={false}
+                />
+                <SetAside savings={stats.savings} inProgress={false} />
+              </div>
             </Panel>
             <Panel
               title="Category history"

@@ -28,7 +28,7 @@ import {
   categorizeBySource,
   setTransactionsLabel,
 } from "@/lib/data/transactions"
-import { createCategory } from "@/lib/data/categories"
+import { createCategory, setCategorySavings } from "@/lib/data/categories"
 import { setCategoryGroup } from "@/lib/data/groups"
 import {
   createLabel,
@@ -38,6 +38,7 @@ import {
 } from "@/lib/data/labels"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
 import {
   Card,
@@ -271,7 +272,26 @@ function StructurePanel({
               .sort((a, b) => a.name.localeCompare(b.name))
             return (
               <div key={g.id} className="rounded-md border p-2.5">
-                <div className="text-sm font-semibold">{g.name}</div>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-sm font-semibold">{g.name}</div>
+                  <label className="text-muted-foreground flex cursor-pointer items-center gap-2 text-xs">
+                    Savings / investment
+                    <Switch
+                      checked={g.is_savings}
+                      onCheckedChange={(v) =>
+                        act(
+                          () => setCategorySavings(g.id, v),
+                          "Could not update group.",
+                        )
+                      }
+                    />
+                  </label>
+                </div>
+                {g.is_savings && (
+                  <p className="text-muted-foreground text-xs">
+                    Money placed here is set aside, not spent.
+                  </p>
+                )}
                 {members.length === 0 ? (
                   <p className="text-muted-foreground mt-1 text-xs">
                     No categories assigned.

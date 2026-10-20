@@ -11,6 +11,8 @@ export type Category = {
   // is itself just a category that Bills/Income entries use. (Bills/Income
   // ignore this field.)
   group_id: string | null
+  // A savings/investment group: money placed here is set aside, not spent.
+  is_savings: boolean
 }
 
 export type PaymentMethod = {

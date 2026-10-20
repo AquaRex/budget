@@ -3,9 +3,9 @@
 import Link from "next/link"
 import { ArrowUpRight } from "lucide-react"
 
-import type { DayStat } from "@/lib/stats/types"
+import type { DayStat, DayTx } from "@/lib/stats/types"
 import { dayTransactions } from "@/lib/stats/flows"
-import { useTransactions } from "@/lib/data/use-budget"
+import { useStatsData } from "@/lib/stats/use-dashboard-stats"
 import { deriveStem } from "@/lib/spending"
 import { cn } from "@/lib/utils"
 import {
@@ -16,6 +16,21 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet"
 import { formatLongDate, kr, signedKr, up } from "@/components/stats/display"
+
+function flowLabel(row: DayTx): string | null {
+  switch (row.flow) {
+    case "income":
+      return "Income"
+    case "refund":
+      return "Refund"
+    case "saved":
+      return "Saved"
+    case "transfer":
+      return row.counted ? "Transfer" : "Transfer · not counted"
+    default:
+      return null
+  }
+}
 
 /** Day-to-day drill-down: every transaction on one date, linking to Spending. */
 export function DaySheet({
@@ -29,8 +44,8 @@ export function DaySheet({
   onOpenChange: (open: boolean) => void
   side?: "right" | "bottom"
 }) {
-  const { transactions } = useTransactions()
-  const list = date ? dayTransactions(transactions, date) : []
+  const { data } = useStatsData()
+  const list = date ? dayTransactions(data, date) : []
   const period = date?.slice(0, 7) ?? ""
 
   return (
@@ -76,11 +91,19 @@ export function DaySheet({
             </p>
           ) : (
             <ul>
-              {list.map((t) => {
+              {list.map((row) => {
+                const t = row.tx
                 const amount = Number(t.amount)
                 const q = deriveStem(t.description) || t.type || ""
+                const flow = flowLabel(row)
                 return (
-                  <li key={t.id} className="border-b last:border-b-0">
+                  <li
+                    key={t.id}
+                    className={cn(
+                      "border-b last:border-b-0",
+                      !row.counted && "opacity-60",
+                    )}
+                  >
                     <Link
                       href={`/spending?tab=transactions&period=${period}&q=${encodeURIComponent(q)}`}
                       className="hover:bg-muted/60 active:bg-muted flex min-h-14 items-center gap-3 px-5 py-3 transition-colors"
@@ -90,7 +113,7 @@ export function DaySheet({
                           {t.description || t.type || "—"}
                         </p>
                         <p className="text-muted-foreground truncate text-xs">
-                          {[t.tx_at?.slice(11, 16), t.type]
+                          {[flow, t.tx_at?.slice(11, 16), t.type]
                             .filter(Boolean)
                             .join(" · ")}
                         </p>
@@ -98,7 +121,11 @@ export function DaySheet({
                       <span
                         className={cn(
                           "text-sm font-semibold tabular-nums",
-                          amount > 0 ? up : "text-foreground",
+                          !row.counted
+                            ? "text-muted-foreground"
+                            : row.flow === "income" || row.flow === "refund"
+                              ? up
+                              : "text-foreground",
                         )}
                       >
                         {signedKr(amount)}

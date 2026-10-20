@@ -15,6 +15,7 @@ import { useDashboardStats } from "@/lib/stats/use-dashboard-stats"
 import { MONTHS_LONG } from "@/lib/budget"
 import { cn } from "@/lib/utils"
 import { getYear, setYear, useYear } from "@/lib/year"
+import { useCountTransfers } from "@/lib/count-transfers"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Panel } from "@/components/stats/panel"
 import { SavingsRing } from "@/components/stats/savings-ring"
@@ -25,7 +26,11 @@ import { CategoryBreakdown } from "@/components/stats/category-breakdown"
 import { TopMerchants } from "@/components/stats/top-merchants"
 import { HeatLegend, MonthHeatmap } from "@/components/stats/spending-heatmap"
 import { DaySheet } from "@/components/stats/day-sheet"
-import { DataThrough } from "@/components/stats/period-numbers"
+import {
+  DataThrough,
+  TransfersCountedChip,
+} from "@/components/stats/period-numbers"
+import { SetAside } from "@/components/stats/set-aside"
 import { useVizData } from "@/components/stats/use-viz-data"
 import { BudgetKpi } from "@/components/dashboard/hero-kpis"
 import {
@@ -50,6 +55,7 @@ export function OsDashboard() {
   const [selectedDay, setSelectedDay] = useState<string | null>(null)
   const touch = useRef<{ x: number; y: number } | null>(null)
   const { resolvedTheme, setTheme } = useTheme()
+  const countTransfers = useCountTransfers()
 
   // The app opens on today, whatever year the desktop view was left on.
   useEffect(() => {
@@ -162,10 +168,13 @@ export function OsDashboard() {
               <span className="text-muted-foreground font-normal">{year}</span>
             </span>
             {!stats.loading && (
-              <DataThrough
-                dataThrough={stats.dataThrough}
-                today={stats.today}
-              />
+              <div className="flex items-center gap-2">
+                <DataThrough
+                  dataThrough={stats.dataThrough}
+                  today={stats.today}
+                />
+                {countTransfers && <TransfersCountedChip />}
+              </div>
             )}
           </div>
           <button
@@ -207,6 +216,7 @@ export function OsDashboard() {
               <BudgetKpi
                 income={focus?.budgetIncome ?? 0}
                 bills={focus?.budgetBills ?? 0}
+                savings={focus?.budgetSavings ?? 0}
               />
             </Panel>
             <p className="text-muted-foreground py-8 text-center text-sm">
@@ -319,12 +329,15 @@ export function OsDashboard() {
                 <PaceChart pace={pace} height={200} />
               </Panel>
               <Panel title="Where it went" subtitle="vs your usual month">
-                <CategoryBreakdown
-                  categories={stats.categories}
-                  palette={palette}
-                  compareBaseline
-                  limit={6}
-                />
+                <div className="flex flex-col gap-6">
+                  <CategoryBreakdown
+                    categories={stats.categories}
+                    palette={palette}
+                    compareBaseline
+                    limit={6}
+                  />
+                  <SetAside savings={stats.savings} inProgress={isCurrent} />
+                </div>
               </Panel>
               <Panel title="Month history" subtitle={String(year)}>
                 <CashflowChart

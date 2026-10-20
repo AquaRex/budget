@@ -13,7 +13,12 @@ import type {
   SpendingPace,
 } from "@/lib/stats/types"
 import { computeCoverage, monthStatus, type Coverage } from "@/lib/stats/coverage"
-import { buildFlows, buildGroupIndex, type Flow, type GroupIndex } from "@/lib/stats/flows"
+import {
+  buildGroupIndex,
+  classifyTransactions,
+  type ClassifiedTx,
+  type GroupIndex,
+} from "@/lib/stats/flows"
 import {
   addDays,
   daysInMonth,
@@ -52,14 +57,17 @@ export function computeDashboardStats(
   const todayKey = isoDate(today)
   const coverage = computeCoverage(data.transactions, data.imports, todayKey)
   const index = buildGroupIndex(data.categories, data.labels, data.typeMap, data.bills, data.incomes)
-  const flows = buildFlows(data.transactions, index)
+  const flows = classifyTransactions(data.transactions, index)
+  const isSavingsEntry = (e: Entry) => !!e.category_id && index.savings.has(e.category_id)
+  const spendingBills = data.bills.filter((e) => !isSavingsEntry(e))
+  const savingsBills = data.bills.filter(isSavingsEntry)
 
   const rowsByMonth = new Map<string, number>()
   for (const t of data.transactions) {
     const ym = effectiveDate(t).slice(0, 7)
     rowsByMonth.set(ym, (rowsByMonth.get(ym) ?? 0) + 1)
   }
-  const flowsByMonth = new Map<string, Flow[]>()
+  const flowsByMonth = new Map<string, ClassifiedTx[]>()
   const dayStats = new Map<string, DayStat>()
   for (const f of flows) {
     const ym = f.date.slice(0, 7)
@@ -72,7 +80,7 @@ export function computeDashboardStats(
     const day = dayStats.get(f.date) ?? { date: f.date, spent: 0, income: 0, txCount: 0 }
     day.spent += f.spent
     day.income += f.income
-    day.txCount++
+    day.txCount += f.counted ? 1 : 0
     dayStats.set(f.date, day)
   }
   const flowsIn = (yms: YearMonth[]) =>
@@ -94,10 +102,14 @@ export function computeDashboardStats(
       net: income - spent,
       savingsRate: savingsRate(income - spent, income),
       cumulativeNet: 0,
+      saved: sumBy(monthFlows, (f) => f.saved),
+      transfersOut: sumBy(monthFlows, (f) => f.transferOut),
+      transfersIn: sumBy(monthFlows, (f) => f.transferIn),
       // The budget template loaded is input.year's; other years have none here.
       budgetIncome: inBudgetYear ? monthTotal(data.incomes, data.ctx, month) : 0,
-      budgetBills: inBudgetYear ? monthTotal(data.bills, data.ctx, month) : 0,
-      txCount: monthFlows.length,
+      budgetBills: inBudgetYear ? monthTotal(spendingBills, data.ctx, month) : 0,
+      budgetSavings: inBudgetYear ? monthTotal(savingsBills, data.ctx, month) : 0,
+      txCount: monthFlows.filter((f) => f.counted).length,
       status: statusOf(year, month),
     }
   }
@@ -154,6 +166,7 @@ export function computeDashboardStats(
       budgetByGroup.set(g.id, budget)
     }
   }
+  const spendingBudgets = new Map([...budgetByGroup].filter(([id]) => !id || !index.savings.has(id)))
 
   const days: DayStat[] = []
   for (let m = 1; m <= 12; m++) {
@@ -168,13 +181,21 @@ export function computeDashboardStats(
     dataThrough: coverage.through,
     dataFrom: coverage.start,
     ...recentSpend(todayKey, coverage, dayStats),
-    ...monthOutlook(focused, data, coverage.through),
+    ...monthOutlook(focused, data.incomes, spendingBills, data.ctx, coverage.through),
     hasData: months.some((m) => m.txCount > 0),
     months,
     days,
     summary,
     pace: spendingPace(input, focused, lookback, coverage.through, dayStats),
-    categories: categorySlices(scopeFlows, avgFlows, avgMonths.length, summary.spent, budgetByGroup, index),
+    categories: categorySlices(scopeFlows, avgFlows, avgMonths.length, summary.spent, spendingBudgets, index),
+    savings: savingsSlices(
+      flowsIn(totalMonths),
+      flowsIn(avgMonths),
+      avgMonths.length,
+      summary.income,
+      budgetByGroup,
+      index,
+    ),
     categoryHistory: categoryHistory(input.year, flowsByMonth, index),
     topMerchants: topMerchants(scopeFlows),
   }
@@ -210,18 +231,22 @@ function recentSpend(
  * the month's length) is after the last covered day of this month; with no
  * data in this month yet, every entry is still to come. Inactive entries are
  * ignored and amounts are this month's effective amounts.
- *   upcomingBills  = Σ bills still to come.
- *   expectedIncome = actual income so far + the income entries still to come,
- *                    capped at max(0, budgeted income − actual income) so pay
- *                    that arrived before its due day isn't counted twice.
+ *   upcomingBills   = Σ bills still to come, excluding savings groups.
+ *   expectedIncome  = actual income so far + the income entries still to come,
+ *                     capped at max(0, budgeted income − actual income) so pay
+ *                     that arrived before its due day isn't counted twice.
+ *   reservedSavings = max(savings budget, saved so far): money set aside is
+ *                     never shown as available, whether or not it has moved yet.
  */
 function monthOutlook(
   focused: MonthStat,
-  data: StatsData,
+  incomes: Entry[],
+  spendingBills: Entry[],
+  ctx: BudgetContext,
   dataThrough: string | null,
-): { expectedIncome: number | null; upcomingBills: number | null } {
+): { expectedIncome: number | null; upcomingBills: number | null; reservedSavings: number | null } {
   if (focused.status !== "current") {
-    return { expectedIncome: null, upcomingBills: null }
+    return { expectedIncome: null, upcomingBills: null, reservedSavings: null }
   }
   const { year, month } = focused
   const dim = daysInMonth(year, month)
@@ -230,12 +255,13 @@ function monthOutlook(
   const stillToCome = (entries: Entry[]) =>
     sumBy(
       entries.filter((e) => e.is_active && Math.min(e.due_day, dim) > coveredDay),
-      (e) => effectiveAmount(e, data.ctx, month),
+      (e) => effectiveAmount(e, ctx, month),
     )
   const incomeGap = Math.max(0, focused.budgetIncome - focused.income)
   return {
-    expectedIncome: focused.income + Math.min(stillToCome(data.incomes), incomeGap),
-    upcomingBills: stillToCome(data.bills),
+    expectedIncome: focused.income + Math.min(stillToCome(incomes), incomeGap),
+    upcomingBills: stillToCome(spendingBills),
+    reservedSavings: Math.max(focused.budgetSavings, focused.saved),
   }
 }
 
@@ -253,8 +279,12 @@ function summarize(totalMonths: MonthStat[], avgMonths: MonthStat[]): PeriodSumm
     spent,
     net: income - spent,
     savingsRate: savingsRate(income - spent, income),
+    saved: sumBy(totalMonths, (m) => m.saved),
+    transfersOut: sumBy(totalMonths, (m) => m.transfersOut),
+    transfersIn: sumBy(totalMonths, (m) => m.transfersIn),
     budgetIncome: sumBy(totalMonths, (m) => m.budgetIncome),
     budgetBills: sumBy(totalMonths, (m) => m.budgetBills),
+    budgetSavings: sumBy(totalMonths, (m) => m.budgetSavings),
     monthsCounted: n,
     avgMonthlyIncome: n ? avgIncome / n : 0,
     avgMonthlySpent: n ? avgSpent / n : 0,
@@ -336,8 +366,8 @@ function spendingPace(
 }
 
 function categorySlices(
-  scopeFlows: Flow[],
-  avgFlows: Flow[],
+  scopeFlows: ClassifiedTx[],
+  avgFlows: ClassifiedTx[],
   avgMonthCount: number,
   totalSpent: number,
   budgetByGroup: Map<string | null, number>,
@@ -371,9 +401,39 @@ function categorySlices(
     .sort((a, b) => b.amount - a.amount || b.baseline - a.baseline || b.budget - a.budget)
 }
 
+/** Savings groups: amount = net saved, share = of the period's income. */
+function savingsSlices(
+  scopeFlows: ClassifiedTx[],
+  avgFlows: ClassifiedTx[],
+  avgMonthCount: number,
+  income: number,
+  budgetByGroup: Map<string | null, number>,
+  index: GroupIndex,
+): CategorySlice[] {
+  return index.groups
+    .filter((g) => index.savings.has(g.id))
+    .map((g) => {
+      const scoped = scopeFlows.filter((f) => f.groupId === g.id)
+      const amount = sumBy(scoped, (f) => f.saved)
+      return {
+        id: g.id,
+        name: g.name,
+        amount,
+        share: income > 0 ? amount / income : 0,
+        baseline: avgMonthCount
+          ? sumBy(avgFlows.filter((f) => f.groupId === g.id), (f) => f.saved) / avgMonthCount
+          : 0,
+        budget: budgetByGroup.get(g.id) ?? 0,
+        txCount: scoped.length,
+      }
+    })
+    .filter((s) => s.amount !== 0 || s.baseline !== 0 || s.budget !== 0)
+    .sort((a, b) => b.amount - a.amount || b.budget - a.budget)
+}
+
 function categoryHistory(
   year: number,
-  flowsByMonth: Map<string, Flow[]>,
+  flowsByMonth: Map<string, ClassifiedTx[]>,
   index: GroupIndex,
 ): CategoryHistory {
   const yearTotals = new Map<string | null, number>()
@@ -400,7 +460,7 @@ function categoryHistory(
   return { categories, months }
 }
 
-function topMerchants(scopeFlows: Flow[]): MerchantStat[] {
+function topMerchants(scopeFlows: ClassifiedTx[]): MerchantStat[] {
   const merchants = new Map<string, MerchantStat>()
   for (const f of scopeFlows) {
     const stat = merchants.get(f.merchant) ?? { name: f.merchant, amount: 0, txCount: 0 }

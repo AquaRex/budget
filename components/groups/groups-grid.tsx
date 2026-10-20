@@ -17,6 +17,7 @@ import {
   placementCategoryId,
   deriveStem,
   isSpending,
+  isIncome,
   isInternalTx,
   type TypeMap,
 } from "@/lib/spending"
@@ -83,6 +84,7 @@ export function GroupsGrid({
     const rowsFor = (
       groupId: string | null,
       want: (t: Transaction) => boolean,
+      signed = false, // savings: outflows add, withdrawals subtract
     ): { rows: ActualRow[]; totals: number[] } => {
       const byCat = new Map<string, ActualRow>()
       const subByCat = new Map<string, Map<string, ActualRow>>()
@@ -102,7 +104,7 @@ export function GroupsGrid({
           subByCat.set(key, new Map())
         }
         const mo = Number(effectiveDate(t).slice(5, 7)) - 1
-        const v = Math.abs(Number(t.amount))
+        const v = signed ? -Number(t.amount) : Math.abs(Number(t.amount))
         row.months[mo] += v
         row.total += v
         totals[mo] += v
@@ -141,11 +143,13 @@ export function GroupsGrid({
         incomeItems.length > 0 && billItems.length === 0 ? "income" : "bill"
       const budgetItems = kind === "income" ? incomeItems : billItems
       const budget = monthlySubtotals(budgetItems, ctx)
-      const want =
-        kind === "income"
-          ? (t: Transaction) => !isInternalTx(t) && !t.is_excluded && Number(t.amount) > 0
+      // A savings group holds every transfer/purchase placed in it, net of withdrawals.
+      const want = g.is_savings
+        ? (t: Transaction) => !t.is_excluded
+        : kind === "income"
+          ? isIncome
           : isSpending
-      const { rows, totals } = rowsFor(g.id, want)
+      const { rows, totals } = rowsFor(g.id, want, g.is_savings)
       out.push({
         key: g.id,
         name: g.name,

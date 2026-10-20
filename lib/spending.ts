@@ -1,6 +1,7 @@
 import type { Category, Transaction, TxRule, TypeCategory } from "@/lib/types"
 import type { ParsedTx } from "@/lib/csv"
 import { getDateMode } from "@/lib/date-mode"
+import { getCountTransfers } from "@/lib/count-transfers"
 
 /** bank-type string -> budget category id. */
 export type TypeMap = Map<string, string>
@@ -339,9 +340,14 @@ export function isInternalTx(t: {
   )
 }
 
-/** Spending transactions only: money out, not internal transfers / excluded. */
+/** Money out, not excluded; own-account transfers only when counting transfers. */
 export function isSpending(t: Transaction): boolean {
-  return !isInternalTx(t) && !t.is_excluded && Number(t.amount) < 0
+  return (!isInternalTx(t) || getCountTransfers()) && !t.is_excluded && Number(t.amount) < 0
+}
+
+/** Money in, not excluded; own-account transfers only when counting transfers. */
+export function isIncome(t: Transaction): boolean {
+  return (!isInternalTx(t) || getCountTransfers()) && !t.is_excluded && Number(t.amount) > 0
 }
 
 /** True if this row has an unresolved proposed update from a later import. */
@@ -399,7 +405,7 @@ export function incomeInPeriod(
   if (!period) return 0
   let s = 0
   for (const t of transactions)
-    if (periodOf(t) === period && !isInternalTx(t) && !t.is_excluded && Number(t.amount) > 0)
+    if (periodOf(t) === period && isIncome(t))
       s += Number(t.amount)
   return s
 }

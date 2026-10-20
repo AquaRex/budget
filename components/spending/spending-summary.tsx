@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils"
 import { monthTotal, type BudgetContext } from "@/lib/budget"
 import {
   isSpending,
-  isInternalTx,
+  isIncome,
   effectiveCategoryId,
   type TypeMap,
 } from "@/lib/spending"
@@ -57,7 +57,7 @@ export function SpendingSummary({
         else if (t.type)
           actualByType.set(t.type, (actualByType.get(t.type) ?? 0) + v)
         else uncategorised += v
-      } else if (!isInternalTx(t) && !t.is_excluded && Number(t.amount) > 0) {
+      } else if (isIncome(t)) {
         totalIncome += Number(t.amount)
       }
     }

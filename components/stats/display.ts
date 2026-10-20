@@ -167,29 +167,36 @@ export function coverage(dataFrom: string | null, dataThrough: string | null) {
 
 /**
  * The month's glance number. Mid-month, actual income − spent is misleading
- * (salary and bills still to come), so the current month shows what's
- * expected to be left after pending income and bills.
+ * (salary and bills still to come, savings set aside), so the current month
+ * shows what's expected to be left after pending income, bills and savings.
  */
 export function leftThisMonth(
   month: MonthStat | undefined,
   summary: PeriodSummary,
-  pending: { expectedIncome: number | null; upcomingBills: number | null },
+  pending: {
+    expectedIncome: number | null
+    upcomingBills: number | null
+    reservedSavings: number | null
+  },
 ) {
   if (month?.status === "current") {
     const income = pending.expectedIncome ?? summary.income
     const bills = pending.upcomingBills ?? 0
+    const reserved = pending.reservedSavings ?? 0
     const incomeToCome = Math.max(0, income - summary.income)
-    const value = income - summary.spent - bills
+    const value = income - summary.spent - bills - reserved
+    const isPending = incomeToCome > 0 || bills > 0
     const notes = [
       incomeToCome > 0 ? `${kr(incomeToCome)} income to come` : null,
       bills > 0 ? `${kr(bills)} bills to come` : null,
+      reserved > 0 ? `${kr(reserved)} set aside` : null,
     ].filter(Boolean)
-    const isPending = notes.length > 0
     return {
       label: isPending ? "Left after bills (expected)" : "Left this month",
-      note: isPending ? notes.join(" · ") : null,
+      note: notes.length ? notes.join(" · ") : null,
       value,
-      rate: income > 0 ? value / income : null,
+      // The ring is a savings rate, so money set aside counts as kept.
+      rate: income > 0 ? (value + reserved) / income : null,
       expected: isPending,
     }
   }

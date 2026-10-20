@@ -4,6 +4,7 @@ import { useCategories } from "@/lib/data/use-budget"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Organize } from "@/components/settings/organize"
 import { DateModeToggle } from "@/components/settings/date-mode-toggle"
+import { TransfersToggle } from "@/components/settings/transfers-toggle"
 import { YearManager } from "@/components/settings/year-manager"
 import { DangerZone } from "@/components/settings/danger-zone"
 
@@ -16,7 +17,10 @@ export default function SettingsPage() {
 
       <YearManager />
 
-      <DateModeToggle />
+      <div className="grid gap-6 lg:grid-cols-2">
+        <DateModeToggle />
+        <TransfersToggle />
+      </div>
 
       {lc ? <Skeleton className="h-40 w-full" /> : <Organize />}
 

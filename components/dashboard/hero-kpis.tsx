@@ -47,6 +47,15 @@ export function SavingsKpi({
             ? [left.label, left.note].filter(Boolean).join(" · ")
             : `kept of ${kr(summary.income)} income`}
         </span>
+        {!left?.note && (summary.saved !== 0 || summary.budgetSavings > 0) && (
+          <span className="text-muted-foreground text-xs tabular-nums">
+            Set aside{" "}
+            <span className="text-foreground font-medium">
+              {kr(summary.saved)}
+            </span>
+            {summary.budgetSavings > 0 && ` of ${kr(summary.budgetSavings)}`}
+          </span>
+        )}
         <span className="text-muted-foreground mt-1 text-xs">
           {baselineLabel}{" "}
           <span className="text-foreground font-medium tabular-nums">
@@ -67,12 +76,18 @@ export function CashKpi({ summary }: { summary: PeriodSummary }) {
       value: summary.income,
       budget: summary.budgetIncome,
       bar: "bg-(--viz-income)",
+      hint: `budget ${kr(summary.budgetIncome)}`,
     },
     {
       label: "Spent",
       value: summary.spent,
       budget: summary.budgetBills,
       bar: "bg-(--viz-spent)",
+      // Savings groups are budgeted separately: setting money aside isn't spending.
+      hint:
+        summary.budgetSavings > 0
+          ? `budget ${kr(summary.budgetBills)} · + ${kr(summary.budgetSavings)} to savings`
+          : `budget ${kr(summary.budgetBills)}`,
     },
   ]
   return (
@@ -104,7 +119,7 @@ export function CashKpi({ summary }: { summary: PeriodSummary }) {
             )}
           </div>
           <span className="text-muted-foreground text-[11px] tabular-nums">
-            budget {kr(r.budget)}
+            {r.hint}
           </span>
         </div>
       ))}
@@ -138,13 +153,15 @@ export function NetSavedKpi({
 export function BudgetKpi({
   income,
   bills,
+  savings,
 }: {
   income: number
   bills: number
+  savings: number
 }) {
-  const left = income - bills
+  const left = income - bills - savings
   return (
-    <dl className="grid grid-cols-3 gap-3">
+    <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
       <div>
         <dt className="text-muted-foreground text-xs">Budgeted income</dt>
         <dd className={cn("text-xl font-semibold tabular-nums", up)}>
@@ -154,6 +171,10 @@ export function BudgetKpi({
       <div>
         <dt className="text-muted-foreground text-xs">Budgeted bills</dt>
         <dd className="text-xl font-semibold tabular-nums">{kr(bills)}</dd>
+      </div>
+      <div>
+        <dt className="text-muted-foreground text-xs">To savings</dt>
+        <dd className="text-xl font-semibold tabular-nums">{kr(savings)}</dd>
       </div>
       <div>
         <dt className="text-muted-foreground text-xs">Left</dt>

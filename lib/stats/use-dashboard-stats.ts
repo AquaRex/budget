@@ -14,7 +14,7 @@ import {
   useTransactions,
   useTypeCategories,
 } from "@/lib/data/use-budget"
-import { computeDashboardStats } from "@/lib/stats/compute"
+import { computeDashboardStats, type StatsData } from "@/lib/stats/compute"
 import type { DashboardStats, DashboardStatsInput } from "@/lib/stats/types"
 import { isoDate } from "@/lib/stats/dates"
 
@@ -33,8 +33,11 @@ function subscribeToDate(onChange: () => void): () => void {
   }
 }
 
-/** Budget entries/amounts follow the globally selected year, so pass `useYear()` as input.year. */
-export function useDashboardStats(input: DashboardStatsInput): DashboardStats {
+/**
+ * The (SWR-deduped) sources the stats engine reads. Budget entries/amounts
+ * follow the globally selected year (`useYear()`).
+ */
+export function useStatsData(): { data: StatsData; loading: boolean } {
   const { entries: bills, isLoading: billsLoading } = useEntries("bill")
   const { entries: incomes, isLoading: incomesLoading } = useEntries("income")
   const { amounts, isLoading: amountsLoading } = useAmounts()
@@ -45,20 +48,12 @@ export function useDashboardStats(input: DashboardStatsInput): DashboardStats {
   const { transactions, isLoading: transactionsLoading } = useTransactions()
   const { typeCategories, isLoading: typesLoading } = useTypeCategories()
   const { imports, isLoading: importsLoading } = useImports()
-  const today = useSyncExternalStore(subscribeToDate, todayKey, todayKey)
 
   const typeMap = useMemo(() => buildTypeMap(typeCategories), [typeCategories])
-  const { year, month, scope, includeIncomplete } = input
-  const stats = useMemo(
-    () =>
-      computeDashboardStats(
-        { transactions, categories, labels, typeMap, imports, bills, incomes, ctx },
-        { year, month, scope, includeIncomplete },
-        new Date(`${today}T00:00`),
-      ),
-    [transactions, categories, labels, typeMap, imports, bills, incomes, ctx, year, month, scope, includeIncomplete, today],
+  const data = useMemo(
+    () => ({ transactions, categories, labels, typeMap, imports, bills, incomes, ctx }),
+    [transactions, categories, labels, typeMap, imports, bills, incomes, ctx],
   )
-
   const loading =
     billsLoading ||
     incomesLoading ||
@@ -69,5 +64,22 @@ export function useDashboardStats(input: DashboardStatsInput): DashboardStats {
     transactionsLoading ||
     typesLoading ||
     importsLoading
+  return { data, loading }
+}
+
+/** Pass `useYear()` as input.year: the budget data follows the selected year. */
+export function useDashboardStats(input: DashboardStatsInput): DashboardStats {
+  const { data, loading } = useStatsData()
+  const today = useSyncExternalStore(subscribeToDate, todayKey, todayKey)
+  const { year, month, scope, includeIncomplete } = input
+  const stats = useMemo(
+    () =>
+      computeDashboardStats(
+        data,
+        { year, month, scope, includeIncomplete },
+        new Date(`${today}T00:00`),
+      ),
+    [data, year, month, scope, includeIncomplete, today],
+  )
   return { ...stats, loading }
 }

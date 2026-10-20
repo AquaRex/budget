@@ -68,3 +68,15 @@ export async function reorderCategories(
     ),
   )
 }
+
+/** Flag a group as savings/investments (its money is set aside, not spent). */
+export async function setCategorySavings(id: string, isSavings: boolean): Promise<void> {
+  const supabase = getSupabase()
+  const { error } = await supabase
+    .from("categories")
+    .update({ is_savings: isSavings })
+    .eq("id", id)
+  if (error) {
+    throw error
+  }
+}

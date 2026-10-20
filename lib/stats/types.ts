@@ -1,6 +1,14 @@
+import type { Transaction } from "@/lib/types"
+
 // Shared contract between the stats engine (lib/stats) and the dashboard UIs
 // (home dashboard + /os). All amounts are positive NOK; "spent" is money out,
-// "income" is money in, both excluding internal transfers and excluded rows.
+// "income" is money in, both excluding excluded rows. Money placed in a savings
+// group (Category.is_savings) is "saved" — set aside, never spent or income.
+// Own-account transfers are tracked separately and only count as spent/income
+// when the "count transfers" setting is on.
+
+// How a single transaction counts.
+export type Flow = "spent" | "income" | "refund" | "saved" | "transfer"
 
 export type Scope = "year" | "month"
 
@@ -18,8 +26,12 @@ export type MonthStat = {
   net: number // income - spent
   savingsRate: number | null // net / income (0..1, may be negative); null when income <= 0
   cumulativeNet: number // running net from Jan of the year (wealth-building proxy)
+  saved: number // net money into savings groups (withdrawals subtract)
+  transfersOut: number // own-account transfers out, excluding savings groups; tracked even when not counted
+  transfersIn: number
   budgetIncome: number // from the Budget template
-  budgetBills: number
+  budgetBills: number // budgeted bills excluding savings groups
+  budgetSavings: number // budgeted bills in savings groups
   txCount: number
   status: MonthStatus
 }
@@ -79,8 +91,12 @@ export type PeriodSummary = {
   spent: number
   net: number
   savingsRate: number | null
+  saved: number
+  transfersOut: number
+  transfersIn: number
   budgetIncome: number
   budgetBills: number
+  budgetSavings: number
   monthsCounted: number // months that fed the averages
   avgMonthlyIncome: number
   avgMonthlySpent: number
@@ -106,13 +122,21 @@ export type DashboardStats = {
   // Current month only (null otherwise): best estimate of this month's income and
   // of budgeted bills not yet paid after dataThrough, for an honest "left" figure.
   expectedIncome: number | null
-  upcomingBills: number | null
+  upcomingBills: number | null // excludes savings groups
+  reservedSavings: number | null // max(this month's savings budget, saved so far): never "available"
   hasData: boolean
   months: MonthStat[] // always the 12 months of `year`
   days: DayStat[] // every day of `year` (for the calendar heatmap)
   summary: PeriodSummary // for the scope
   pace: SpendingPace // for the focused month
-  categories: CategorySlice[] // for the scope, sorted desc
+  categories: CategorySlice[] // spending groups for the scope, sorted desc
+  savings: CategorySlice[] // savings groups for the scope; amount = net saved, share = of income
   categoryHistory: CategoryHistory // per month of the year
   topMerchants: MerchantStat[] // for the scope, sorted desc
+}
+
+export type DayTx = {
+  tx: Transaction
+  flow: Flow
+  counted: boolean // false for transfers while the "count transfers" setting is off
 }

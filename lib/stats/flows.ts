@@ -7,21 +7,25 @@ import {
   placementCategoryId,
   type TypeMap,
 } from "@/lib/spending"
-
-/** Real money movement: not an internal transfer, not excluded, not zero. */
-export function isCounted(t: Transaction): boolean {
-  return !isInternalTx(t) && !t.is_excluded && Number(t.amount) !== 0
-}
+import { getCountTransfers } from "@/lib/count-transfers"
+import type { StatsData } from "@/lib/stats/compute"
+import type { DayTx, Flow } from "@/lib/stats/types"
 
 export function merchantOf(t: Transaction): string {
   return deriveStem(t.description) || t.type || "Unknown"
 }
 
-/** A counted transaction, classified once for every aggregate. */
-export type Flow = {
+/** A transaction classified once for every aggregate. */
+export type ClassifiedTx = {
+  tx: Transaction
+  flow: Flow
+  counted: boolean // false only for transfers while "count transfers" is off
   date: string // effective date, YYYY-MM-DD
-  spent: number // > 0 purchase, < 0 refund netted against spending, 0 for income
+  spent: number // > 0 purchase or counted transfer out, < 0 refund
   income: number
+  saved: number // > 0 into a savings group, < 0 withdrawal
+  transferOut: number // own-account transfers outside savings groups, counted or not
+  transferIn: number
   groupId: string | null
   merchant: string
 }
@@ -31,6 +35,7 @@ export type GroupIndex = {
   nameOf: (groupId: string | null) => string
   groupOf: (t: Transaction) => string | null
   incomeOnly: Set<string> // groups used only by Income entries
+  savings: Set<string> // groups flagged is_savings
 }
 
 export const UNASSIGNED_NAME = "Unassigned"
@@ -61,24 +66,35 @@ export function buildGroupIndex(
       return group && groupIds.has(group) ? group : null
     },
     incomeOnly: new Set(groups.filter((g) => !billCats.has(g.id)).map((g) => g.id)),
+    savings: new Set(groups.filter((g) => g.is_savings).map((g) => g.id)),
   }
 }
 
 /**
- * Money in is a refund (netted against spending on the day it lands, so the
- * savings rate isn't overstated) when its description stem equals a stem you've
- * paid, or starts with one followed by a word break ("kiwi retur" matches
- * "kiwi", "kiwiburger" doesn't). Anything placed under an income-only group is
- * always income. Deliberately conservative, since netting salary would wreck
- * every figure: returns from a merchant never paid within the data, or booked
- * under a different description, count as income.
+ * Classifies every non-excluded, non-zero row, in this order:
+ *   saved    — placed in a savings group (transfer or not); out adds, in withdraws.
+ *   transfer — own-account transfer; counts as spent (out) / income (in) only
+ *              when the "count transfers" setting is on, else just tracked.
+ *   spent    — any other money out.
+ *   refund   — money in whose description stem equals a stem you've paid, or
+ *              starts with one followed by a word break ("kiwi retur" matches
+ *              "kiwi", "kiwiburger" doesn't), unless placed in an income-only
+ *              group. Netted against spending on the day it lands so the savings
+ *              rate isn't overstated. Deliberately conservative, since netting
+ *              salary would wreck every figure: returns from a merchant never
+ *              paid within the data, or under a different description, count
+ *              as income.
+ *   income   — any other money in.
  */
-export function buildFlows(transactions: Transaction[], index: GroupIndex): Flow[] {
-  const counted = transactions.filter(isCounted)
+export function classifyTransactions(transactions: Transaction[], index: GroupIndex): ClassifiedTx[] {
+  const countTransfers = getCountTransfers()
+  const rows = transactions
+    .filter((t) => !t.is_excluded && Number(t.amount) !== 0)
+    .map((t) => ({ t, amount: Number(t.amount), groupId: index.groupOf(t), internal: isInternalTx(t) }))
   const stemsPaid = new Set<string>()
-  for (const t of counted) {
-    if (Number(t.amount) < 0) {
-      stemsPaid.add(deriveStem(t.description))
+  for (const r of rows) {
+    if (r.amount < 0 && !r.internal && !(r.groupId && index.savings.has(r.groupId))) {
+      stemsPaid.add(deriveStem(r.t.description))
     }
   }
   stemsPaid.delete("")
@@ -91,27 +107,49 @@ export function buildFlows(transactions: Transaction[], index: GroupIndex): Flow
     }
     return false
   }
-  return counted.map((t) => {
-    const amount = Number(t.amount)
-    const groupId = index.groupOf(t)
-    const isRefund =
-      amount > 0 &&
-      isPaidStem(deriveStem(t.description)) &&
-      !(groupId && index.incomeOnly.has(groupId))
-    const isIncome = amount > 0 && !isRefund
+  const flowOf = (r: (typeof rows)[number]): Flow => {
+    if (r.groupId && index.savings.has(r.groupId)) {
+      return "saved"
+    }
+    if (r.internal) {
+      return "transfer"
+    }
+    if (r.amount < 0) {
+      return "spent"
+    }
+    if (isPaidStem(deriveStem(r.t.description)) && !(r.groupId && index.incomeOnly.has(r.groupId))) {
+      return "refund"
+    }
+    return "income"
+  }
+  return rows.map((r) => {
+    const { t, amount, groupId } = r
+    const flow = flowOf(r)
+    const counted = flow !== "transfer" || countTransfers
+    const isOut = amount < 0
+    const countsAsSpent = flow === "spent" || flow === "refund" || (flow === "transfer" && counted && isOut)
+    const countsAsIncome = flow === "income" || (flow === "transfer" && counted && !isOut)
     return {
+      tx: t,
+      flow,
+      counted,
       date: effectiveDate(t),
-      spent: isIncome ? 0 : -amount,
-      income: isIncome ? amount : 0,
+      spent: countsAsSpent ? -amount : 0,
+      income: countsAsIncome ? amount : 0,
+      saved: flow === "saved" ? -amount : 0,
+      transferOut: flow === "transfer" && isOut ? -amount : 0,
+      transferIn: flow === "transfer" && !isOut ? amount : 0,
       groupId,
       merchant: merchantOf(t),
     }
   })
 }
 
-/** The day drill-down: every counted row on `date`, in time order. */
-export function dayTransactions(transactions: Transaction[], date: string): Transaction[] {
-  return transactions
-    .filter((t) => isCounted(t) && effectiveDate(t) === date)
-    .sort((a, b) => (a.tx_at ?? effectiveDate(a)).localeCompare(b.tx_at ?? effectiveDate(b)))
+/** The day drill-down: every non-excluded row on `date` with how it counts, in time order. */
+export function dayTransactions(data: StatsData, date: string): DayTx[] {
+  const index = buildGroupIndex(data.categories, data.labels, data.typeMap, data.bills, data.incomes)
+  return classifyTransactions(data.transactions, index)
+    .filter((c) => c.date === date)
+    .sort((a, b) => (a.tx.tx_at ?? a.date).localeCompare(b.tx.tx_at ?? b.date))
+    .map((c) => ({ tx: c.tx, flow: c.flow, counted: c.counted }))
 }

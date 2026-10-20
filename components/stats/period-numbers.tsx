@@ -2,6 +2,7 @@
 
 import type { MonthStat, PeriodSummary, SpendingPace } from "@/lib/stats/types"
 import { MONTHS_LONG } from "@/lib/budget"
+import { useCountTransfers } from "@/lib/count-transfers"
 import { cn } from "@/lib/utils"
 import {
   Table,
@@ -44,155 +45,185 @@ export function YearTable({
   onSelectMonth?: (month: number) => void
 }) {
   return (
-    <Table className="text-sm">
-      <TableHeader>
-        <TableRow>
-          <TableHead>Month</TableHead>
-          <TableHead className="text-right">Income</TableHead>
-          <TableHead className="text-right">Spent</TableHead>
-          <TableHead className="text-right">Net</TableHead>
-          <TableHead className="text-right">Rate</TableHead>
-          <TableHead className="hidden text-right sm:table-cell">
-            Net saved
-          </TableHead>
-          <TableHead className="hidden text-right md:table-cell">
-            Budget bills
-          </TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {months.map((m) => {
-          const empty = m.status === "future" || m.status === "no-data"
-          // Rows outside the totals are muted so the Total row visibly adds up.
-          const counted =
-            m.status === "complete" ||
-            (includeIncomplete &&
-              (m.status === "current" || m.status === "partial"))
-          return (
-            <TableRow
-              key={m.month}
-              onClick={
-                onSelectMonth && !empty
-                  ? () => onSelectMonth(m.month)
-                  : undefined
-              }
+    <div className="flex flex-col gap-3">
+      <Table className="text-sm">
+        <TableHeader>
+          <TableRow>
+            <TableHead>Month</TableHead>
+            <TableHead className="text-right">Income</TableHead>
+            <TableHead className="text-right">Spent</TableHead>
+            <TableHead className="text-right">Net</TableHead>
+            <TableHead className="text-right">Rate</TableHead>
+            <TableHead className="hidden text-right sm:table-cell">
+              Saved
+            </TableHead>
+            <TableHead className="hidden text-right xl:table-cell">
+              Running net
+            </TableHead>
+            <TableHead className="hidden text-right 2xl:table-cell">
+              Budget bills
+            </TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {months.map((m) => {
+            const empty = m.status === "future" || m.status === "no-data"
+            // Rows outside the totals are muted so the Total row visibly adds up.
+            const counted =
+              m.status === "complete" ||
+              (includeIncomplete &&
+                (m.status === "current" || m.status === "partial"))
+            return (
+              <TableRow
+                key={m.month}
+                onClick={
+                  onSelectMonth && !empty
+                    ? () => onSelectMonth(m.month)
+                    : undefined
+                }
+                className={cn(
+                  "tabular-nums",
+                  !counted && "text-muted-foreground",
+                  onSelectMonth && !empty && "cursor-pointer",
+                )}
+              >
+                <TableCell className="font-medium">
+                  {MONTHS_LONG[m.month - 1]}
+                  {summary.monthsCounted > 1 &&
+                    summary.bestMonth?.month === m.month && (
+                      <span
+                        className={cn(
+                          "ml-2 text-[10px] font-semibold tracking-widest uppercase",
+                          up,
+                        )}
+                      >
+                        best
+                      </span>
+                    )}
+                  {summary.monthsCounted > 1 &&
+                    summary.worstMonth?.month === m.month && (
+                      <span
+                        className={cn(
+                          "ml-2 text-[10px] font-semibold tracking-widest uppercase",
+                          down,
+                        )}
+                      >
+                        weakest
+                      </span>
+                    )}
+                  {STATUS_LABEL[m.status] && (
+                    <span className="text-muted-foreground ml-2 text-[10px] font-semibold tracking-widest uppercase">
+                      {STATUS_LABEL[m.status]}
+                    </span>
+                  )}
+                </TableCell>
+                <TableCell className="text-right">
+                  {empty ? "—" : kr(m.income)}
+                </TableCell>
+                <TableCell className="text-right">
+                  {empty ? "—" : kr(m.spent)}
+                </TableCell>
+                <TableCell
+                  className={cn(
+                    "text-right font-medium",
+                    counted && tone(m.net),
+                  )}
+                >
+                  {empty ? "—" : signedKr(m.net)}
+                </TableCell>
+                <TableCell
+                  className={cn(
+                    "text-right",
+                    m.status === "complete" && m.savingsRate != null
+                      ? tone(m.savingsRate)
+                      : "text-muted-foreground",
+                  )}
+                >
+                  {empty ? "—" : pct(m.savingsRate)}
+                </TableCell>
+                <TableCell className="hidden text-right sm:table-cell">
+                  {empty ? "—" : kr(m.saved)}
+                </TableCell>
+                <TableCell className="hidden text-right xl:table-cell">
+                  {empty ? "—" : signedKr(m.cumulativeNet)}
+                </TableCell>
+                <TableCell className="text-muted-foreground hidden text-right 2xl:table-cell">
+                  {kr(m.budgetBills)}
+                </TableCell>
+              </TableRow>
+            )
+          })}
+        </TableBody>
+        <TableFooter className="tabular-nums">
+          <TableRow>
+            <TableCell className="font-semibold">
+              {includeIncomplete ? "Total" : "Total (completed months)"}
+            </TableCell>
+            <TableCell className="text-right font-semibold">
+              {kr(summary.income)}
+            </TableCell>
+            <TableCell className="text-right font-semibold">
+              {kr(summary.spent)}
+            </TableCell>
+            <TableCell
+              className={cn("text-right font-semibold", tone(summary.net))}
+            >
+              {signedKr(summary.net)}
+            </TableCell>
+            <TableCell className="text-right font-semibold">
+              {pct(summary.savingsRate)}
+            </TableCell>
+            <TableCell className="hidden text-right font-semibold sm:table-cell">
+              {kr(summary.saved)}
+            </TableCell>
+            <TableCell className="hidden xl:table-cell" />
+            <TableCell className="text-muted-foreground hidden text-right 2xl:table-cell">
+              {kr(summary.budgetBills)}
+            </TableCell>
+          </TableRow>
+          <TableRow>
+            <TableCell className="text-muted-foreground">
+              Average · {summary.monthsCounted} mo
+            </TableCell>
+            <TableCell className="text-right">
+              {kr(summary.avgMonthlyIncome)}
+            </TableCell>
+            <TableCell className="text-right">
+              {kr(summary.avgMonthlySpent)}
+            </TableCell>
+            <TableCell
               className={cn(
-                "tabular-nums",
-                !counted && "text-muted-foreground",
-                onSelectMonth && !empty && "cursor-pointer",
+                "text-right",
+                tone(summary.avgMonthlyIncome - summary.avgMonthlySpent),
               )}
             >
-              <TableCell className="font-medium">
-                {MONTHS_LONG[m.month - 1]}
-                {summary.monthsCounted > 1 &&
-                  summary.bestMonth?.month === m.month && (
-                    <span
-                      className={cn(
-                        "ml-2 text-[10px] font-semibold tracking-widest uppercase",
-                        up,
-                      )}
-                    >
-                      best
-                    </span>
-                  )}
-                {summary.monthsCounted > 1 &&
-                  summary.worstMonth?.month === m.month && (
-                    <span
-                      className={cn(
-                        "ml-2 text-[10px] font-semibold tracking-widest uppercase",
-                        down,
-                      )}
-                    >
-                      weakest
-                    </span>
-                  )}
-                {STATUS_LABEL[m.status] && (
-                  <span className="text-muted-foreground ml-2 text-[10px] font-semibold tracking-widest uppercase">
-                    {STATUS_LABEL[m.status]}
-                  </span>
-                )}
-              </TableCell>
-              <TableCell className="text-right">
-                {empty ? "—" : kr(m.income)}
-              </TableCell>
-              <TableCell className="text-right">
-                {empty ? "—" : kr(m.spent)}
-              </TableCell>
-              <TableCell
-                className={cn("text-right font-medium", counted && tone(m.net))}
-              >
-                {empty ? "—" : signedKr(m.net)}
-              </TableCell>
-              <TableCell
-                className={cn(
-                  "text-right",
-                  m.status === "complete" && m.savingsRate != null
-                    ? tone(m.savingsRate)
-                    : "text-muted-foreground",
-                )}
-              >
-                {empty ? "—" : pct(m.savingsRate)}
-              </TableCell>
-              <TableCell className="hidden text-right sm:table-cell">
-                {empty ? "—" : signedKr(m.cumulativeNet)}
-              </TableCell>
-              <TableCell className="text-muted-foreground hidden text-right md:table-cell">
-                {kr(m.budgetBills)}
-              </TableCell>
-            </TableRow>
-          )
-        })}
-      </TableBody>
-      <TableFooter className="tabular-nums">
-        <TableRow>
-          <TableCell className="font-semibold">
-            {includeIncomplete ? "Total" : "Total (completed months)"}
-          </TableCell>
-          <TableCell className="text-right font-semibold">
-            {kr(summary.income)}
-          </TableCell>
-          <TableCell className="text-right font-semibold">
-            {kr(summary.spent)}
-          </TableCell>
-          <TableCell
-            className={cn("text-right font-semibold", tone(summary.net))}
-          >
-            {signedKr(summary.net)}
-          </TableCell>
-          <TableCell className="text-right font-semibold">
-            {pct(summary.savingsRate)}
-          </TableCell>
-          <TableCell className="hidden sm:table-cell" />
-          <TableCell className="text-muted-foreground hidden text-right md:table-cell">
-            {kr(summary.budgetBills)}
-          </TableCell>
-        </TableRow>
-        <TableRow>
-          <TableCell className="text-muted-foreground">
-            Average · {summary.monthsCounted} mo
-          </TableCell>
-          <TableCell className="text-right">
-            {kr(summary.avgMonthlyIncome)}
-          </TableCell>
-          <TableCell className="text-right">
-            {kr(summary.avgMonthlySpent)}
-          </TableCell>
-          <TableCell
-            className={cn(
-              "text-right",
-              tone(summary.avgMonthlyIncome - summary.avgMonthlySpent),
-            )}
-          >
-            {signedKr(summary.avgMonthlyIncome - summary.avgMonthlySpent)}
-          </TableCell>
-          <TableCell className="text-right">
-            {pct(summary.avgSavingsRate)}
-          </TableCell>
-          <TableCell className="hidden sm:table-cell" />
-          <TableCell className="hidden md:table-cell" />
-        </TableRow>
-      </TableFooter>
-    </Table>
+              {signedKr(summary.avgMonthlyIncome - summary.avgMonthlySpent)}
+            </TableCell>
+            <TableCell className="text-right">
+              {pct(summary.avgSavingsRate)}
+            </TableCell>
+            <TableCell className="hidden sm:table-cell" />
+            <TableCell className="hidden xl:table-cell" />
+            <TableCell className="hidden 2xl:table-cell" />
+          </TableRow>
+        </TableFooter>
+      </Table>
+      <TransfersNote out={summary.transfersOut} into={summary.transfersIn} />
+    </div>
+  )
+}
+
+/** Own-account transfers are always tracked, but only counted when the setting is on. */
+export function TransfersNote({ out, into }: { out: number; into: number }) {
+  const counted = useCountTransfers()
+  if (out === 0 && into === 0) {
+    return null
+  }
+  return (
+    <p className="text-muted-foreground text-xs tabular-nums">
+      Transfers between own accounts: {kr(out)} out · {kr(into)} in ·{" "}
+      {counted ? "counted as spending/income" : "not counted"}
+    </p>
   )
 }
 
@@ -225,6 +256,7 @@ export function MonthFigures({
               : "—",
           hint: `${kr(summary.spent)} of ${kr(summary.budgetBills)}`,
         }
+  const countTransfers = useCountTransfers()
   const rows = [
     {
       label: "Income received",
@@ -265,6 +297,20 @@ export function MonthFigures({
       label: "Typical month",
       value: kr(pace.avgFullMonth),
       hint: `${pace.lookbackMonths} complete months`,
+    },
+    {
+      label: "Set aside",
+      value: kr(summary.saved),
+      hint:
+        summary.budgetSavings > 0
+          ? `of ${kr(summary.budgetSavings)} budgeted`
+          : undefined,
+    },
+    {
+      label: "Transfers out / in",
+      value: `${kr(summary.transfersOut)} / ${kr(summary.transfersIn)}`,
+      hint: countTransfers ? "counted" : "not counted",
+      className: countTransfers ? undefined : "text-muted-foreground",
     },
     { label: "Transactions", value: String(month.txCount) },
   ]
@@ -320,6 +366,15 @@ export function DataThrough({
       />
       Data through {formatShortDate(dataThrough)}
       {stale && <span className="sr-only">(more than 3 days old)</span>}
+    </span>
+  )
+}
+
+/** Shown in headers while transfers count, so the numbers aren't misread. */
+export function TransfersCountedChip() {
+  return (
+    <span className="border-primary/60 text-foreground border px-1.5 py-0.5 text-[10px] font-semibold tracking-widest whitespace-nowrap uppercase">
+      Transfers counted
     </span>
   )
 }
