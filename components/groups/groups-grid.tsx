@@ -143,7 +143,7 @@ export function GroupsGrid({
       const budget = monthlySubtotals(budgetItems, ctx)
       const want =
         kind === "income"
-          ? (t: Transaction) => !isInternalTx(t) && Number(t.amount) > 0
+          ? (t: Transaction) => !isInternalTx(t) && !t.is_excluded && Number(t.amount) > 0
           : isSpending
       const { rows, totals } = rowsFor(g.id, want)
       out.push({

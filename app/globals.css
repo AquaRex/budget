@@ -127,3 +127,57 @@
     @apply font-sans;
     }
 }
+/* Dashboard data-viz tokens. Categorical slots are a CVD-validated order;
+   heat steps are a single amber ramp (low recedes toward the surface). */
+:root {
+    --viz-income: oklch(0.696 0.17 162.48);
+    --viz-spent: oklch(0.645 0.246 16.439);
+    --viz-baseline: oklch(0.705 0.015 286.067);
+    --viz-cat-1: #2a78d6;
+    --viz-cat-2: #eb6834;
+    --viz-cat-3: #1baf7a;
+    --viz-cat-4: #eda100;
+    --viz-cat-5: #e87ba4;
+    --viz-cat-6: #008300;
+    --viz-cat-7: #6250d6;
+    --viz-cat-8: #e34948;
+    --viz-other: oklch(0.8 0.01 286);
+    --heat-0: oklch(0.955 0.003 286);
+    --heat-1: oklch(0.94 0.06 95);
+    --heat-2: oklch(0.87 0.12 88);
+    --heat-3: oklch(0.79 0.16 76);
+    --heat-4: oklch(0.69 0.17 62);
+    --heat-5: oklch(0.57 0.17 48);
+    --heat-ink-hi: oklch(0.99 0 0);
+}
+
+.dark {
+    --viz-income: oklch(0.765 0.177 163.223);
+    --viz-spent: oklch(0.712 0.194 13.428);
+    --viz-baseline: oklch(0.552 0.016 285.938);
+    --viz-cat-1: #3987e5;
+    --viz-cat-2: #d95926;
+    --viz-cat-3: #199e70;
+    --viz-cat-4: #c98500;
+    --viz-cat-5: #d55181;
+    --viz-cat-6: #008300;
+    --viz-cat-7: #9085e9;
+    --viz-cat-8: #e66767;
+    --viz-other: oklch(0.45 0.01 286);
+    --heat-0: oklch(0.26 0.006 286);
+    --heat-1: oklch(0.33 0.05 70);
+    --heat-2: oklch(0.43 0.09 68);
+    --heat-3: oklch(0.56 0.13 66);
+    --heat-4: oklch(0.71 0.16 72);
+    --heat-5: oklch(0.85 0.17 88);
+    --heat-ink-hi: oklch(0.18 0.006 286);
+}
+
+/* Diagonal hatch for days/months outside the imported data window. */
+.viz-no-data {
+    background-image: repeating-linear-gradient(
+        135deg,
+        color-mix(in oklch, var(--muted-foreground) 22%, transparent) 0 1px,
+        transparent 1px 5px
+    );
+}

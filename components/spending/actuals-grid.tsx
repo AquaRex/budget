@@ -49,7 +49,7 @@ export function ActualsGrid({
     const wanted = (t: Transaction) =>
       kind === "bill"
         ? isSpending(t)
-        : !isInternalTx(t) && Number(t.amount) > 0
+        : !isInternalTx(t) && !t.is_excluded && Number(t.amount) > 0
     type RawBand = { name: string; order: number; items: Map<string, Item> }
     const map = new Map<string, RawBand>()
 
@@ -117,7 +117,7 @@ export function ActualsGrid({
   const [calMonth, setCalMonth] = useState<number | null>(null)
 
   const wanted = (t: Transaction) =>
-    kind === "bill" ? isSpending(t) : !isInternalTx(t) && Number(t.amount) > 0
+    kind === "bill" ? isSpending(t) : !isInternalTx(t) && !t.is_excluded && Number(t.amount) > 0
   const calGetEvents = (yy: number, m: number): CalEvent[] => {
     const key = `${yy}-${String(m).padStart(2, "0")}`
     return transactions
