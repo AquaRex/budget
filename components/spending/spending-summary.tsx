@@ -57,7 +57,7 @@ export function SpendingSummary({
         else if (t.type)
           actualByType.set(t.type, (actualByType.get(t.type) ?? 0) + v)
         else uncategorised += v
-      } else if (!isInternalTx(t) && Number(t.amount) > 0) {
+      } else if (!isInternalTx(t) && !t.is_excluded && Number(t.amount) > 0) {
         totalIncome += Number(t.amount)
       }
     }

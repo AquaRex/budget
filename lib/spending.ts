@@ -399,7 +399,7 @@ export function incomeInPeriod(
   if (!period) return 0
   let s = 0
   for (const t of transactions)
-    if (periodOf(t) === period && !isInternalTx(t) && Number(t.amount) > 0)
+    if (periodOf(t) === period && !isInternalTx(t) && !t.is_excluded && Number(t.amount) > 0)
       s += Number(t.amount)
   return s
 }
