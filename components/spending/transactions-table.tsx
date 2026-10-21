@@ -331,7 +331,7 @@ export function TransactionsTable({
       </div>
 
       {selected.size > 0 && (
-        <div className="bg-muted/40 flex flex-wrap items-center gap-2 rounded-md border px-3 py-2 text-sm">
+        <div className="bg-primary/5 border-primary/30 flex flex-wrap items-center gap-2 border px-3 py-2 text-sm">
           <span className="font-medium">{selected.size} selected</span>
           <LabelCombobox
             labels={labels}
@@ -357,10 +357,10 @@ export function TransactionsTable({
         </div>
       )}
 
-      <div className="overflow-x-auto rounded-lg border">
+      <div className="overflow-x-auto border">
         <table className="w-full border-collapse text-sm">
           <thead>
-            <tr className="bg-muted/50 text-muted-foreground border-b text-xs">
+            <tr className="bg-muted text-muted-foreground border-b text-[11px] tracking-wider uppercase">
               <th className="w-8 px-2 py-2">
                 <input
                   type="checkbox"
@@ -425,7 +425,7 @@ export function TransactionsTable({
                       {fmtDate(effectiveDate(t))}
                     </td>
                     <td className="px-2 py-2">
-                      <div className="font-medium">{t.description || t.type}</div>
+                      <div className="font-medium break-words">{t.description || t.type}</div>
                       <div className="text-muted-foreground text-xs">
                         {t.type}
                         {internal && (

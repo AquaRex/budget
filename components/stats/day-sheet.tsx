@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { ArrowUpRight } from "lucide-react"
 
-import type { DayStat, DayTx } from "@/lib/stats/types"
+import type { DayStat } from "@/lib/stats/types"
 import { dayTransactions } from "@/lib/stats/flows"
 import { useStatsData } from "@/lib/stats/use-dashboard-stats"
 import { deriveStem } from "@/lib/spending"
@@ -15,22 +15,13 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
-import { formatLongDate, kr, signedKr, up } from "@/components/stats/display"
-
-function flowLabel(row: DayTx): string | null {
-  switch (row.flow) {
-    case "income":
-      return "Income"
-    case "refund":
-      return "Refund"
-    case "saved":
-      return "Saved"
-    case "transfer":
-      return row.counted ? "Transfer" : "Transfer · not counted"
-    default:
-      return null
-  }
-}
+import {
+  flowLabel,
+  formatLongDate,
+  kr,
+  signedKr,
+  up,
+} from "@/components/stats/display"
 
 /** Day-to-day drill-down: every transaction on one date, linking to Spending. */
 export function DaySheet({

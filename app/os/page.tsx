@@ -1,5 +1,5 @@
-import { OsDashboard } from "@/components/os/os-dashboard"
+import { OsHome } from "@/components/os/os-home"
 
 export default function OsPage() {
-  return <OsDashboard />
+  return <OsHome />
 }

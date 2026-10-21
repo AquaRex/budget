@@ -136,7 +136,7 @@ export function SalaryCalculator({ onChanged }: { onChanged: () => void }) {
   ]
 
   return (
-    <Card>
+    <Card size="sm">
       <CardHeader>
         <button
           type="button"
@@ -144,7 +144,7 @@ export function SalaryCalculator({ onChanged }: { onChanged: () => void }) {
           className="flex w-full items-center justify-between text-left"
         >
           <div>
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className="text-muted-foreground flex items-center gap-2 text-[11px] tracking-widest">
               <Settings2 className="size-4" />
               Salary calculator
               {profile && profile.yearlySalary > 0 && (
@@ -157,12 +157,12 @@ export function SalaryCalculator({ onChanged }: { onChanged: () => void }) {
               Auto-fills the Salary row. Drag a result onto any month.
             </CardDescription>
           </div>
-          <ChevronDown
-            className={cn(
-              "text-muted-foreground size-5 transition-transform",
-              open && "rotate-180",
-            )}
-          />
+          <span className="text-muted-foreground flex shrink-0 items-center gap-1 text-xs font-medium">
+            {open ? "Hide" : "Edit salary"}
+            <ChevronDown
+              className={cn("size-4 transition-transform", open && "rotate-180")}
+            />
+          </span>
         </button>
       </CardHeader>
 
@@ -174,7 +174,7 @@ export function SalaryCalculator({ onChanged }: { onChanged: () => void }) {
               draggable={c.value > 0}
               onDragStart={(e) => setDragAmount(e, c.value)}
               className={cn(
-                "flex items-center gap-2 rounded-md border px-3 py-2",
+                "flex items-center gap-2 border px-3 py-2",
                 c.value > 0
                   ? "bg-card cursor-grab active:cursor-grabbing"
                   : "opacity-50",
@@ -352,7 +352,7 @@ export function SalaryCalculator({ onChanged }: { onChanged: () => void }) {
               </div>
             )}
 
-            <div className="text-muted-foreground grid gap-1 rounded-md border p-3 text-sm sm:grid-cols-2">
+            <div className="text-muted-foreground grid gap-1 border p-3 text-sm sm:grid-cols-2">
               <div className="flex justify-between">
                 <span>Yearly after tax</span>
                 <span className="text-foreground font-medium tabular-nums">

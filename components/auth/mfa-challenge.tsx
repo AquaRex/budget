@@ -82,13 +82,17 @@ export function MfaChallenge() {
       </CardContent>
       <CardFooter className="flex flex-col gap-2">
         <Button
-          className="w-full"
+          className="h-11 w-full sm:h-10"
           onClick={() => verify(code)}
           disabled={loading || code.length !== 6}
         >
           {loading ? "Verifying…" : "Verify"}
         </Button>
-        <Button variant="ghost" className="w-full" onClick={signOut}>
+        <Button
+          variant="ghost"
+          className="h-11 w-full sm:h-10"
+          onClick={signOut}
+        >
           Use a different account
         </Button>
       </CardFooter>

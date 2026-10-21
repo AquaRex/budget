@@ -34,7 +34,7 @@ export function DangerZone() {
   }
 
   return (
-    <Card className="border-destructive/40">
+    <Card size="sm" className="ring-destructive/40">
       <CardHeader className="pb-2">
         <CardTitle className="text-destructive flex items-center gap-2 text-sm font-medium">
           <AlertTriangle className="size-4" />
@@ -59,7 +59,7 @@ export function DangerZone() {
             </Button>
           </div>
         ) : (
-          <div className="border-destructive/40 flex flex-col gap-2 rounded-md border p-3">
+          <div className="border-destructive/40 flex flex-col gap-2 border p-3">
             <p className="text-sm font-medium">
               Permanently delete all {count} transactions and import history?
             </p>

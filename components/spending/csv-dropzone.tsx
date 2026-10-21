@@ -13,12 +13,13 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 
 function defaultLabel(): string {
   return new Date().toLocaleString("nb-NO", {
@@ -41,9 +42,12 @@ type Preview = {
 export function CsvDropzone({
   rules,
   onImported,
+  large = false,
 }: {
   rules: TxRule[]
   onImported: () => void
+  /** The first-run drop area; otherwise a compact button-sized target. */
+  large?: boolean
 }) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [dragOver, setDragOver] = useState(false)
@@ -103,114 +107,160 @@ export function CsvDropzone({
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Import bank transactions</CardTitle>
-        <CardDescription>
-          Drop your bank&apos;s CSV export here. Only new transactions are added;
-          re-uploading the same file changes nothing.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
-        <div
-          role="button"
-          tabIndex={0}
-          onClick={() => inputRef.current?.click()}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") inputRef.current?.click()
-          }}
-          onDragOver={(e) => {
-            e.preventDefault()
-            setDragOver(true)
-          }}
-          onDragLeave={() => setDragOver(false)}
-          onDrop={(e) => {
-            e.preventDefault()
-            setDragOver(false)
-            const file = e.dataTransfer.files?.[0]
-            if (file) handleFile(file)
-          }}
-          className={cn(
-            "flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed px-6 py-10 text-center transition-colors",
-            dragOver
-              ? "border-primary bg-primary/5"
-              : "border-muted-foreground/25 hover:border-muted-foreground/50",
-          )}
-        >
-          {busy ? (
-            <Loader2 className="text-muted-foreground size-6 animate-spin" />
-          ) : (
-            <Upload className="text-muted-foreground size-6" />
-          )}
-          <p className="text-sm font-medium">
-            Drag &amp; drop a .csv, or click to choose
-          </p>
-          <p className="text-muted-foreground text-xs">
-            Semicolon-separated export (NOK), all accounts.
-          </p>
-          <input
-            ref={inputRef}
-            type="file"
-            accept=".csv,text/csv"
-            className="hidden"
-            onChange={(e) => {
-              const file = e.target.files?.[0]
-              if (file) handleFile(file)
-              e.target.value = ""
-            }}
-          />
-        </div>
-
-        {preview && (
-          <div className="flex flex-col gap-3 rounded-lg border p-4">
-            <div className="flex items-center gap-2 text-sm font-medium">
-              <FileText className="size-4" />
-              {preview.filename}
-            </div>
-            <div className="flex flex-wrap gap-4 text-sm">
-              <span>
-                <span className="font-semibold text-emerald-600 dark:text-emerald-400">
-                  {preview.insert}
-                </span>{" "}
-                new
-              </span>
-              <span>
-                <span className="font-semibold text-amber-600 dark:text-amber-400">
-                  {preview.update}
-                </span>{" "}
-                updated
-              </span>
-              <span className="text-muted-foreground">
-                {preview.unchanged} already imported
-              </span>
-            </div>
-            <div className="grid gap-2 sm:max-w-xs">
-              <Label htmlFor="import-label">Snapshot label</Label>
-              <Input
-                id="import-label"
-                value={label}
-                onChange={(e) => setLabel(e.target.value)}
-                placeholder="e.g. After June salary"
-              />
-              <p className="text-muted-foreground text-xs">
-                When you took this snapshot (before/after salary or bills).
-              </p>
-            </div>
-            <div className="flex gap-2">
-              <Button onClick={confirmImport} disabled={busy}>
-                {busy ? "Importing…" : "Import"}
-              </Button>
-              <Button
-                variant="ghost"
-                onClick={() => setPreview(null)}
-                disabled={busy}
-              >
-                Cancel
-              </Button>
-            </div>
-          </div>
+    <>
+      <div
+        role="button"
+        tabIndex={0}
+        title="Import your bank's CSV export"
+        onClick={() => inputRef.current?.click()}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            inputRef.current?.click()
+          }
+        }}
+        onDragOver={(e) => {
+          e.preventDefault()
+          setDragOver(true)
+        }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={(e) => {
+          e.preventDefault()
+          setDragOver(false)
+          const file = e.dataTransfer.files?.[0]
+          if (file) {
+            handleFile(file)
+          }
+        }}
+        className={cn(
+          "flex cursor-pointer items-center border border-dashed transition-colors",
+          large
+            ? "flex-col justify-center gap-2 border-2 px-6 py-14 text-center"
+            : "h-11 gap-2 px-3 sm:h-9",
+          dragOver
+            ? "border-primary bg-primary/5"
+            : "border-muted-foreground/30 hover:border-muted-foreground/60 hover:bg-muted/40",
         )}
-      </CardContent>
-    </Card>
+      >
+        {busy ? (
+          <Loader2 className="text-muted-foreground size-4 animate-spin" />
+        ) : (
+          <Upload
+            className={cn("text-muted-foreground", large ? "size-6" : "size-4")}
+          />
+        )}
+        {large ? (
+          <>
+            <p className="text-sm font-medium">
+              Drag &amp; drop your bank&apos;s .csv, or click to choose
+            </p>
+            <p className="text-muted-foreground max-w-sm text-xs">
+              Semicolon-separated export (NOK), all accounts. Only new
+              transactions are added; re-uploading the same file changes
+              nothing.
+            </p>
+          </>
+        ) : (
+          <>
+            <span className="text-xs font-semibold tracking-wider uppercase">
+              Import CSV
+            </span>
+            <span className="text-muted-foreground hidden text-xs md:inline">
+              drop a file or click
+            </span>
+          </>
+        )}
+        <input
+          ref={inputRef}
+          type="file"
+          accept=".csv,text/csv"
+          className="hidden"
+          onClick={(e) => e.stopPropagation()}
+          onChange={(e) => {
+            const file = e.target.files?.[0]
+            if (file) {
+              handleFile(file)
+            }
+            e.target.value = ""
+          }}
+        />
+      </div>
+
+      <Dialog
+        open={!!preview}
+        onOpenChange={(o) => {
+          if (!o && !busy) {
+            setPreview(null)
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Import bank transactions</DialogTitle>
+            <DialogDescription>
+              Only new transactions are added; re-uploading the same file
+              changes nothing.
+            </DialogDescription>
+          </DialogHeader>
+          {preview && (
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center gap-2 text-sm font-medium">
+                <FileText className="size-4" />
+                <span className="truncate">{preview.filename}</span>
+              </div>
+              <dl className="grid grid-cols-3 border text-center">
+                <div className="flex flex-col gap-0.5 py-3">
+                  <dt className="text-muted-foreground text-[11px] font-semibold tracking-wider uppercase">
+                    New
+                  </dt>
+                  <dd className="text-xl font-semibold text-emerald-600 tabular-nums dark:text-emerald-400">
+                    {preview.insert}
+                  </dd>
+                </div>
+                <div className="flex flex-col gap-0.5 border-x py-3">
+                  <dt className="text-muted-foreground text-[11px] font-semibold tracking-wider uppercase">
+                    Updated
+                  </dt>
+                  <dd className="text-xl font-semibold text-amber-600 tabular-nums dark:text-amber-400">
+                    {preview.update}
+                  </dd>
+                </div>
+                <div className="flex flex-col gap-0.5 py-3">
+                  <dt className="text-muted-foreground text-[11px] font-semibold tracking-wider uppercase">
+                    Already in
+                  </dt>
+                  <dd className="text-muted-foreground text-xl font-semibold tabular-nums">
+                    {preview.unchanged}
+                  </dd>
+                </div>
+              </dl>
+              <div className="grid gap-2">
+                <Label htmlFor="import-label">Snapshot label</Label>
+                <Input
+                  id="import-label"
+                  value={label}
+                  onChange={(e) => setLabel(e.target.value)}
+                  placeholder="e.g. After June salary"
+                />
+                <p className="text-muted-foreground text-xs">
+                  When you took this snapshot (before/after salary or bills).
+                </p>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              onClick={() => setPreview(null)}
+              disabled={busy}
+            >
+              Cancel
+            </Button>
+            <Button onClick={confirmImport} disabled={busy}>
+              {busy ? "Importing…" : "Import"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }

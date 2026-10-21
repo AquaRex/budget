@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next"
 
+import { OsShell } from "@/components/os/os-shell"
+
 export const metadata: Metadata = {
   title: "Budget OS",
   description: "Quick-glance budget for your phone",
@@ -25,5 +27,5 @@ export default function OsLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
-  return children
+  return <OsShell>{children}</OsShell>
 }

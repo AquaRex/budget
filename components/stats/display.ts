@@ -1,5 +1,6 @@
 import type {
   CategoryHistory,
+  Flow,
   DayStat,
   MonthStat,
   PeriodSummary,
@@ -215,3 +216,19 @@ export function leftThisMonth(
 }
 
 export type MonthLeft = ReturnType<typeof leftThisMonth>
+
+/** How a transaction counts, for list rows; null for plain spending. */
+export function flowLabel(row: { flow: Flow; counted: boolean }): string | null {
+  switch (row.flow) {
+    case "income":
+      return "Income"
+    case "refund":
+      return "Refund"
+    case "saved":
+      return "Saved"
+    case "transfer":
+      return row.counted ? "Transfer" : "Transfer · not counted"
+    default:
+      return null
+  }
+}

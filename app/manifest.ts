@@ -5,6 +5,10 @@ export const dynamic = "force-static"
 // Manifest URLs are not rewritten by Next, so they carry the basePath themselves.
 const base = process.env.NEXT_PUBLIC_BASE_PATH || ""
 
+const shortcutIcon = [
+  { src: `${base}/icon-96.png`, sizes: "96x96", type: "image/png" },
+]
+
 export default function manifest(): MetadataRoute.Manifest {
   return {
     id: `${base}/os/`,
@@ -15,8 +19,17 @@ export default function manifest(): MetadataRoute.Manifest {
     start_url: `${base}/os/`,
     scope: `${base}/os/`,
     display: "standalone",
+    display_override: ["standalone", "minimal-ui"],
+    // The Fold turns between a tall cover screen and a near-square inner one.
+    orientation: "any",
+    categories: ["finance", "productivity"],
     background_color: "#09090b",
     theme_color: "#09090b",
+    shortcuts: [
+      { name: "Spending", url: `${base}/os/spending/`, icons: shortcutIcon },
+      { name: "Budget", url: `${base}/os/budget/`, icons: shortcutIcon },
+      { name: "Groups", url: `${base}/os/groups/`, icons: shortcutIcon },
+    ],
     icons: [
       {
         src: `${base}/icon-192.png`,

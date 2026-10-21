@@ -93,14 +93,6 @@ export function Organize() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div>
-        <h2 className="text-lg font-semibold tracking-tight">Organize</h2>
-        <p className="text-muted-foreground text-sm">
-          Build your groups &amp; categories on the left; categorise every
-          merchant in bulk on the right. One category decision covers all of a
-          merchant&apos;s past and future charges.
-        </p>
-      </div>
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
         <StructurePanel
           categories={categories}
@@ -271,7 +263,13 @@ function StructurePanel({
               .filter((c) => c.group_id === g.id)
               .sort((a, b) => a.name.localeCompare(b.name))
             return (
-              <div key={g.id} className="rounded-md border p-2.5">
+              <div
+                key={g.id}
+                className={cn(
+                  "border p-2.5",
+                  g.is_savings && "border-emerald-500/40 bg-emerald-500/5",
+                )}
+              >
                 <div className="flex items-center justify-between gap-2">
                   <div className="text-sm font-semibold">{g.name}</div>
                   <label className="text-muted-foreground flex cursor-pointer items-center gap-2 text-xs">

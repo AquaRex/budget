@@ -1,7 +1,7 @@
 import type { ImportBatch, Transaction } from "@/lib/types"
 import { effectiveDate } from "@/lib/spending"
 import type { MonthStatus } from "@/lib/stats/types"
-import { addDays, daysInMonth, dayKey, isoDate } from "@/lib/stats/dates"
+import { addDays, daysInMonth, dayKey, isoDate, ymKey } from "@/lib/stats/dates"
 
 // The date window the imported bank data fully covers (inclusive).
 export type Coverage = { start: string | null; through: string | null }
@@ -94,6 +94,25 @@ export function computeCoverage(
   return {
     start: coverageStart(transactions),
     through: coverageThrough(transactions, imports, today),
+  }
+}
+
+/** Coverage plus a status lookup for any month, from all transactions. */
+export function monthStatusResolver(
+  transactions: Transaction[],
+  imports: ImportBatch[],
+  today: string,
+): { coverage: Coverage; statusOf: (year: number, month: number) => MonthStatus } {
+  const coverage = computeCoverage(transactions, imports, today)
+  const rowsByMonth = new Map<string, number>()
+  for (const t of transactions) {
+    const ym = effectiveDate(t).slice(0, 7)
+    rowsByMonth.set(ym, (rowsByMonth.get(ym) ?? 0) + 1)
+  }
+  return {
+    coverage,
+    statusOf: (year, month) =>
+      monthStatus(year, month, coverage, today, rowsByMonth.get(ymKey(year, month)) ?? 0),
   }
 }
 

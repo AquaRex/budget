@@ -453,6 +453,11 @@ export function EntriesGrid({
                 {cat ? cat.name : "Uncategorized"}
               </span>
             )}
+            {cat?.is_savings && (
+              <Badge variant="outline" className="text-[10px]">
+                savings
+              </Badge>
+            )}
             {cat && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -527,12 +532,14 @@ export function EntriesGrid({
 
   return (
     <div className="flex flex-col gap-6">
-      <div
-        className={cn(
-          "flex flex-wrap items-center gap-3",
-          embedded ? "justify-end" : "justify-between",
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        {embedded && (
+          <p className="text-muted-foreground text-xs">
+            Click a cell to edit · drag ⋮⋮ to reorder or move between groups ·
+            drag a value onto another month to copy it · click a month for its
+            calendar
+          </p>
         )}
-      >
         {!embedded && (
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">
@@ -553,7 +560,7 @@ export function EntriesGrid({
 
       {!isBill && <SalaryCalculator onChanged={refresh} />}
 
-      <div ref={wrapperRef} className="overflow-x-auto rounded-lg border">
+      <div ref={wrapperRef} className="overflow-x-auto border">
         <table
           className="w-full border-collapse text-sm"
           onMouseOver={(e) => {
@@ -567,7 +574,7 @@ export function EntriesGrid({
             className="relative z-[11]"
             style={{ top: headOffset || undefined }}
           >
-            <tr className="border-b">
+            <tr className="border-b [&>th]:text-[11px] [&>th]:tracking-wider [&>th]:uppercase">
               <th className={cn(sticky, "bg-muted px-3 py-2 text-left font-medium")}>
                 Name
               </th>
@@ -619,7 +626,7 @@ export function EntriesGrid({
                   <Fragment key={cat.id}>
                     {idx > 0 && (
                       <tr aria-hidden>
-                        <td colSpan={COLS} className="bg-background h-12 border-0 p-0" />
+                        <td colSpan={COLS} className="bg-background h-6 border-0 p-0" />
                       </tr>
                     )}
                     {renderBand(cat, itemsOf(cat.id))}
@@ -629,7 +636,7 @@ export function EntriesGrid({
                 {uncategorized.length > 0 && (
                   <>
                     <tr aria-hidden>
-                      <td colSpan={COLS} className="bg-background h-12 border-0 p-0" />
+                      <td colSpan={COLS} className="bg-background h-6 border-0 p-0" />
                     </tr>
                     {renderBand(null, uncategorized)}
                     {uncategorized.map((e) => renderEntryRow(e))}

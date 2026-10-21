@@ -12,7 +12,7 @@ import { useAvailableYears, useBudgetYears } from "@/lib/data/use-budget"
 import { copyYearBudget, deleteYearBudget } from "@/lib/data/years"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Panel } from "@/components/stats/panel"
 import {
   Select,
   SelectContent,
@@ -118,13 +118,11 @@ export function YearManager() {
   }
 
   return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-muted-foreground text-sm font-medium">
-          Years
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-3">
+    <Panel
+      title="Budget years"
+      subtitle="Each year has its own budget sheet and salary"
+    >
+      <div className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center gap-1.5">
           {years.map((y) => {
             const hasBudget = budgetYears.includes(y)
@@ -151,7 +149,7 @@ export function YearManager() {
                   if (from != null) copy(from, y)
                 }}
                 className={cn(
-                  "flex items-center gap-1 rounded-md border py-1 pr-1 pl-2.5 text-sm font-medium tabular-nums transition-colors",
+                  "flex items-center gap-1 border py-1 pr-1 pl-2.5 text-sm font-medium tabular-nums transition-colors",
                   y === year ? "border-primary bg-secondary" : "hover:bg-secondary/60",
                   overYear === y && "ring-primary ring-2",
                   dragYear === y && "opacity-40",
@@ -194,7 +192,7 @@ export function YearManager() {
         </div>
 
         {adding && (
-          <div className="flex flex-wrap items-end gap-2 rounded-md border p-3">
+          <div className="flex flex-wrap items-end gap-2 border p-3">
             <label className="flex flex-col gap-1 text-xs">
               <span className="text-muted-foreground">Year</span>
               <Input
@@ -236,7 +234,7 @@ export function YearManager() {
           (replaces the target) · × deletes a year&apos;s budget. Years marked
           “(actuals)” only have imported transactions.
         </p>
-      </CardContent>
-    </Card>
+      </div>
+    </Panel>
   )
 }

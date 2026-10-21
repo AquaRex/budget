@@ -1,11 +1,10 @@
 "use client"
 
-import { Fragment, useMemo, useState } from "react"
+import { Fragment, useState } from "react"
 import { ChevronRight } from "lucide-react"
 
-import type { Category, Entry, Label, Transaction } from "@/lib/types"
-import type { BudgetContext } from "@/lib/budget"
-import { MONTHS_SHORT, MONTHS_LONG, monthlySubtotals } from "@/lib/budget"
+import type { Category, Transaction } from "@/lib/types"
+import { MONTHS_SHORT, MONTHS_LONG } from "@/lib/budget"
 import { formatNumber } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import { useRouter } from "next/navigation"
@@ -13,176 +12,42 @@ import { useRouter } from "next/navigation"
 import {
   effectiveCategoryId,
   effectiveDate,
-  groupOfCategory,
-  placementCategoryId,
   deriveStem,
-  isSpending,
-  isIncome,
   isInternalTx,
   type TypeMap,
 } from "@/lib/spending"
+import { NO_LABEL, type GroupBand } from "@/lib/stats/groups"
+import type { MonthStatus } from "@/lib/stats/types"
 import { MonthCalendar, type CalEvent } from "@/components/calendar/month-calendar"
+import { down, signedKr, up } from "@/components/stats/display"
+import {
+  DiffLegend,
+  diffFill,
+  diffLevel,
+  isSettled,
+} from "@/components/groups/diff-heat"
 
 // Freeze the first column on ≥sm screens, like the other grids.
 const sticky = "sm:sticky sm:left-0 sm:z-10"
 const COLS = 15 // name + 12 months + total + avg
-const NO_LABEL = "__nolabel__"
-
-type ActualRow = {
-  key: string
-  name: string
-  months: number[]
-  total: number
-  // Per-label breakdown of this category's spend (empty when nothing is labelled).
-  subRows?: ActualRow[]
-}
-type Band = {
-  key: string
-  name: string
-  kind: "bill" | "income"
-  savings: boolean // saving more than budgeted is good, like income
-  budget: number[] // 12 monthly budgeted amounts (0s for the Unassigned band)
-  hasBudget: boolean
-  rows: ActualRow[] // one per bank type, actuals
-  actual: number[] // 12 monthly actual totals
-}
-
-const zeros = () => Array(12).fill(0) as number[]
-const sum = (a: number[]) => a.reduce((s, v) => s + v, 0)
 
 export function GroupsGrid({
   transactions,
   groups,
   categories,
-  labels,
   typeMap,
-  billEntries,
-  incomeEntries,
-  ctx,
   year,
+  statuses,
+  bands,
 }: {
   transactions: Transaction[]
   groups: Category[] // categories used by Bills/Income, in sort order
   categories: Category[] // the full pool (for category -> group resolution)
-  labels: Label[]
   typeMap: TypeMap
-  billEntries: Entry[]
-  incomeEntries: Entry[]
-  ctx: BudgetContext
   year: string
+  statuses: MonthStatus[] // 12, from computeGroupsMatrix
+  bands: GroupBand[] // from computeGroupsMatrix
 }) {
-  const bands = useMemo<Band[]>(() => {
-    const inYear = transactions.filter(
-      (t) => effectiveDate(t).slice(0, 4) === year,
-    )
-    const groupIds = new Set(groups.map((g) => g.id))
-    const catById = new Map(categories.map((c) => [c.id, c]))
-    const labelById = new Map(labels.map((l) => [l.id, l]))
-    const labelHome = new Map(labels.map((l) => [l.id, l.category_id]))
-
-    // Actual rows (one per resolved category) for a group + sign convention.
-    // Each category row also carries a per-label breakdown for drill-down.
-    const rowsFor = (
-      groupId: string | null,
-      want: (t: Transaction) => boolean,
-      signed = false, // savings: outflows add, withdrawals subtract
-    ): { rows: ActualRow[]; totals: number[] } => {
-      const byCat = new Map<string, ActualRow>()
-      const subByCat = new Map<string, Map<string, ActualRow>>()
-      const totals = zeros()
-      for (const t of inYear) {
-        if (!want(t)) continue
-        // Labelled charges roll up under the label's home category, so a label's
-        // total spans every payment channel it was bought through.
-        const ec = placementCategoryId(t, typeMap, labelHome)
-        if (groupOfCategory(ec, groupIds, catById) !== groupId) continue
-        const key = ec ?? `type:${t.type ?? ""}`
-        const name = (ec && catById.get(ec)?.name) || t.type || "Uncategorised"
-        let row = byCat.get(key)
-        if (!row) {
-          row = { key, name, months: zeros(), total: 0 }
-          byCat.set(key, row)
-          subByCat.set(key, new Map())
-        }
-        const mo = Number(effectiveDate(t).slice(5, 7)) - 1
-        const v = signed ? -Number(t.amount) : Math.abs(Number(t.amount))
-        row.months[mo] += v
-        row.total += v
-        totals[mo] += v
-
-        // Per-label sub-row within this category.
-        const subMap = subByCat.get(key)!
-        const lkey = t.label_id ?? NO_LABEL
-        const lname = t.label_id
-          ? labelById.get(t.label_id)?.name ?? "Label"
-          : "No label"
-        let sub = subMap.get(lkey)
-        if (!sub) {
-          sub = { key: lkey, name: lname, months: zeros(), total: 0 }
-          subMap.set(lkey, sub)
-        }
-        sub.months[mo] += v
-        sub.total += v
-      }
-      for (const [key, row] of byCat) {
-        const subs = Array.from(subByCat.get(key)!.values()).sort(
-          (a, b) => b.total - a.total,
-        )
-        // Only worth expanding when something here is actually labelled.
-        row.subRows = subs.some((s) => s.key !== NO_LABEL) ? subs : []
-      }
-      const rows = Array.from(byCat.values()).sort((a, b) => b.total - a.total)
-      return { rows, totals }
-    }
-
-    const out: Band[] = []
-
-    for (const g of groups) {
-      const billItems = billEntries.filter((e) => e.category_id === g.id)
-      const incomeItems = incomeEntries.filter((e) => e.category_id === g.id)
-      const kind: "bill" | "income" =
-        incomeItems.length > 0 && billItems.length === 0 ? "income" : "bill"
-      const budgetItems = kind === "income" ? incomeItems : billItems
-      const budget = monthlySubtotals(budgetItems, ctx)
-      // A savings group holds every transfer/purchase placed in it, net of withdrawals.
-      const want = g.is_savings
-        ? (t: Transaction) => !t.is_excluded
-        : kind === "income"
-          ? isIncome
-          : isSpending
-      const { rows, totals } = rowsFor(g.id, want, g.is_savings)
-      out.push({
-        key: g.id,
-        name: g.name,
-        kind,
-        savings: g.is_savings,
-        budget,
-        hasBudget: budgetItems.length > 0,
-        rows,
-        actual: totals,
-      })
-    }
-
-    // Trailing band: spending whose bank type isn't assigned to a group yet.
-    const { rows: unRows, totals: unTotals } = rowsFor(null, isSpending)
-    if (unRows.length > 0) {
-      out.push({
-        key: "__unassigned__",
-        name: "Unassigned",
-        kind: "bill",
-        savings: false,
-        budget: zeros(),
-        hasBudget: false,
-        rows: unRows,
-        actual: unTotals,
-      })
-    }
-
-    // Hide chosen groups that have neither budget nor actuals this year.
-    return out.filter(
-      (b) => b.hasBudget || b.rows.length > 0 || b.key === "__unassigned__",
-    )
-  }, [transactions, groups, categories, labels, typeMap, billEntries, incomeEntries, ctx, year])
 
   const [hoverCol, setHoverCol] = useState<number | null>(null)
   const colBg = (m: number) => (hoverCol === m ? "bg-primary/5" : "")
@@ -226,15 +91,10 @@ export function GroupsGrid({
         } as CalEvent
       })
   }
-  const avg12 = (total: number) => total / 12
-  const avgActive = (months: number[], total: number) => {
-    const n = months.filter((m) => m > 0).length
-    return n ? total / n : 0
-  }
 
   if (groups.length === 0) {
     return (
-      <div className="text-muted-foreground rounded-lg border py-10 text-center text-sm">
+      <div className="text-muted-foreground border py-10 text-center text-sm">
         No groups yet. Groups are the categories your Bills and Income use — add
         an entry under a category to create one.
       </div>
@@ -243,7 +103,7 @@ export function GroupsGrid({
 
   if (bands.length === 0) {
     return (
-      <div className="text-muted-foreground rounded-lg border py-10 text-center text-sm">
+      <div className="text-muted-foreground border py-10 text-center text-sm">
         No budget or spending to show for {year}.
       </div>
     )
@@ -251,7 +111,8 @@ export function GroupsGrid({
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="overflow-x-auto rounded-lg border">
+      <DiffLegend />
+      <div className="overflow-x-auto border">
         <table
           className="w-full border-collapse text-sm"
           onMouseOver={(e) => {
@@ -261,7 +122,7 @@ export function GroupsGrid({
           onMouseLeave={() => setHoverCol(null)}
         >
           <thead>
-            <tr className="bg-muted border-b">
+            <tr className="bg-muted border-b text-[11px] tracking-wider uppercase">
               <th
                 className={cn(sticky, "bg-muted px-3 py-2 text-left font-medium")}
               >
@@ -289,23 +150,22 @@ export function GroupsGrid({
           </thead>
           <tbody>
             {bands.map((band, idx) => {
-              const budgetTotal = sum(band.budget)
-              const actualTotal = sum(band.actual)
-              // Difference is signed so positive is always good: money saved
-              // (bills under budget), extra income or extra savings; negative is
-              // over budget / short on income or savings. So red is always "−",
-              // green always "+".
-              const dsign = band.kind === "income" || band.savings ? 1 : -1
-              const diff = band.budget.map((b, i) => dsign * (band.actual[i] - b))
-              const diffTotal = dsign * (actualTotal - budgetTotal)
+              // Difference is signed so + is always good, so red is always "−".
+              const { budgetTotal, actualTotal, diff } = band
               const badSign = (v: number) => v < 0
+              // Income/savings still to come this month isn't a shortfall yet.
+              const isPending = (v: number, i: number) =>
+                band.kind !== "bill" && v < 0 && statuses[i] === "current"
+              const current = statuses.indexOf("current")
+              const pendingNow = current >= 0 && isPending(diff[current], current)
+              const { diffToDate } = band
               return (
                 <Fragment key={band.key}>
                   {idx > 0 && (
                     <tr aria-hidden>
                       <td
                         colSpan={COLS}
-                        className="bg-background h-6 border-0 p-0"
+                        className="bg-background h-4 border-0 p-0"
                       />
                     </tr>
                   )}
@@ -319,9 +179,16 @@ export function GroupsGrid({
                       )}
                     >
                       {band.name}
-                      {band.kind === "income" && (
-                        <span className="text-muted-foreground ml-1.5 text-xs font-normal">
-                          income
+                      {band.kind !== "bill" && (
+                        <span
+                          className={cn(
+                            "ml-2 border px-1.5 py-0.5 text-[10px] font-semibold tracking-wider uppercase",
+                            band.kind === "savings"
+                              ? "border-emerald-500/40 text-emerald-700 dark:text-emerald-400"
+                              : "text-muted-foreground",
+                          )}
+                        >
+                          {band.kind}
                         </span>
                       )}
                     </td>
@@ -357,13 +224,13 @@ export function GroupsGrid({
                       </td>
                     ))}
                     <td className="text-muted-foreground px-2 py-1.5 text-right tabular-nums whitespace-nowrap">
-                      {formatNumber(avg12(budgetTotal))}
+                      {formatNumber(band.budgetAvg)}
                     </td>
                   </tr>
 
                   {/* Actual rows, one per resolved category (expandable into labels) */}
                   {band.rows.map((row) => {
-                    const expandable = (row.subRows?.length ?? 0) > 0
+                    const expandable = row.subRows.length > 0
                     const ekey = `${band.key}:${row.key}`
                     const isOpen = expanded.has(ekey)
                     return (
@@ -410,13 +277,13 @@ export function GroupsGrid({
                             </td>
                           ))}
                           <td className="text-muted-foreground px-2 py-1.5 text-right tabular-nums whitespace-nowrap">
-                            {formatNumber(avgActive(row.months, row.total))}
+                            {formatNumber(row.avg)}
                           </td>
                         </tr>
 
                         {/* Per-label breakdown */}
                         {isOpen &&
-                          row.subRows!.map((sub) => (
+                          row.subRows.map((sub) => (
                             <tr key={sub.key} className="border-b">
                               <td
                                 className={cn(
@@ -499,7 +366,7 @@ export function GroupsGrid({
                       </td>
                     ))}
                     <td className="text-muted-foreground px-2 py-1.5 text-right tabular-nums whitespace-nowrap">
-                      {formatNumber(avg12(actualTotal))}
+                      {formatNumber(band.actualAvg)}
                     </td>
                   </tr>
 
@@ -515,37 +382,74 @@ export function GroupsGrid({
                         Difference
                       </td>
                       <td
+                        title={`Year to date: budget ${formatNumber(band.budgetToDate)}, ${signedKr(diffToDate)}${pendingNow ? " (this month's pending amount not counted yet)" : ""}`}
                         className={cn(
                           "px-2 py-1.5 text-right font-semibold tabular-nums whitespace-nowrap",
-                          diffTotal === 0
+                          diffToDate === 0
                             ? "text-muted-foreground"
-                            : badSign(diffTotal)
-                              ? "text-red-600 dark:text-red-400"
-                              : "text-emerald-600 dark:text-emerald-400",
+                            : badSign(diffToDate)
+                              ? down
+                              : up,
                         )}
                       >
-                        {diffTotal > 0 ? "+" : ""}
-                        {formatNumber(diffTotal)}
+                        <span className="text-muted-foreground mr-1.5 text-[10px] font-medium tracking-wider uppercase">
+                          to date
+                        </span>
+                        {diffToDate > 0 ? "+" : ""}
+                        {formatNumber(diffToDate)}
                       </td>
-                      {diff.map((v, i) => (
-                        <td
-                          key={i}
-                          data-col={i + 1}
-                          className={cn(
-                            "px-1 py-1.5 text-right tabular-nums whitespace-nowrap",
-                            colBg(i + 1),
-                            v === 0
-                              ? "text-muted-foreground/40"
-                              : badSign(v)
-                                ? "text-red-600 dark:text-red-400"
-                                : "text-emerald-600 dark:text-emerald-400",
-                          )}
-                        >
-                          {v === 0
-                            ? "–"
-                            : `${v > 0 ? "+" : ""}${formatNumber(v)}`}
-                        </td>
-                      ))}
+                      {diff.map((v, i) => {
+                        // Settled months get the diverging fill; in-progress
+                        // ones only coloured text; future/unimported stay grey.
+                        const status = statuses[i]
+                        const settled = isSettled(status)
+                        const idle =
+                          status === "future" ||
+                          status === "no-data" ||
+                          status === "partial"
+                        const level = diffLevel(v, band.budget[i], band.budgetAvg)
+                        const pending = isPending(v, i)
+                        const note = settled
+                          ? ""
+                          : status === "partial"
+                            ? " · partly imported"
+                            : idle
+                              ? " · no data yet"
+                            : pending
+                              ? " · still to come this month"
+                              : " · month not complete"
+                        return (
+                          <td
+                            key={i}
+                            data-col={i + 1}
+                            title={`${MONTHS_LONG[i]}: budget ${formatNumber(band.budget[i])}, actual ${formatNumber(band.actual[i])}, ${signedKr(v)}${note}`}
+                            style={
+                              settled
+                                ? { backgroundColor: diffFill(level, v) }
+                                : undefined
+                            }
+                            className={cn(
+                              "px-1 py-1.5 text-right tabular-nums whitespace-nowrap",
+                              colBg(i + 1),
+                              v === 0 || idle
+                                ? "text-muted-foreground/40"
+                                : pending
+                                  ? "text-muted-foreground"
+                                  : settled
+                                  ? level === 0
+                                    ? "text-muted-foreground"
+                                    : "text-foreground font-medium"
+                                  : badSign(v)
+                                    ? down
+                                    : up,
+                            )}
+                          >
+                            {v === 0
+                              ? "–"
+                              : `${v > 0 ? "+" : ""}${formatNumber(v)}`}
+                          </td>
+                        )
+                      })}
                       <td />
                     </tr>
                   )}

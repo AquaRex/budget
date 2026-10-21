@@ -6,6 +6,7 @@ import type { Category, Transaction } from "@/lib/types"
 import { formatNumber } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import { MONTHS_SHORT, MONTHS_LONG } from "@/lib/budget"
+import { categoryColor } from "@/lib/categories"
 import { MonthCalendar, type CalEvent } from "@/components/calendar/month-calendar"
 import {
   effectiveCategoryId,
@@ -133,7 +134,7 @@ export function ActualsGrid({
 
   if (bands.length === 0) {
     return (
-      <div className="text-muted-foreground rounded-lg border py-10 text-center text-sm">
+      <div className="text-muted-foreground border py-10 text-center text-sm">
         No {kind === "bill" ? "spending" : "income"} in {year}.
       </div>
     )
@@ -141,7 +142,12 @@ export function ActualsGrid({
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="overflow-x-auto rounded-lg border">
+      <p className="text-muted-foreground text-xs">
+        Every {kind === "bill" ? "merchant" : "source"} under the category its
+        transactions are placed in · click a cell to filter the transactions ·
+        hold to open the full list · click a month for its calendar
+      </p>
+      <div className="overflow-x-auto border">
         <table
           className="w-full border-collapse text-sm"
           onMouseOver={(e) => {
@@ -151,7 +157,7 @@ export function ActualsGrid({
           onMouseLeave={() => setHoverCol(null)}
         >
           <thead>
-            <tr className="bg-muted border-b">
+            <tr className="bg-muted border-b text-[11px] tracking-wider uppercase">
               <th className={cn(sticky, "bg-muted px-3 py-2 text-left font-medium")}>
                 {kind === "bill" ? "Merchant" : "Source"}
               </th>
@@ -182,12 +188,21 @@ export function ActualsGrid({
                 <Fragment key={band.key}>
                   {idx > 0 && (
                     <tr aria-hidden>
-                      <td colSpan={COLS} className="bg-background h-6 border-0 p-0" />
+                      <td colSpan={COLS} className="bg-background h-4 border-0 p-0" />
                     </tr>
                   )}
                   <tr className="bg-muted border-y">
                     <td className={cn(sticky, "bg-muted px-3 py-2 font-semibold whitespace-nowrap")}>
-                      {band.name}
+                      <span className="flex items-center gap-2">
+                        <span
+                          className="size-2.5 shrink-0"
+                          style={{ backgroundColor: categoryColor(band.name) }}
+                        />
+                        {band.name}
+                        <span className="text-muted-foreground text-xs font-normal tabular-nums">
+                          {band.items.length}
+                        </span>
+                      </span>
                     </td>
                     {band.subtotals.map((t, i) => (
                       <td

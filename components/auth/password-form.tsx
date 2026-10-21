@@ -85,6 +85,7 @@ export function PasswordForm() {
               autoComplete="username"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              className="h-11 sm:h-10"
             />
           </div>
           <div className="flex flex-col gap-2">
@@ -96,10 +97,15 @@ export function PasswordForm() {
               autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              className="h-11 sm:h-10"
             />
           </div>
           {error && <p className="text-destructive text-sm">{error}</p>}
-          <Button type="submit" disabled={loading || !email || !password}>
+          <Button
+            type="submit"
+            className="h-11 sm:h-10"
+            disabled={loading || !email || !password}
+          >
             {loading ? "Signing in…" : "Continue"}
           </Button>
         </form>
@@ -108,7 +114,7 @@ export function PasswordForm() {
           type="button"
           onClick={onDemo}
           disabled={loading}
-          className="text-muted-foreground hover:text-foreground inline-flex items-center justify-center gap-1.5 text-sm"
+          className="text-muted-foreground hover:text-foreground inline-flex min-h-11 items-center justify-center gap-1.5 text-sm"
         >
           <Play className="size-3.5" />
           View demo

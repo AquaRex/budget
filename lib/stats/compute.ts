@@ -1,5 +1,5 @@
 import type { Category, Entry, ImportBatch, Label, Transaction } from "@/lib/types"
-import { effectiveDate, type TypeMap } from "@/lib/spending"
+import type { TypeMap } from "@/lib/spending"
 import { effectiveAmount, monthTotal, type BudgetContext } from "@/lib/budget"
 import type {
   CategoryHistory,
@@ -12,7 +12,7 @@ import type {
   PeriodSummary,
   SpendingPace,
 } from "@/lib/stats/types"
-import { computeCoverage, monthStatus, type Coverage } from "@/lib/stats/coverage"
+import { monthStatusResolver, type Coverage } from "@/lib/stats/coverage"
 import {
   buildGroupIndex,
   classifyTransactions,
@@ -55,18 +55,13 @@ export function computeDashboardStats(
   today: Date,
 ): Omit<DashboardStats, "loading"> {
   const todayKey = isoDate(today)
-  const coverage = computeCoverage(data.transactions, data.imports, todayKey)
+  const { coverage, statusOf } = monthStatusResolver(data.transactions, data.imports, todayKey)
   const index = buildGroupIndex(data.categories, data.labels, data.typeMap, data.bills, data.incomes)
   const flows = classifyTransactions(data.transactions, index)
   const isSavingsEntry = (e: Entry) => !!e.category_id && index.savings.has(e.category_id)
   const spendingBills = data.bills.filter((e) => !isSavingsEntry(e))
   const savingsBills = data.bills.filter(isSavingsEntry)
 
-  const rowsByMonth = new Map<string, number>()
-  for (const t of data.transactions) {
-    const ym = effectiveDate(t).slice(0, 7)
-    rowsByMonth.set(ym, (rowsByMonth.get(ym) ?? 0) + 1)
-  }
   const flowsByMonth = new Map<string, ClassifiedTx[]>()
   const dayStats = new Map<string, DayStat>()
   for (const f of flows) {
@@ -85,9 +80,6 @@ export function computeDashboardStats(
   }
   const flowsIn = (yms: YearMonth[]) =>
     yms.flatMap((m) => flowsByMonth.get(ymKey(m.year, m.month)) ?? [])
-
-  const statusOf = (year: number, month: number) =>
-    monthStatus(year, month, coverage, todayKey, rowsByMonth.get(ymKey(year, month)) ?? 0)
 
   const monthStat = (year: number, month: number): MonthStat => {
     const monthFlows = flowsByMonth.get(ymKey(year, month)) ?? []

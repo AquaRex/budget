@@ -33,6 +33,11 @@ function subscribeToDate(onChange: () => void): () => void {
   }
 }
 
+/** Today's local date (YYYY-MM-DD), kept current across midnight and app resumes. */
+export function useToday(): string {
+  return useSyncExternalStore(subscribeToDate, todayKey, todayKey)
+}
+
 /**
  * The (SWR-deduped) sources the stats engine reads. Budget entries/amounts
  * follow the globally selected year (`useYear()`).
@@ -70,7 +75,7 @@ export function useStatsData(): { data: StatsData; loading: boolean } {
 /** Pass `useYear()` as input.year: the budget data follows the selected year. */
 export function useDashboardStats(input: DashboardStatsInput): DashboardStats {
   const { data, loading } = useStatsData()
-  const today = useSyncExternalStore(subscribeToDate, todayKey, todayKey)
+  const today = useToday()
   const { year, month, scope, includeIncomplete } = input
   const stats = useMemo(
     () =>

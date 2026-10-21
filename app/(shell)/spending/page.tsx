@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 import { ChevronLeft, ChevronRight } from "lucide-react"
 
 import { MONTHS_LONG } from "@/lib/budget"
+import { cn } from "@/lib/utils"
 import { buildTypeMap, effectiveDate } from "@/lib/spending"
 import { buildGroupIndex, isSavingsTx } from "@/lib/stats/flows"
 import { useYear, setYear } from "@/lib/year"
@@ -20,12 +21,13 @@ import {
 } from "@/lib/data/use-budget"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CsvDropzone } from "@/components/spending/csv-dropzone"
 import { SpendingSummary } from "@/components/spending/spending-summary"
 import { TransactionsTable } from "@/components/spending/transactions-table"
 import { ActualsGrid, type DrillMode } from "@/components/spending/actuals-grid"
+
+type Scope = "month" | "year" | "all"
 
 function monthKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
@@ -66,25 +68,60 @@ export default function SpendingPage() {
     return Array.from(set).sort((a, b) => b.localeCompare(a))
   }, [transactions])
 
-  // "all" = every transaction; otherwise a "YYYY-MM" key.
+  const dataYears = useMemo(
+    () => Array.from(new Set(periods.map((p) => p.slice(0, 4)))),
+    [periods],
+  )
+
+  // "all" = every transaction; "YYYY" = a year; otherwise a "YYYY-MM" key.
   const [period, setPeriod] = useState<string | null>(null)
   const active = period ?? periods[0] ?? monthKey(new Date())
   const isAll = active === "all"
-  const idx = periods.indexOf(active)
+  const isYear = active.length === 4
+  const scope: Scope = isAll ? "all" : isYear ? "year" : "month"
+  const steps = isYear ? dataYears : periods
+  const idx = steps.indexOf(active)
 
   const stepPeriod = (deltaTime: number) => {
-    if (periods.length === 0 || isAll) return
-    const next = Math.min(Math.max(idx - deltaTime, 0), periods.length - 1)
-    setPeriod(periods[next])
+    if (steps.length === 0 || isAll) {
+      return
+    }
+    const next = Math.min(Math.max(idx - deltaTime, 0), steps.length - 1)
+    setPeriod(steps[next])
   }
 
-  const monthNum = isAll ? 0 : Number(active.slice(5, 7))
+  const changeScope = (next: Scope) => {
+    if (next === scope) {
+      return
+    }
+    if (next === "all") {
+      setPeriod("all")
+    } else if (next === "year") {
+      setPeriod(isAll ? (dataYears[0] ?? active) : active.slice(0, 4))
+    } else if (isYear) {
+      setPeriod(periods.find((p) => p.startsWith(active)) ?? periods[0])
+    } else {
+      setPeriod(periods[0])
+    }
+  }
+
+  const monthNum = isAll || isYear ? 0 : Number(active.slice(5, 7))
   const yearNum = isAll ? "" : active.slice(0, 4)
+  // A period holding the current month is still running: no budget verdict yet.
+  const thisMonth = monthKey(new Date())
+  const inProgress = isAll
+    ? periods.includes(thisMonth)
+    : thisMonth.startsWith(active) || active > thisMonth
+  const periodLabel = isAll
+    ? "All time"
+    : isYear
+      ? active
+      : `${MONTHS_LONG[monthNum - 1]} ${yearNum}`
   const inPeriod = useMemo(
     () =>
       isAll
         ? transactions
-        : transactions.filter((t) => effectiveDate(t).slice(0, 7) === active),
+        : transactions.filter((t) => effectiveDate(t).startsWith(active)),
     [transactions, active, isAll],
   )
   const unsavedInPeriod = useMemo(
@@ -93,7 +130,11 @@ export default function SpendingPage() {
   )
   const budgetMonths = isAll
     ? periods.map((p) => Number(p.slice(5, 7)))
-    : [monthNum]
+    : isYear
+      ? periods
+          .filter((p) => p.startsWith(active))
+          .map((p) => Number(p.slice(5, 7)))
+      : [monthNum]
 
   // Bills/Income grids follow the global year selector.
   const globalYear = useYear()
@@ -143,7 +184,9 @@ export default function SpendingPage() {
     // Defer so we're not setting state synchronously inside the effect.
     queueMicrotask(() => {
       if (tb) setTab(tb)
-      if (p) setPeriod(p)
+      if (p && /^(all|\d{4}|\d{4}-(0[1-9]|1[0-2]))$/.test(p)) {
+        setPeriod(p)
+      }
       if (cat) setCatFilter(cat)
       if (label) setLabelFilter(label)
       if (q != null) {
@@ -161,10 +204,15 @@ export default function SpendingPage() {
       if (el && /^(input|textarea|select)$/i.test(el.tagName)) return
       if (document.querySelector('[role="dialog"]')) return
       const back = e.key === "ArrowLeft"
+      if (el?.closest('[role="radiogroup"]')) {
+        return
+      }
       if (tab === "transactions") {
-        if (isAll || periods.length === 0) return
+        if (isAll || steps.length === 0) {
+          return
+        }
         setPeriod(
-          periods[Math.min(Math.max(idx + (back ? 1 : -1), 0), periods.length - 1)],
+          steps[Math.min(Math.max(idx + (back ? 1 : -1), 0), steps.length - 1)],
         )
       } else {
         setYear(globalYear + (back ? -1 : 1))
@@ -172,7 +220,7 @@ export default function SpendingPage() {
     }
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
-  }, [tab, periods, idx, isAll, globalYear])
+  }, [tab, steps, idx, isAll, globalYear])
 
   const refresh = () => {
     mutateTx()
@@ -182,26 +230,33 @@ export default function SpendingPage() {
     mutateLabels()
   }
 
-  const monthControls = (
-    <div className="flex items-center rounded-md border">
+  const stepper = (
+    label: string,
+    onStep: (delta: number) => void,
+    canBack: boolean,
+    canForward: boolean,
+  ) => (
+    <div className="flex items-center border">
       <Button
         variant="ghost"
-        size="icon"
-        aria-label="Older month"
-        onClick={() => stepPeriod(-1)}
-        disabled={isAll || idx >= periods.length - 1}
+        size="icon-sm"
+        className="size-11 sm:size-9"
+        aria-label="Previous"
+        onClick={() => onStep(-1)}
+        disabled={!canBack}
       >
         <ChevronLeft className="size-4" />
       </Button>
-      <span className="w-32 text-center text-sm font-medium">
-        {isAll ? "All time" : `${MONTHS_LONG[monthNum - 1]} ${yearNum}`}
+      <span className="w-24 text-center text-xs font-semibold tracking-widest uppercase tabular-nums sm:w-28">
+        {label}
       </span>
       <Button
         variant="ghost"
-        size="icon"
-        aria-label="Newer month"
-        onClick={() => stepPeriod(1)}
-        disabled={isAll || idx <= 0}
+        size="icon-sm"
+        className="size-11 sm:size-9"
+        aria-label="Next"
+        onClick={() => onStep(1)}
+        disabled={!canForward}
       >
         <ChevronRight className="size-4" />
       </Button>
@@ -210,15 +265,23 @@ export default function SpendingPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold tracking-tight">Spending</h1>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="flex flex-col gap-0.5">
+          <h1 className="text-2xl font-semibold tracking-tight">Spending</h1>
+          <p className="text-muted-foreground text-sm">
+            Your imported bank transactions and where each one is categorised.
+          </p>
+        </div>
+        {(lt || transactions.length > 0) && (
+          <CsvDropzone rules={rules} onImported={refresh} />
+        )}
       </div>
-
-      <CsvDropzone rules={rules} onImported={refresh} />
 
       {lt ? (
         <Skeleton className="h-40 w-full" />
-      ) : transactions.length === 0 ? null : (
+      ) : transactions.length === 0 ? (
+        <CsvDropzone rules={rules} onImported={refresh} large />
+      ) : (
         <Tabs value={tab} onValueChange={setTab} className="gap-6">
           <div className="bg-background/95 supports-backdrop-filter:backdrop-blur sticky top-14 z-10 -mx-4 flex flex-wrap items-center justify-between gap-3 border-b px-4 py-2 sm:-mx-6 sm:px-6">
             <TabsList>
@@ -228,19 +291,36 @@ export default function SpendingPage() {
             </TabsList>
             {tab === "transactions" ? (
               <div className="flex flex-wrap items-center gap-2">
-                {monthControls}
-                <Button
-                  variant={isAll ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setPeriod(isAll ? periods[0] : "all")}
-                >
-                  All time
-                </Button>
+                <div className="flex border" role="radiogroup" aria-label="Period">
+                  {(["month", "year", "all"] as Scope[]).map((sc) => (
+                    <button
+                      key={sc}
+                      role="radio"
+                      aria-checked={scope === sc}
+                      onClick={() => changeScope(sc)}
+                      className={cn(
+                        "h-11 px-3 text-xs font-semibold tracking-widest uppercase transition-colors sm:h-9",
+                        scope === sc
+                          ? "bg-primary text-primary-foreground"
+                          : "text-muted-foreground hover:text-foreground",
+                      )}
+                    >
+                      {sc}
+                    </button>
+                  ))}
+                </div>
+                {!isAll &&
+                  stepper(
+                    isYear
+                      ? active
+                      : `${MONTHS_LONG[monthNum - 1].slice(0, 3)} ${yearNum}`,
+                    stepPeriod,
+                    idx < steps.length - 1,
+                    idx > 0,
+                  )}
               </div>
             ) : (
-              <span className="text-muted-foreground px-1 text-sm font-medium tabular-nums">
-                {activeYear}
-              </span>
+              stepper(activeYear, (d) => setYear(globalYear + d), true, true)
             )}
           </div>
 
@@ -250,16 +330,14 @@ export default function SpendingPage() {
               bills={spendingBills}
               ctx={ctx}
               months={budgetMonths}
-              categories={categories}
               typeMap={typeMap}
+              periodLabel={periodLabel}
+              inProgress={inProgress}
             />
 
-            <Separator className="my-1" />
-
             <div className="flex flex-col gap-3">
-              <h2 className="text-lg font-semibold tracking-tight">
-                Transactions —{" "}
-                {isAll ? "All time" : `${MONTHS_LONG[monthNum - 1]} ${yearNum}`}
+              <h2 className="text-muted-foreground text-[11px] font-semibold tracking-widest uppercase">
+                Transactions · {periodLabel}
               </h2>
               <TransactionsTable
                 transactions={inPeriod}
