@@ -39,7 +39,11 @@ import {
 } from "@/components/ui/card"
 import { LabelCombobox } from "@/components/spending/label-combobox"
 import { TypeMapper } from "@/components/spending/type-mapper"
-import { CategorySelect } from "@/components/spending/category-picker"
+import {
+  CategorySelect,
+  categoryOptions,
+  optionLabel,
+} from "@/components/spending/category-picker"
 import {
   MixedMerchantDialog,
   merchantMix,
@@ -127,6 +131,10 @@ function TriagePanel({
   }
   const catName = (id: string | null) =>
     categories.find((c) => c.id === id)?.name ?? null
+  const categoryLabels = useMemo(
+    () => new Map(categoryOptions(categories).map((o) => [o.id, optionLabel(o)])),
+    [categories],
+  )
 
   const covered = spending.filter((t) => effectiveCategoryId(t, typeMap)).length
   const pct = spending.length ? Math.round((covered / spending.length) * 100) : 100
@@ -257,6 +265,7 @@ function TriagePanel({
                   {isOpen && (
                     <ExpandedMerchant
                       group={g}
+                      categoryName={(t) => categoryLabels.get(effectiveCategoryId(t, typeMap) ?? "") ?? null}
                       labels={labels}
                       onChanged={onChanged}
                     />
@@ -295,10 +304,12 @@ function TriagePanel({
 
 function ExpandedMerchant({
   group,
+  categoryName,
   labels,
   onChanged,
 }: {
   group: MerchantGroup
+  categoryName: (t: Transaction) => string | null
   labels: Label[]
   onChanged: () => void
 }) {
@@ -367,6 +378,14 @@ function ExpandedMerchant({
             {fmtDate(effectiveDate(t))}
           </span>
           <span className="min-w-0 flex-1 truncate">{t.description || t.type}</span>
+          <span
+            className={cn(
+              "max-w-[40%] shrink-0 truncate",
+              categoryName(t) ? "text-foreground" : "text-amber-600 dark:text-amber-400",
+            )}
+          >
+            {categoryName(t) ?? "Uncategorised"}
+          </span>
           <span className="tabular-nums">{formatNOK(Number(t.amount))}</span>
           <LabelCombobox
             labels={labels}

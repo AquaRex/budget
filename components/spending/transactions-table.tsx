@@ -1039,6 +1039,37 @@ export function TransactionsTable({
 
       {/* The list */}
       <div className="border">
+        {visible.length > 0 && (
+          <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 border-b px-3 py-2.5 tabular-nums">
+            <span className="text-muted-foreground text-xs">
+              {visible.length.toLocaleString("nb-NO")} transaction
+              {visible.length === 1 ? "" : "s"}
+              {visible.length !== rows.length &&
+                ` of ${rows.length.toLocaleString("nb-NO")} · filtered`}
+            </span>
+            <span className="flex flex-wrap items-baseline gap-x-5 gap-y-1 text-sm">
+              <span>
+                <span className="text-muted-foreground text-xs">Out </span>
+                <span className="font-semibold">{formatNOK(totals.out)}</span>
+              </span>
+              <span>
+                <span className="text-muted-foreground text-xs">In </span>
+                <span className="font-semibold">{formatNOK(totals.inn)}</span>
+              </span>
+              <span>
+                <span className="text-muted-foreground text-xs">Net </span>
+                <span
+                  className={cn(
+                    "font-semibold",
+                    totals.inn - totals.out > 0 && "text-emerald-600 dark:text-emerald-400",
+                  )}
+                >
+                  {formatNOK(totals.inn - totals.out)}
+                </span>
+              </span>
+            </span>
+          </div>
+        )}
         <div className="bg-muted text-muted-foreground hidden h-10 grid-cols-[28px_76px_minmax(0,1fr)_minmax(0,220px)_minmax(0,140px)_112px_36px] items-center gap-x-3 border-b px-2 md:grid">
           <input
             type="checkbox"
@@ -1095,20 +1126,6 @@ export function TransactionsTable({
                 />
               ))}
             </div>
-          </div>
-        )}
-
-        {visible.length > 0 && (
-          <div className="bg-muted text-muted-foreground flex flex-wrap justify-between gap-x-4 gap-y-1 border-t px-3 py-2 text-xs tabular-nums">
-            <span>
-              {visible.length.toLocaleString("nb-NO")} transaction
-              {visible.length === 1 ? "" : "s"}
-              {visible.length !== rows.length && ` of ${rows.length.toLocaleString("nb-NO")}`}
-            </span>
-            <span>
-              Out <span className="text-foreground font-medium">{formatNOK(totals.out)}</span>
-              {" · "}In <span className="text-foreground font-medium">{formatNOK(totals.inn)}</span>
-            </span>
           </div>
         )}
       </div>
