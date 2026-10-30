@@ -12,14 +12,18 @@ import {
 
 /** Display-only shaping shared by the home dashboard and /os. */
 export function useVizData(stats: DashboardStats) {
-  const { days, dataFrom, dataThrough, categoryHistory } = stats
+  const { days, months, dataFrom, dataThrough, categoryHistory } = stats
   return useMemo(() => {
     const covered = coverage(dataFrom, dataThrough)
     const heatMonths: HeatDay[][] = Array.from({ length: 12 }, () => [])
     for (const d of days) {
-      heatMonths[Number(d.date.slice(5, 7)) - 1].push({
+      const m = Number(d.date.slice(5, 7)) - 1
+      // Payday: the day brings at least half the month's budgeted income.
+      const budgetIncome = months[m]?.budgetIncome ?? 0
+      heatMonths[m].push({
         ...d,
         covered: covered(d),
+        payday: budgetIncome > 0 && d.income >= budgetIncome / 2,
       })
     }
     return {
@@ -27,5 +31,5 @@ export function useVizData(stats: DashboardStats) {
       scale: heatScale(days, covered),
       palette: categoryPalette(categoryHistory),
     }
-  }, [days, dataFrom, dataThrough, categoryHistory])
+  }, [days, months, dataFrom, dataThrough, categoryHistory])
 }

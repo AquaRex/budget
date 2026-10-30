@@ -13,7 +13,7 @@ import {
 
 const WEEKDAYS = ["M", "T", "W", "T", "F", "S", "S"]
 
-export type HeatDay = DayStat & { covered: boolean }
+export type HeatDay = DayStat & { covered: boolean; payday: boolean }
 
 type Props = {
   days: HeatDay[] // the days of one month, in order
@@ -32,21 +32,21 @@ function dayTitle(d: HeatDay): string {
   if (!d.covered) {
     return `${formatShortDate(d.date)}: no data`
   }
+  const pay = d.payday ? ` · payday +${kr(d.income)}` : ""
   if (d.spent < 0) {
-    return `${formatShortDate(d.date)}: net refund ${kr(-d.spent)}`
+    return `${formatShortDate(d.date)}: net refund ${kr(-d.spent)}${pay}`
   }
-  return `${formatShortDate(d.date)}: ${kr(d.spent)} spent${d.txCount ? ` · ${d.txCount} tx` : ""}`
+  return `${formatShortDate(d.date)}: ${kr(d.spent)} spent${d.txCount ? ` · ${d.txCount} tx` : ""}${pay}`
 }
 
-// Refunds outweighed spending: distinct from a plain no-spend day.
-const refundRing = "text-foreground ring-1 ring-inset ring-(--viz-income)"
+const paydayRing = "ring-2 ring-inset ring-(--viz-income)"
 
 function cellClass(d: HeatDay, bucket: number) {
   if (!d.covered) {
     return "viz-no-data bg-transparent text-muted-foreground/60 ring-1 ring-inset ring-border"
   }
-  if (d.spent < 0) {
-    return refundRing
+  if (d.payday) {
+    return cn("text-foreground", paydayRing)
   }
   if (bucket === 5) {
     return "text-(--heat-ink-hi)"
@@ -194,7 +194,7 @@ export function YearHeatmap({
                     className={cn(
                       "aspect-square outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default",
                       !d.covered && "viz-no-data ring-border ring-1 ring-inset",
-                      d.covered && d.spent < 0 && refundRing,
+                      d.covered && d.payday && paydayRing,
                       d.date === today && "ring-foreground ring-2 ring-inset",
                       selected === d.date && "ring-primary ring-2 ring-inset",
                     )}
@@ -256,8 +256,7 @@ export function HeatLegend({
         data
       </span>
       <span className="flex items-center gap-1.5">
-        <span className="size-3 ring-1 ring-(--viz-income) ring-inset" /> Net
-        refund
+        <span className="size-3 ring-2 ring-(--viz-income) ring-inset" /> Payday
       </span>
       <span className={cn("tabular-nums", short && "hidden")}>
         Buckets: {compact(a)} · {compact(b)} · {compact(c)} · {compact(d)} kr

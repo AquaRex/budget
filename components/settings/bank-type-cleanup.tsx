@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import Link from "next/link"
 import useSWR from "swr"
 
 import type { Category } from "@/lib/types"
@@ -13,6 +14,7 @@ import { Button } from "@/components/ui/button"
 import {
   DeleteCategoryDialog,
   MergeDialog,
+  plural,
 } from "@/components/settings/category-dialogs"
 
 /**
@@ -53,9 +55,23 @@ export function BankTypeCleanup({ onChanged }: { onChanged: () => void }) {
             <span className="min-w-0 flex-1 truncate text-sm font-medium">
               {b.category.name}
             </span>
-            <span className="text-muted-foreground text-xs tabular-nums">
-              {b.transactions} tx · {b.mappedTransactions} via mapping · {b.rules} rules ·{" "}
-              {b.mappings} mappings{b.entries > 0 && ` · ${b.entries} budget rows`}
+            <span className="text-muted-foreground flex flex-wrap items-center gap-x-2 text-xs tabular-nums">
+              {b.transactions + b.mappedTransactions > 0 ? (
+                <Link
+                  href={`/transactions?tab=transactions&period=all&cat=${b.category.id}`}
+                  className="text-foreground underline-offset-2 hover:underline"
+                  title={`${b.transactions} placed on it directly, ${b.mappedTransactions} through their bank type`}
+                >
+                  Show {plural(b.transactions + b.mappedTransactions, "transaction")} →
+                </Link>
+              ) : (
+                <span>No transactions</span>
+              )}
+              {b.mappings > 0 && (
+                <span>· {plural(b.mappings, "bank type")} sorted here</span>
+              )}
+              {b.rules > 0 && <span>· {plural(b.rules, "merchant rule")}</span>}
+              {b.entries > 0 && <span>· {plural(b.entries, "budget row")}</span>}
             </span>
             <div className="flex gap-1.5">
               <Button size="sm" variant="outline" onClick={() => setMerge(b)}>
