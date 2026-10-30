@@ -78,14 +78,18 @@ export function CategorySelect({
   const options = categoryOptions(categories).filter(
     (o) => (!groupsOnly || o.group === null) && !exclude?.includes(o.id),
   )
+  // An empty Radix list opens off-screen, so say so on the trigger instead.
+  const empty = options.length === 0 && !noneLabel
   return (
     <Select
       value={value ?? (noneLabel ? NONE : "")}
       onValueChange={(v) => onChange(v === NONE ? null : v)}
-      disabled={disabled}
+      disabled={disabled || empty}
     >
       <SelectTrigger className={cn("w-full", className)}>
-        <SelectValue placeholder={placeholder} />
+        <SelectValue
+          placeholder={empty ? (groupsOnly ? "No groups yet" : "No categories yet") : placeholder}
+        />
       </SelectTrigger>
       <SelectContent>
         {noneLabel && <SelectItem value={NONE}>{noneLabel}</SelectItem>}
