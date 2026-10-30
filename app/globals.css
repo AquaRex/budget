@@ -48,38 +48,38 @@
 }
 
 :root {
-    --background: oklch(1 0 0);
+    --background: oklch(0.948 0.004 286);
     --foreground: oklch(0.141 0.005 285.823);
-    --card: oklch(1 0 0);
+    --card: oklch(0.982 0.002 286);
     --card-foreground: oklch(0.141 0.005 285.823);
-    --popover: oklch(1 0 0);
+    --popover: oklch(0.982 0.002 286);
     --popover-foreground: oklch(0.141 0.005 285.823);
     --primary: oklch(0.852 0.199 91.936);
     --primary-foreground: oklch(0.421 0.095 57.708);
-    --secondary: oklch(0.967 0.001 286.375);
+    --secondary: oklch(0.91 0.005 286);
     --secondary-foreground: oklch(0.21 0.006 285.885);
-    --muted: oklch(0.967 0.001 286.375);
-    --muted-foreground: oklch(0.552 0.016 285.938);
-    --accent: oklch(0.967 0.001 286.375);
+    --muted: oklch(0.91 0.005 286);
+    --muted-foreground: oklch(0.47 0.016 286);
+    --accent: oklch(0.9 0.006 286);
     --accent-foreground: oklch(0.21 0.006 285.885);
     --destructive: oklch(0.577 0.245 27.325);
-    --border: oklch(0.92 0.004 286.32);
-    --input: oklch(0.92 0.004 286.32);
-    --ring: oklch(0.705 0.015 286.067);
+    --border: oklch(0.835 0.007 286);
+    --input: oklch(0.79 0.009 286);
+    --ring: oklch(0.6 0.015 286);
     --chart-1: oklch(0.905 0.182 98.111);
     --chart-2: oklch(0.795 0.184 86.047);
     --chart-3: oklch(0.681 0.162 75.834);
     --chart-4: oklch(0.554 0.135 66.442);
     --chart-5: oklch(0.476 0.114 61.907);
     --radius: 0.625rem;
-    --sidebar: oklch(0.985 0 0);
+    --sidebar: oklch(0.925 0.005 286);
     --sidebar-foreground: oklch(0.141 0.005 285.823);
     --sidebar-primary: oklch(0.681 0.162 75.834);
     --sidebar-primary-foreground: oklch(0.987 0.026 102.212);
-    --sidebar-accent: oklch(0.967 0.001 286.375);
+    --sidebar-accent: oklch(0.89 0.006 286);
     --sidebar-accent-foreground: oklch(0.21 0.006 285.885);
-    --sidebar-border: oklch(0.92 0.004 286.32);
-    --sidebar-ring: oklch(0.705 0.015 286.067);
+    --sidebar-border: oklch(0.835 0.007 286);
+    --sidebar-ring: oklch(0.6 0.015 286);
 }
 
 .dark {
@@ -141,8 +141,8 @@
     --viz-cat-6: #008300;
     --viz-cat-7: #6250d6;
     --viz-cat-8: #e34948;
-    --viz-other: oklch(0.8 0.01 286);
-    --heat-0: oklch(0.955 0.003 286);
+    --viz-other: oklch(0.78 0.01 286);
+    --heat-0: oklch(0.915 0.004 286);
     --heat-1: oklch(0.94 0.06 95);
     --heat-2: oklch(0.87 0.12 88);
     --heat-3: oklch(0.79 0.16 76);
@@ -185,12 +185,12 @@
 /* Groups difference heatmap: diverging, + (good) green / − (bad) rose. Step 0
    is "on budget" (within a few %); 1..4 grow with the gap relative to budget. */
 :root {
-    --diff-good-1: oklch(0.96 0.035 162);
-    --diff-good-2: oklch(0.91 0.07 162);
+    --diff-good-1: oklch(0.94 0.04 162);
+    --diff-good-2: oklch(0.9 0.07 162);
     --diff-good-3: oklch(0.84 0.11 162);
     --diff-good-4: oklch(0.76 0.14 162);
-    --diff-bad-1: oklch(0.96 0.03 15);
-    --diff-bad-2: oklch(0.91 0.06 15);
+    --diff-bad-1: oklch(0.94 0.035 15);
+    --diff-bad-2: oklch(0.9 0.06 15);
     --diff-bad-3: oklch(0.84 0.1 15);
     --diff-bad-4: oklch(0.76 0.14 15);
 }

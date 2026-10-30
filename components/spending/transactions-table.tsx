@@ -406,7 +406,10 @@ export function TransactionsTable({
         // "COMPASS 5105 HI" with interior digits.
         descMatches(r.t.description, q) ||
         (r.t.type ?? "").toLowerCase().includes(q) ||
-        (r.t.message ?? "").toLowerCase().includes(q)
+        (r.t.message ?? "").toLowerCase().includes(q) ||
+        (r.tagName ?? "").toLowerCase().includes(q) ||
+        (r.catName ?? "").toLowerCase().includes(q) ||
+        (r.groupId ? r.groupName : "").toLowerCase().includes(q)
       )
     })
     const text = (a: string | null, b: string | null) =>
@@ -836,7 +839,7 @@ export function TransactionsTable({
           <Input
             value={query}
             onChange={(e) => onQueryChange(e.target.value)}
-            placeholder="Search merchant, type, message…"
+            placeholder="Search merchant, tag, category, group, message…"
             className="pl-8"
           />
         </div>

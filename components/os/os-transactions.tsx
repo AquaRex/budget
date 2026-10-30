@@ -16,7 +16,12 @@ import {
   categorizeBySource,
   setTransactionCategory,
 } from "@/lib/data/transactions"
-import { deriveStem, sourceKeyFor, txMatchesSource } from "@/lib/spending"
+import {
+  deriveStem,
+  effectiveCategoryId,
+  sourceKeyFor,
+  txMatchesSource,
+} from "@/lib/spending"
 import type { Category, Transaction } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -73,6 +78,10 @@ export function OsTransactions() {
         ),
     [data.transactions, index, period],
   )
+  const names = useMemo(
+    () => new Map([...data.categories, ...data.labels].map((c) => [c.id, c.name])),
+    [data.categories, data.labels],
+  )
   const q = query.trim().toLowerCase()
   const shown = q
     ? rows.filter((f) =>
@@ -80,7 +89,10 @@ export function OsTransactions() {
           f.merchant,
           f.tx.description,
           f.tx.type,
+          f.tx.message,
           index.nameOf(f.groupId),
+          names.get(effectiveCategoryId(f.tx, data.typeMap) ?? ""),
+          names.get(f.tx.label_id ?? ""),
           String(Math.abs(Number(f.tx.amount))),
         ]
           .join(" ")
@@ -111,7 +123,7 @@ export function OsTransactions() {
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search merchant, text or amount"
+            placeholder="Search merchant, tag, category or amount"
             className="h-11 min-w-0 flex-1 bg-transparent text-base outline-none select-text placeholder:text-sm"
             enterKeyHint="search"
           />
