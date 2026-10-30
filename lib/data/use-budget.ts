@@ -3,7 +3,12 @@
 import { useMemo } from "react"
 import useSWR from "swr"
 
-import { fetchEntries, fetchAmounts, fetchEntryYears } from "@/lib/data/entries"
+import {
+  fetchEntries,
+  fetchAmounts,
+  fetchEntryCountsByCategory,
+  fetchEntryYears,
+} from "@/lib/data/entries"
 import { fetchCategories } from "@/lib/data/categories"
 import { fetchLabels } from "@/lib/data/labels"
 import { useYear } from "@/lib/year"
@@ -62,6 +67,19 @@ export function useBudgetYears() {
     isLoading,
     mutate,
   }
+}
+
+/**
+ * Budget entries per category across all years (key "entry_counts"). After any
+ * entry create/update/delete/reorder, or a group delete/merge, revalidate it
+ * with `mutate()` from this hook, or SWR's global `mutate("entry_counts")`.
+ */
+export function useEntryCounts() {
+  const { data, error, isLoading, mutate } = useSWR(
+    "entry_counts",
+    fetchEntryCountsByCategory,
+  )
+  return { counts: data ?? new Map<string, { total: number; byYear: Record<number, number> }>(), error, isLoading, mutate }
 }
 
 /**

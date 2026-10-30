@@ -26,7 +26,11 @@ export default function manifest(): MetadataRoute.Manifest {
     background_color: "#09090b",
     theme_color: "#09090b",
     shortcuts: [
-      { name: "Spending", url: `${base}/os/spending/`, icons: shortcutIcon },
+      {
+        name: "Transactions",
+        url: `${base}/os/transactions/`,
+        icons: shortcutIcon,
+      },
       { name: "Budget", url: `${base}/os/budget/`, icons: shortcutIcon },
       { name: "Groups", url: `${base}/os/groups/`, icons: shortcutIcon },
     ],

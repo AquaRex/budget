@@ -96,7 +96,7 @@ export function DaySheet({
                     )}
                   >
                     <Link
-                      href={`/spending?tab=transactions&period=${period}&q=${encodeURIComponent(q)}`}
+                      href={`/transactions?tab=transactions&period=${period}&q=${encodeURIComponent(q)}`}
                       className="hover:bg-muted/60 active:bg-muted flex min-h-14 items-center gap-3 px-5 py-3 transition-colors"
                     >
                       <div className="min-w-0 flex-1">

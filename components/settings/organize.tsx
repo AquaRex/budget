@@ -1,8 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { useRouter } from "next/navigation"
-import { ChevronRight, Pencil, Plus, Tag, Tags, Trash2 } from "lucide-react"
+import { ChevronRight, Plus, Tag, Tags } from "lucide-react"
 import { toast } from "sonner"
 
 import type { Category, Label, Transaction, TypeCategory } from "@/lib/types"
@@ -22,23 +21,14 @@ import {
   useLabels,
   useTxRules,
   useTypeCategories,
-  useEntries,
 } from "@/lib/data/use-budget"
 import {
   categorizeBySource,
   setTransactionsLabel,
 } from "@/lib/data/transactions"
-import { createCategory, setCategorySavings } from "@/lib/data/categories"
-import { setCategoryGroup } from "@/lib/data/groups"
-import {
-  createLabel,
-  deleteLabel,
-  renameLabel,
-  setLabelCategory,
-} from "@/lib/data/labels"
+import { createLabel } from "@/lib/data/labels"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
 import {
   Card,
@@ -47,17 +37,17 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import { LabelCombobox } from "@/components/spending/label-combobox"
 import { TypeMapper } from "@/components/spending/type-mapper"
-
-const NONE = "__none__"
+import { CategorySelect } from "@/components/spending/category-picker"
+import {
+  MixedMerchantDialog,
+  merchantMix,
+  type MerchantMix,
+} from "@/components/spending/mixed-merchant-dialog"
+import { CategoryTree } from "@/components/settings/category-tree"
+import { BankTypeCleanup } from "@/components/settings/bank-type-cleanup"
+import { TagsManager } from "@/components/settings/tags-manager"
 
 function fmtDate(iso: string): string {
   const [y, m, d] = iso.split("-")
@@ -70,8 +60,6 @@ export function Organize() {
   const { labels, mutate: mutateLabels } = useLabels()
   const { typeCategories, mutate: mutateTypeCats } = useTypeCategories()
   const { mutate: mutateRules } = useTxRules()
-  const { entries: bills } = useEntries("bill")
-  const { entries: incomes } = useEntries("income")
   const typeMap = useMemo(() => buildTypeMap(typeCategories), [typeCategories])
 
   const refresh = () => {
@@ -82,26 +70,11 @@ export function Organize() {
     mutateRules()
   }
 
-  // Groups are the categories a Bills/Income entry uses (existing convention).
-  const groups = useMemo(() => {
-    const used = new Set<string>()
-    for (const e of [...bills, ...incomes]) if (e.category_id) used.add(e.category_id)
-    return categories
-      .filter((c) => used.has(c.id))
-      .sort((a, b) => a.sort_order - b.sort_order)
-  }, [categories, bills, incomes])
-
   return (
-    <div className="flex flex-col gap-4">
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
-        <StructurePanel
-          categories={categories}
-          groups={groups}
-          labels={labels}
-          transactions={transactions}
-          typeMap={typeMap}
-          onChanged={refresh}
-        />
+    <div className="flex flex-col gap-6">
+      <CategoryTree />
+      <BankTypeCleanup onChanged={refresh} />
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
         <TriagePanel
           transactions={transactions}
           categories={categories}
@@ -110,313 +83,9 @@ export function Organize() {
           typeMap={typeMap}
           onChanged={refresh}
         />
+        <TagsManager onChanged={refresh} />
       </div>
     </div>
-  )
-}
-
-/* ---------------------------------------------------------------- Structure */
-
-function StructurePanel({
-  categories,
-  groups,
-  labels,
-  transactions,
-  typeMap,
-  onChanged,
-}: {
-  categories: Category[]
-  groups: Category[]
-  labels: Label[]
-  transactions: Transaction[]
-  typeMap: ReturnType<typeof buildTypeMap>
-  onChanged: () => void
-}) {
-  const router = useRouter()
-  const [newCat, setNewCat] = useState("")
-  const [adding, setAdding] = useState(false)
-  const [editing, setEditing] = useState<string | null>(null)
-  const [editName, setEditName] = useState("")
-
-  const groupIds = useMemo(() => new Set(groups.map((g) => g.id)), [groups])
-  const labelsByCat = useMemo(() => {
-    const m = new Map<string, Label[]>()
-    for (const l of labels) {
-      const k = l.category_id ?? NONE
-      const arr = m.get(k) ?? []
-      arr.push(l)
-      m.set(k, arr)
-    }
-    return m
-  }, [labels])
-
-  const spentByCat = useMemo(() => {
-    const m = new Map<string, number>()
-    for (const t of transactions) {
-      if (isInternalTx(t) || Number(t.amount) >= 0) continue
-      const ec = effectiveCategoryId(t, typeMap)
-      if (!ec) continue
-      m.set(ec, (m.get(ec) ?? 0) - Number(t.amount))
-    }
-    return m
-  }, [transactions, typeMap])
-
-  const viewCategory = (id: string) =>
-    router.push(`/spending?tab=transactions&period=all&cat=${id}`)
-  const viewLabel = (id: string) =>
-    router.push(`/spending?tab=transactions&period=all&label=${id}`)
-
-  async function addCategory() {
-    const name = newCat.trim()
-    if (!name) return
-    setAdding(true)
-    try {
-      await createCategory(name)
-      setNewCat("")
-      onChanged()
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not add category.")
-    } finally {
-      setAdding(false)
-    }
-  }
-
-  async function act(fn: () => Promise<unknown>, err: string) {
-    try {
-      await fn()
-      onChanged()
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : err)
-    }
-  }
-
-  const nonGroupCats = categories
-    .filter((c) => !groupIds.has(c.id))
-    .sort((a, b) => a.name.localeCompare(b.name))
-  const unassignedLabels = labelsByCat.get(NONE) ?? []
-
-  const labelRow = (l: Label) => (
-    <div key={l.id} className="flex items-center gap-1.5 py-0.5 pl-6 text-xs">
-      <Tag className="text-muted-foreground size-3 shrink-0" />
-      {editing === l.id ? (
-        <Input
-          autoFocus
-          value={editName}
-          onChange={(e) => setEditName(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && editName.trim()) {
-              act(() => renameLabel(l.id, editName.trim()), "Could not rename.")
-              setEditing(null)
-            } else if (e.key === "Escape") setEditing(null)
-          }}
-          onBlur={() => setEditing(null)}
-          className="h-6 w-40 text-xs"
-        />
-      ) : (
-        <button
-          type="button"
-          onClick={() => viewLabel(l.id)}
-          className="hover:text-foreground hover:underline"
-        >
-          {l.name}
-        </button>
-      )}
-      <button
-        type="button"
-        aria-label="Rename label"
-        onClick={() => {
-          setEditing(l.id)
-          setEditName(l.name)
-        }}
-        className="text-muted-foreground hover:text-foreground ml-auto"
-      >
-        <Pencil className="size-3" />
-      </button>
-      <button
-        type="button"
-        aria-label="Delete label"
-        onClick={() => act(() => deleteLabel(l.id), "Could not delete.")}
-        className="text-muted-foreground hover:text-destructive"
-      >
-        <Trash2 className="size-3" />
-      </button>
-    </div>
-  )
-
-  return (
-    <Card className="h-fit">
-      <CardHeader>
-        <CardTitle className="text-base">Structure</CardTitle>
-        <CardDescription>Groups → categories → labels.</CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
-        {/* Group tree */}
-        <div className="flex flex-col gap-3">
-          {groups.length === 0 && (
-            <p className="text-muted-foreground text-sm">
-              No groups yet — a category becomes a group when a Bills or Income
-              entry uses it.
-            </p>
-          )}
-          {groups.map((g) => {
-            const members = categories
-              .filter((c) => c.group_id === g.id)
-              .sort((a, b) => a.name.localeCompare(b.name))
-            return (
-              <div
-                key={g.id}
-                className={cn(
-                  "border p-2.5",
-                  g.is_savings && "border-emerald-500/40 bg-emerald-500/5",
-                )}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <div className="text-sm font-semibold">{g.name}</div>
-                  <label className="text-muted-foreground flex cursor-pointer items-center gap-2 text-xs">
-                    Savings / investment
-                    <Switch
-                      checked={g.is_savings}
-                      onCheckedChange={(v) =>
-                        act(
-                          () => setCategorySavings(g.id, v),
-                          "Could not update group.",
-                        )
-                      }
-                    />
-                  </label>
-                </div>
-                {g.is_savings && (
-                  <p className="text-muted-foreground text-xs">
-                    Money placed here is set aside, not spent.
-                  </p>
-                )}
-                {members.length === 0 ? (
-                  <p className="text-muted-foreground mt-1 text-xs">
-                    No categories assigned.
-                  </p>
-                ) : (
-                  <div className="mt-1.5 flex flex-col gap-1.5">
-                    {members.map((c) => (
-                      <div key={c.id} className="flex flex-col">
-                        <div className="flex items-center justify-between gap-2">
-                          <button
-                            type="button"
-                            onClick={() => viewCategory(c.id)}
-                            className="hover:text-primary text-sm hover:underline"
-                          >
-                            {c.name}
-                          </button>
-                          <span className="text-muted-foreground text-xs tabular-nums">
-                            {formatNOK(spentByCat.get(c.id) ?? 0)}
-                          </span>
-                        </div>
-                        {(labelsByCat.get(c.id) ?? [])
-                          .sort((a, b) => a.name.localeCompare(b.name))
-                          .map(labelRow)}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )
-          })}
-        </div>
-
-        {/* Unassigned categories */}
-        <div className="flex flex-col gap-2">
-          <div className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
-            Categories
-          </div>
-          <div className="flex gap-2">
-            <Input
-              value={newCat}
-              onChange={(e) => setNewCat(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && addCategory()}
-              placeholder="New category, e.g. Games"
-              className="h-8 text-sm"
-            />
-            <Button size="sm" onClick={addCategory} disabled={adding || !newCat.trim()}>
-              <Plus className="size-4" />
-            </Button>
-          </div>
-          <div className="flex flex-col divide-y">
-            {nonGroupCats.map((c) => (
-              <div key={c.id} className="flex flex-col py-1.5">
-                <div className="flex items-center justify-between gap-2">
-                  <button
-                    type="button"
-                    onClick={() => viewCategory(c.id)}
-                    className="hover:text-primary truncate text-sm hover:underline"
-                  >
-                    {c.name}
-                  </button>
-                  <Select
-                    value={c.group_id ?? NONE}
-                    onValueChange={(v) =>
-                      act(
-                        () => setCategoryGroup(c.id, v === NONE ? null : v),
-                        "Could not assign group.",
-                      )
-                    }
-                  >
-                    <SelectTrigger className="h-7 w-[150px] text-xs">
-                      <SelectValue placeholder="No group" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={NONE}>No group</SelectItem>
-                      {groups.map((g) => (
-                        <SelectItem key={g.id} value={g.id}>
-                          {g.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                {(labelsByCat.get(c.id) ?? [])
-                  .sort((a, b) => a.name.localeCompare(b.name))
-                  .map(labelRow)}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Labels without a home category */}
-        {unassignedLabels.length > 0 && (
-          <div className="flex flex-col gap-1.5">
-            <div className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
-              Labels needing a home category
-            </div>
-            {unassignedLabels
-              .sort((a, b) => a.name.localeCompare(b.name))
-              .map((l) => (
-                <div key={l.id} className="flex items-center gap-2 text-xs">
-                  <Tag className="text-muted-foreground size-3" />
-                  <span className="truncate">{l.name}</span>
-                  <Select
-                    onValueChange={(v) =>
-                      act(() => setLabelCategory(l.id, v), "Could not set home.")
-                    }
-                  >
-                    <SelectTrigger className="ml-auto h-7 w-[150px] text-xs">
-                      <SelectValue placeholder="Set home…" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categories
-                        .slice()
-                        .sort((a, b) => a.name.localeCompare(b.name))
-                        .map((c) => (
-                          <SelectItem key={c.id} value={c.id}>
-                            {c.name}
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
   )
 }
 
@@ -469,8 +138,22 @@ function TriagePanel({
     return true
   })
 
-  async function assignMerchant(g: MerchantGroup, value: string) {
-    const catId = value === NONE ? null : value
+  const [mixed, setMixed] = useState<{
+    mix: MerchantMix
+    group: MerchantGroup
+    catId: string | null
+  } | null>(null)
+
+  function pickMerchant(g: MerchantGroup, catId: string | null) {
+    const mix = merchantMix(transactions, g.sample, catId, typeMap, (id) => catName(id) ?? "Uncategorised")
+    if (mix) {
+      setMixed({ mix, group: g, catId })
+      return
+    }
+    assignMerchant(g, catId)
+  }
+
+  async function assignMerchant(g: MerchantGroup, catId: string | null) {
     try {
       const n = await categorizeBySource(g.sample, catId)
       onChanged()
@@ -489,7 +172,7 @@ function TriagePanel({
       <CardHeader className="gap-3">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <CardTitle className="text-base">Merchants</CardTitle>
+            <CardTitle className="text-base">Merchants · needs sorting</CardTitle>
             <CardDescription>
               {covered.toLocaleString("nb-NO")} /{" "}
               {spending.length.toLocaleString("nb-NO")} categorised ({pct}%)
@@ -560,40 +243,21 @@ function TriagePanel({
                         </span>
                       </span>
                     </button>
-                    <Select
-                      value={cat ?? NONE}
-                      onValueChange={(v) => assignMerchant(g, v)}
-                    >
-                      <SelectTrigger className="h-8 w-[150px] shrink-0 text-xs">
-                        <SelectValue placeholder="Uncategorised">
-                          {cat ? (
-                            catName(cat)
-                          ) : (
-                            <span className="text-muted-foreground">
-                              {mixed ? "Mixed" : "Set category"}
-                            </span>
-                          )}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value={NONE}>Uncategorised</SelectItem>
-                        {categories
-                          .slice()
-                          .sort((a, b) => a.name.localeCompare(b.name))
-                          .map((c) => (
-                            <SelectItem key={c.id} value={c.id}>
-                              {c.name}
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
+                    <div className="w-[190px] shrink-0">
+                      <CategorySelect
+                        categories={categories}
+                        value={cat}
+                        onChange={(id) => pickMerchant(g, id)}
+                        noneLabel={mixed ? "Mixed / uncategorised" : "Uncategorised"}
+                        className="h-8 text-xs"
+                      />
+                    </div>
                   </div>
 
                   {isOpen && (
                     <ExpandedMerchant
                       group={g}
                       labels={labels}
-                      homeCategory={cat}
                       onChanged={onChanged}
                     />
                   )}
@@ -603,6 +267,17 @@ function TriagePanel({
           </div>
         )}
       </CardContent>
+
+      <MixedMerchantDialog
+        mix={mixed?.mix ?? null}
+        onCancel={() => setMixed(null)}
+        onAll={() => {
+          if (mixed) {
+            assignMerchant(mixed.group, mixed.catId)
+          }
+          setMixed(null)
+        }}
+      />
 
       <TypeMapper
         open={mapperOpen}
@@ -621,22 +296,18 @@ function TriagePanel({
 function ExpandedMerchant({
   group,
   labels,
-  homeCategory,
   onChanged,
 }: {
   group: MerchantGroup
   labels: Label[]
-  homeCategory: string | null
   onChanged: () => void
 }) {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const labelName = (id: string | null) =>
     labels.find((l) => l.id === id)?.name ?? null
 
-  // New labels inherit this merchant's category as their home, so a "Path of
-  // Exile 2" created on a Games charge totals under Games across all channels.
   async function createAndGetId(name: string): Promise<string> {
-    const l = await createLabel(name, homeCategory)
+    const l = await createLabel(name)
     onChanged()
     return l.id
   }

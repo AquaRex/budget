@@ -60,71 +60,6 @@ export type ImportSummary = {
   unchanged: number
 }
 
-const isInternalType = (type: string) =>
-  /overf/i.test(type) || type.toLowerCase() === "nettbank"
-
-/**
- * Make sure every bank "Type" in the import exists as a category and is mapped
- * to it (unless the user already mapped that type elsewhere). The bank CSV is
- * the source of truth, so its categories flow into our shared pool.
- */
-async function ensureCategoriesForTypes(types: (string | null)[]): Promise<void> {
-  const supabase = getSupabase()
-  const clean = Array.from(
-    new Set(
-      types
-        .map((t) => (t ?? "").trim())
-        .filter((t) => t !== "" && !isInternalType(t)),
-    ),
-  )
-  if (clean.length === 0) return
-
-  const { data: cats } = await supabase.from("categories").select("id,name")
-  const byName = new Map(
-    ((cats ?? []) as { id: string; name: string }[]).map((c) => [
-      c.name.toLowerCase(),
-      c.id,
-    ]),
-  )
-  const { data: maps } = await supabase
-    .from("type_categories")
-    .select("bank_type")
-  const mapped = new Set(
-    ((maps ?? []) as { bank_type: string }[]).map((m) => m.bank_type),
-  )
-
-  for (const type of clean) {
-    let catId = byName.get(type.toLowerCase())
-    if (!catId) {
-      try {
-        const { data } = await supabase
-          .from("categories")
-          .insert({ name: type })
-          .select("id")
-          .single()
-        catId = (data as { id: string } | null)?.id
-        if (catId) byName.set(type.toLowerCase(), catId)
-      } catch {
-        // A racing insert may have created it; look it up.
-        const { data } = await supabase
-          .from("categories")
-          .select("id")
-          .ilike("name", type)
-          .limit(1)
-        catId = (data?.[0] as { id: string } | undefined)?.id
-      }
-    }
-    if (catId && !mapped.has(type)) {
-      await supabase
-        .from("type_categories")
-        .upsert(
-          { bank_type: type, category_id: catId },
-          { onConflict: "user_id,bank_type" },
-        )
-    }
-  }
-}
-
 /**
  * Apply a parsed CSV: insert new rows (auto-categorised by rules), record
  * proposed updates on conflicting rows, and create an import batch. Returns a
@@ -139,10 +74,6 @@ export async function importTransactions(
   // Always reconcile against the latest stored rows, never a stale snapshot.
   const existing = await fetchTransactions()
   const plan: ImportPlan = classifyImport(parsed, existing)
-
-  // Promote any new bank types into our shared category pool first, so the
-  // freshly imported rows resolve to a category immediately.
-  await ensureCategoriesForTypes(parsed.map((r) => r.type))
 
   // Record the import batch first so rows can reference it.
   const { data: imp, error: impErr } = await supabase
@@ -255,6 +186,7 @@ export async function resolveConflict(
   if (error) throw error
 }
 
+/** One-off exception: re-categorise a single transaction, leaving its merchant's rule alone. */
 export async function setTransactionCategory(
   id: string,
   categoryId: string | null,
@@ -269,9 +201,10 @@ export async function setTransactionCategory(
 
 /**
  * Categorise every transaction sharing this one's source (same merchant /
- * account) and persist a rule so future imports inherit it. Passing null
- * clears the category for the whole source and removes the rule.
- * Returns how many transactions were updated.
+ * account) across all time — regardless of any period the UI shows — and
+ * persist a rule so future imports inherit it. Passing null clears the category
+ * for the whole source and removes the rule. Use setTransactionCategory for a
+ * one-off exception. Returns how many transactions were updated.
  */
 export async function categorizeBySource(
   tx: Transaction,
@@ -302,22 +235,30 @@ export async function categorizeBySource(
       .eq("pattern", src.pattern)
   }
 
-  const { data } = await supabase.from("transactions").select("*")
+  // Every matching row across all time (paged: a bare select stops at 1000 rows).
+  const all = await fetchTransactions()
   const ids = new Set(
-    ((data ?? []) as Transaction[])
-      .filter((t) => txMatchesSource(t, src.matchType, src.pattern))
-      .map((t) => t.id),
+    all.filter((t) => txMatchesSource(t, src.matchType, src.pattern)).map((t) => t.id),
   )
   ids.add(tx.id) // always apply to the one the user clicked
-  await Promise.all(
-    Array.from(ids).map((id) =>
-      supabase
-        .from("transactions")
-        .update({ category_id: categoryId })
-        .eq("id", id),
-    ),
-  )
+  await setCategoryForIds(Array.from(ids), categoryId)
   return ids.size
+}
+
+const UPDATE_CHUNK = 200 // keeps the `id=in.(…)` URL well under length limits
+
+/** Set one category on many transactions, a chunk of ids per update statement. */
+export async function setCategoryForIds(ids: string[], categoryId: string | null): Promise<void> {
+  const supabase = getSupabase()
+  for (let i = 0; i < ids.length; i += UPDATE_CHUNK) {
+    const { error } = await supabase
+      .from("transactions")
+      .update({ category_id: categoryId })
+      .in("id", ids.slice(i, i + UPDATE_CHUNK))
+    if (error) {
+      throw error
+    }
+  }
 }
 
 /** Set (or clear, with null) the manual label on one transaction. */
@@ -394,22 +335,12 @@ export async function saveRuleAndApply(
   if (error) throw error
   const r = saved as TxRule
 
-  // Re-categorise existing matches (only those without a category yet).
-  const { data: rows } = await supabase
-    .from("transactions")
-    .select("*")
-    .is("category_id", null)
-  const matches = ((rows ?? []) as Transaction[]).filter(
-    (t) => ruleCategoryFor(t, [r]) === categoryId,
+  // Re-categorise existing matches (only those without a category yet), over
+  // every row (paged: a bare select stops at 1000 rows).
+  const matches = (await fetchTransactions()).filter(
+    (t) => t.category_id === null && ruleCategoryFor(t, [r]) === categoryId,
   )
-  await Promise.all(
-    matches.map((t) =>
-      supabase
-        .from("transactions")
-        .update({ category_id: categoryId })
-        .eq("id", t.id),
-    ),
-  )
+  await setCategoryForIds(matches.map((t) => t.id), categoryId)
   return matches.length
 }
 

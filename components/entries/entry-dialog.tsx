@@ -1,12 +1,12 @@
 "use client"
 
 import { useId, useState } from "react"
+import Link from "next/link"
 import { toast } from "sonner"
 
 import type { Entry, EntryKind } from "@/lib/types"
 import { MONTHS_LONG } from "@/lib/budget"
 import { createEntry, updateEntry, setAmount } from "@/lib/data/entries"
-import { createCategory } from "@/lib/data/categories"
 import { createMethod } from "@/lib/data/methods"
 import { useCategories, useMethods } from "@/lib/data/use-budget"
 import { useYear } from "@/lib/year"
@@ -39,6 +39,8 @@ type Props = {
   presetCategory?: string
   onSaved: () => void
 }
+
+const NO_GROUP = "__none__"
 
 type FormState = {
   name: string
@@ -74,9 +76,8 @@ export function EntryDialog({
 }: Props) {
   const year = useYear()
   const isBill = kind === "bill"
-  const catListId = useId()
   const methodListId = useId()
-  const { categories, mutate: mutateCategories } = useCategories()
+  const { categories } = useCategories()
   const { methods, mutate: mutateMethods } = useMethods()
 
   const [form, setForm] = useState<FormState>(() => emptyForm())
@@ -123,17 +124,13 @@ export function EntryDialog({
   const isSalary = !!entry?.is_salary
   const showOneTimeAmount = isCreate && !form.is_recurring
 
-  // Resolve a typed category/method name to an id, creating it when new.
+  // Budget rows belong to a group; groups are created in Settings.
+  const groups = categories
+    .filter((c) => c.is_group)
+    .sort((a, b) => a.sort_order - b.sort_order)
   async function resolveCategoryId(): Promise<string | null> {
-    const name = form.category.trim()
-    if (!name) return null
-    const existing = categories.find(
-      (c) => c.name.toLowerCase() === name.toLowerCase(),
-    )
-    if (existing) return existing.id
-    const created = await createCategory(name)
-    await mutateCategories()
-    return created.id
+    const name = form.category.trim().toLowerCase()
+    return groups.find((g) => g.name.toLowerCase() === name)?.id ?? null
   }
   async function resolveMethodId(): Promise<string | null> {
     const name = form.method.trim()
@@ -315,19 +312,40 @@ export function EntryDialog({
 
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label htmlFor="category">Category</Label>
-                <Input
-                  id="category"
-                  list={catListId}
-                  value={form.category}
-                  placeholder="Pick or type new…"
-                  onChange={(e) => set("category", e.target.value)}
-                />
-                <datalist id={catListId}>
-                  {categories.map((c) => (
-                    <option key={c.id} value={c.name} />
-                  ))}
-                </datalist>
+                <div className="flex items-baseline justify-between gap-2">
+                  <Label htmlFor="category">Group</Label>
+                  <Link
+                    href="/settings#categories"
+                    className="text-muted-foreground hover:text-foreground text-xs"
+                  >
+                    Manage…
+                  </Link>
+                </div>
+                <Select
+                  value={form.category || NO_GROUP}
+                  onValueChange={(v) => set("category", v === NO_GROUP ? "" : v)}
+                >
+                  <SelectTrigger id="category" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NO_GROUP}>No group</SelectItem>
+                    {groups.map((g) => (
+                      <SelectItem key={g.id} value={g.name}>
+                        {g.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {form.category &&
+                  !groups.some(
+                    (g) => g.name.toLowerCase() === form.category.toLowerCase(),
+                  ) && (
+                    <p className="text-xs text-amber-700 dark:text-amber-400">
+                      “{form.category}” isn&apos;t a group. Pick a group, or it
+                      saves without one.
+                    </p>
+                  )}
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="method">Method</Label>

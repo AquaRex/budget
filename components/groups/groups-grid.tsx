@@ -66,7 +66,7 @@ export function GroupsGrid({
   // Drill from a label sub-row into the matching transactions.
   const openLabel = (subKey: string) => {
     const q = subKey === NO_LABEL ? "__none__" : subKey
-    router.push(`/spending?tab=transactions&period=all&label=${q}`)
+    router.push(`/transactions?tab=transactions&period=all&label=${q}`)
   }
 
   const calGetEvents = (yy: number, m: number): CalEvent[] => {
@@ -469,7 +469,7 @@ export function GroupsGrid({
         onEventClick={(e, yy, m) => {
           const period = `${yy}-${String(m).padStart(2, "0")}`
           const q = encodeURIComponent(e.merchant ?? "")
-          router.push(`/spending?tab=transactions&period=${period}&q=${q}`)
+          router.push(`/transactions?tab=transactions&period=${period}&q=${q}`)
         }}
       />
     </div>

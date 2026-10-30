@@ -3,6 +3,7 @@
 import { Fragment, useEffect, useRef, useState } from "react"
 import { GripVertical, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react"
 import { toast } from "sonner"
+import { useSWRConfig } from "swr"
 
 import type { Category, Entry, EntryAmount, EntryKind } from "@/lib/types"
 import { formatNumber, dayLabel } from "@/lib/format"
@@ -40,7 +41,6 @@ import { deleteEntry, setAmount, reorderEntries } from "@/lib/data/entries"
 import {
   reorderCategories,
   renameCategory,
-  deleteCategory,
 } from "@/lib/data/categories"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -49,6 +49,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { EditableCell } from "@/components/entries/editable-cell"
 import { EntryDialog } from "@/components/entries/entry-dialog"
 import { SalaryCalculator } from "@/components/income/salary-calculator"
+import { DeleteCategoryDialog } from "@/components/settings/category-dialogs"
 import { MonthCalendar, type CalEvent } from "@/components/calendar/month-calendar"
 import {
   DropdownMenu,
@@ -72,7 +73,7 @@ import {
 const sticky = "sm:sticky sm:left-0 sm:z-10"
 const COLS = 18
 
-type Confirm = { type: "entry" | "category"; id: string; name: string }
+type Confirm = { id: string; name: string }
 
 export function EntriesGrid({
   kind,
@@ -90,11 +91,13 @@ export function EntriesGrid({
   const { categories, mutate: mutateCategories } = useCategories()
   const { methods } = useMethods()
   const ctx = useBudgetContext(amounts, profile)
+  const { mutate } = useSWRConfig()
 
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<Entry | null>(null)
   const [presetCategory, setPresetCategory] = useState("")
   const [confirm, setConfirm] = useState<Confirm | null>(null)
+  const [deletingGroup, setDeletingGroup] = useState<Category | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [renameDraft, setRenameDraft] = useState("")
@@ -167,6 +170,9 @@ export function EntriesGrid({
     mutateAmounts()
     mutateSalary()
     mutateCategories()
+    // Settings counts budget rows per group across every year.
+    mutate("entry_counts")
+    mutate("entry_years")
   }
 
   // Inline cell edit / drop: optimistic amounts cache update, then persist.
@@ -208,7 +214,10 @@ export function EntriesGrid({
     if (updates.length === 0) return
     mutateEntries(nextEntries, { revalidate: false })
     reorderEntries(updates)
-      .then(() => mutateEntries())
+      .then(() => {
+        mutateEntries()
+        mutate("entry_counts")
+      })
       .catch((err) => {
         toast.error(err instanceof Error ? err.message : "Could not reorder.")
         mutateEntries()
@@ -248,14 +257,8 @@ export function EntriesGrid({
     if (!confirm) return
     setDeleting(true)
     try {
-      if (confirm.type === "entry") {
-        await deleteEntry(confirm.id)
-        refresh()
-      } else {
-        await deleteCategory(confirm.id)
-        mutateCategories()
-        mutateEntries()
-      }
+      await deleteEntry(confirm.id)
+      refresh()
       toast.success("Deleted.")
       setConfirm(null)
     } catch (err) {
@@ -380,7 +383,7 @@ export function EntriesGrid({
               <DropdownMenuItem
                 variant="destructive"
                 onClick={() =>
-                  setConfirm({ type: "entry", id: entry.id, name: entry.name })
+                  setConfirm({ id: entry.id, name: entry.name })
                 }
               >
                 <Trash2 className="size-4" />
@@ -482,16 +485,10 @@ export function EntriesGrid({
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     variant="destructive"
-                    onClick={() =>
-                      setConfirm({
-                        type: "category",
-                        id: cat.id,
-                        name: cat.name,
-                      })
-                    }
+                    onClick={() => setDeletingGroup(cat)}
                   >
                     <Trash2 className="size-4" />
-                    Delete group
+                    Delete group…
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -707,14 +704,19 @@ export function EntriesGrid({
         onSaved={refresh}
       />
 
+      <DeleteCategoryDialog
+        target={deletingGroup}
+        categories={categories}
+        onClose={() => setDeletingGroup(null)}
+        onDone={refresh}
+      />
+
       <AlertDialog open={!!confirm} onOpenChange={(o) => !o && setConfirm(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete “{confirm?.name}”?</AlertDialogTitle>
             <AlertDialogDescription>
-              {confirm?.type === "category"
-                ? "The group is removed; its entries become uncategorized (not deleted)."
-                : "This removes the entry and all its monthly amounts. You can’t undo this."}
+              This removes the entry and all its monthly amounts. You can’t undo this.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -25,7 +25,7 @@ export function buildTypeMap(rows: TypeCategory[]): TypeMap {
 
 /**
  * The group a category rolls up into:
- *   - if the category is itself a group (used by Bills/Income) -> itself,
+ *   - if the category is itself a group -> itself,
  *   - else its assigned group_id,
  *   - else null (Unassigned).
  */
@@ -43,7 +43,7 @@ export function groupOfCategory(
  * The category a transaction counts under, resolving in order:
  *   1. an explicit per-transaction category (manual / source rule),
  *   2. the bank-type's mapping,
- *   3. none (it stays ungrouped under its own bank type).
+ *   3. none (uncategorised).
  */
 export function effectiveCategoryId(
   t: { category_id: string | null; type: string | null },
@@ -52,24 +52,6 @@ export function effectiveCategoryId(
   if (t.category_id) return t.category_id
   if (t.type && typeMap.has(t.type)) return typeMap.get(t.type)!
   return null
-}
-
-/**
- * Where a transaction lands in the group view. A labelled charge rolls up under
- * its label's *home* category (so e.g. every "Path of Exile 2" payment totals
- * under Games regardless of how it was paid); otherwise it uses its own resolved
- * category. `labelHome` maps label id -> its category id (or null).
- */
-export function placementCategoryId(
-  t: { category_id: string | null; type: string | null; label_id: string | null },
-  typeMap: TypeMap,
-  labelHome: Map<string, string | null>,
-): string | null {
-  if (t.label_id) {
-    const home = labelHome.get(t.label_id)
-    if (home) return home
-  }
-  return effectiveCategoryId(t, typeMap)
 }
 
 /** Lowercase + collapse whitespace, for stable rule matching. */

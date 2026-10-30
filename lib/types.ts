@@ -1,15 +1,15 @@
 export type EntryKind = "bill" | "income"
 
-// Categories are a single shared pool (used by both bills and income, and
-// auto-populated from the bank's transaction types).
+// Categories are a single shared pool. Some are groups (is_group): the units
+// the budget (Bills/Income entries) and the Groups page work in. Every other
+// category should belong to a group via group_id; null = "Needs sorting".
 export type Category = {
   id: string
   user_id: string
   name: string
   sort_order: number
-  // The group this category rolls up into on the Groups page, or null. A group
-  // is itself just a category that Bills/Income entries use. (Bills/Income
-  // ignore this field.)
+  is_group: boolean
+  // The group this category rolls up into, or null. Unused on groups.
   group_id: string | null
   // A savings/investment group: money placed here is set aside, not spent.
   is_savings: boolean
@@ -92,9 +92,6 @@ export type Label = {
   id: string
   user_id: string
   name: string
-  // The label's "home" category — where its (cross-channel) total rolls up in
-  // the group view. Null = fall back to each transaction's own category.
-  category_id: string | null
   created_at: string
 }
 

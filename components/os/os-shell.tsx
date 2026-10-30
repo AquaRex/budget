@@ -34,7 +34,7 @@ import { useInstall, useInstallListener } from "@/components/os/platform"
 
 const TABS = [
   { href: "/os", label: "Home", icon: Gauge },
-  { href: "/os/spending", label: "Spending", icon: Wallet },
+  { href: "/os/transactions", label: "Transactions", icon: Wallet },
   { href: "/os/budget", label: "Budget", icon: ReceiptText },
   { href: "/os/groups", label: "Groups", icon: Layers },
   { href: "/os/more", label: "More", icon: Ellipsis },
@@ -303,7 +303,7 @@ function TabLink({
       href={tab.href}
       aria-current={active ? "page" : undefined}
       className={cn(
-        "flex flex-col items-center justify-center gap-1 text-[10px] font-semibold tracking-widest uppercase transition-colors",
+        "flex min-w-0 flex-col items-center justify-center gap-1 text-[10px] font-semibold tracking-wide uppercase transition-colors",
         rail ? "mx-2 h-16" : "h-16",
         active
           ? "text-foreground"
@@ -318,7 +318,7 @@ function TabLink({
       >
         <Icon className="size-5" />
       </span>
-      {tab.label}
+      <span className="max-w-full truncate px-0.5">{tab.label}</span>
     </Link>
   )
 }

@@ -85,10 +85,10 @@ export default function SettingsPage() {
         title="Categories & groups"
         description={
           <>
-            The Organize workspace. Build groups &amp; categories on the left
-            (and mark savings / investment groups); categorise every merchant in
-            bulk on the right. One category decision covers all of a
-            merchant&apos;s past and future charges.
+            Groups hold categories; Groups, the dashboard and the budget all
+            count by group. Rename, reorder, merge or delete here, mark savings
+            groups, sort what&apos;s in Needs sorting, and categorise merchants —
+            one decision covers a merchant&apos;s past and future charges.
           </>
         }
       >

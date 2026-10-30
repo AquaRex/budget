@@ -1,4 +1,5 @@
 import { getSupabase } from "@/lib/supabase/client"
+import { assertGroups } from "@/lib/data/categories"
 import type { Entry, EntryAmount, EntryInput, EntryKind } from "@/lib/types"
 
 export async function fetchEntries(
@@ -27,14 +28,52 @@ export async function fetchAmounts(year: number): Promise<EntryAmount[]> {
   return (data ?? []) as EntryAmount[]
 }
 
+/** category_id + year of every budget entry, all years (paged past the 1000-row cap). */
+async function fetchAllEntryKeys(): Promise<{ category_id: string | null; year: number }[]> {
+  const PAGE = 1000
+  const out: { category_id: string | null; year: number }[] = []
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await getSupabase()
+      .from("entries")
+      .select("id,category_id,year")
+      .order("id", { ascending: true })
+      .range(from, from + PAGE - 1)
+    if (error) {
+      throw error
+    }
+    const page = (data ?? []) as { category_id: string | null; year: number }[]
+    out.push(...page)
+    if (page.length < PAGE) {
+      break
+    }
+  }
+  return out
+}
+
 /** Distinct years that have any budget entries, newest first. */
 export async function fetchEntryYears(): Promise<number[]> {
-  const supabase = getSupabase()
-  const { data, error } = await supabase.from("entries").select("year")
-  if (error) throw error
-  const years = new Set<number>()
-  for (const r of (data ?? []) as { year: number }[]) years.add(r.year)
+  const years = new Set((await fetchAllEntryKeys()).map((e) => e.year))
   return Array.from(years).sort((a, b) => b - a)
+}
+
+/**
+ * Budget entries per category across every year (category id -> total and per
+ * year), so delete/merge dialogs can warn about rows in years not on screen.
+ */
+export async function fetchEntryCountsByCategory(): Promise<
+  Map<string, { total: number; byYear: Record<number, number> }>
+> {
+  const counts = new Map<string, { total: number; byYear: Record<number, number> }>()
+  for (const e of await fetchAllEntryKeys()) {
+    if (!e.category_id) {
+      continue
+    }
+    const c = counts.get(e.category_id) ?? { total: 0, byYear: {} }
+    c.total++
+    c.byYear[e.year] = (c.byYear[e.year] ?? 0) + 1
+    counts.set(e.category_id, c)
+  }
+  return counts
 }
 
 async function nextSortOrder(
@@ -54,6 +93,7 @@ async function nextSortOrder(
 }
 
 export async function createEntry(input: EntryInput): Promise<Entry> {
+  await assertGroups([input.category_id])
   const supabase = getSupabase()
   const sort_order = await nextSortOrder(input.kind, input.year, input.category_id)
   const { data, error } = await supabase
@@ -69,6 +109,7 @@ export async function updateEntry(
   id: string,
   input: EntryInput,
 ): Promise<Entry> {
+  await assertGroups([input.category_id])
   const supabase = getSupabase()
   const { data, error } = await supabase
     .from("entries")
@@ -90,6 +131,7 @@ export async function deleteEntry(id: string): Promise<void> {
 export async function reorderEntries(
   updates: { id: string; category_id: string | null; sort_order: number }[],
 ): Promise<void> {
+  await assertGroups(updates.map((u) => u.category_id))
   const supabase = getSupabase()
   await Promise.all(
     updates.map((u) =>

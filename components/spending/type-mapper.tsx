@@ -14,15 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-
-const NONE = "__none__"
+import { CategorySelect } from "@/components/spending/category-picker"
 
 type TypeStat = { type: string; count: number; spent: number }
 
@@ -56,8 +48,7 @@ export function TypeMapper({
     return Array.from(m.values()).sort((a, b) => b.spent - a.spent)
   }, [transactions])
 
-  async function assign(type: string, value: string) {
-    const id = value === NONE ? null : value
+  async function assign(type: string, id: string | null) {
     setSaving(type)
     try {
       await setTypeCategory(type, id)
@@ -76,8 +67,8 @@ export function TypeMapper({
           <DialogTitle>Bank categories</DialogTitle>
           <DialogDescription>
             Group the bank&apos;s transaction types into your budget categories.
-            Anything left ungrouped shows up under its own name (e.g. “Spill”).
-            A per-transaction category always overrides these.
+            Unmapped types land in Needs sorting. A merchant&apos;s category
+            always overrides these.
           </DialogDescription>
         </DialogHeader>
 
@@ -98,23 +89,16 @@ export function TypeMapper({
                     {s.count} tx · {formatNOK(s.spent)}
                   </div>
                 </div>
-                <Select
-                  value={typeMap.get(s.type) ?? NONE}
-                  onValueChange={(v) => assign(s.type, v)}
-                  disabled={saving === s.type}
-                >
-                  <SelectTrigger className="h-8 w-[170px] text-xs">
-                    <SelectValue placeholder="Ungrouped" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={NONE}>Ungrouped</SelectItem>
-                    {categories.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="w-[200px] shrink-0">
+                  <CategorySelect
+                    categories={categories}
+                    value={typeMap.get(s.type) ?? null}
+                    onChange={(id) => assign(s.type, id)}
+                    noneLabel="Not mapped (Needs sorting)"
+                    disabled={saving === s.type}
+                    className="h-8 text-xs"
+                  />
+                </div>
               </div>
             ))
           )}

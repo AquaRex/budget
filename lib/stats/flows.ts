@@ -1,10 +1,10 @@
-import type { Category, Entry, Label, Transaction } from "@/lib/types"
+import type { Category, Entry, Transaction } from "@/lib/types"
 import {
   deriveStem,
   effectiveDate,
+  effectiveCategoryId,
   groupOfCategory,
   isInternalTx,
-  placementCategoryId,
   type TypeMap,
 } from "@/lib/spending"
 import { getCountTransfers } from "@/lib/count-transfers"
@@ -46,32 +46,32 @@ export function isSavingsTx(t: Transaction, index: GroupIndex): boolean {
   return !!groupId && index.savings.has(groupId)
 }
 
-/** Groups exactly as the Groups page derives and places them. */
+/**
+ * Groups are the categories flagged is_group. A transaction's category is its
+ * own category, else its bank type's mapping; its group is that category if it
+ * is a group, else the category's group. Entries only decide a group's kind
+ * (income-only groups).
+ */
 export function buildGroupIndex(
   categories: Category[],
-  labels: Label[],
   typeMap: TypeMap,
   bills: Entry[],
   incomes: Entry[],
 ): GroupIndex {
   const billCats = new Set(bills.map((e) => e.category_id))
   const incomeCats = new Set(incomes.map((e) => e.category_id))
-  const groups = categories
-    .filter((c) => billCats.has(c.id) || incomeCats.has(c.id))
-    .sort((a, b) => a.sort_order - b.sort_order)
+  const groups = categories.filter((c) => c.is_group).sort((a, b) => a.sort_order - b.sort_order)
   const groupIds = new Set(groups.map((g) => g.id))
   const catById = new Map(categories.map((c) => [c.id, c]))
-  const labelHome = new Map(labels.map((l) => [l.id, l.category_id]))
   return {
     groups,
     nameOf: (groupId) => (groupId && catById.get(groupId)?.name) || UNASSIGNED_NAME,
     groupOf: (t) => {
-      const group = groupOfCategory(placementCategoryId(t, typeMap, labelHome), groupIds, catById)
-      // A group_id pointing at a category no Bills/Income entry uses this year
-      // isn't a group, so that spend is unassigned rather than silently dropped.
+      const group = groupOfCategory(effectiveCategoryId(t, typeMap), groupIds, catById)
+      // A group_id pointing at a category that isn't a group is "Needs sorting".
       return group && groupIds.has(group) ? group : null
     },
-    incomeOnly: new Set(groups.filter((g) => !billCats.has(g.id)).map((g) => g.id)),
+    incomeOnly: new Set(groups.filter((g) => incomeCats.has(g.id) && !billCats.has(g.id)).map((g) => g.id)),
     savings: new Set(groups.filter((g) => g.is_savings).map((g) => g.id)),
   }
 }
@@ -156,7 +156,7 @@ export function classifyTransactions(transactions: Transaction[], index: GroupIn
 
 /** The day drill-down: every non-excluded row on `date` with how it counts, in time order. */
 export function dayTransactions(data: StatsData, date: string): DayTx[] {
-  const index = buildGroupIndex(data.categories, data.labels, data.typeMap, data.bills, data.incomes)
+  const index = buildGroupIndex(data.categories, data.typeMap, data.bills, data.incomes)
   return classifyTransactions(data.transactions, index)
     .filter((c) => c.date === date)
     .sort((a, b) => (a.tx.tx_at ?? a.date).localeCompare(b.tx.tx_at ?? b.date))

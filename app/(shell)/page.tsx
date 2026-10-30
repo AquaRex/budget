@@ -96,7 +96,7 @@ export default function DashboardPage() {
       if (el && /^(input|textarea|select)$/i.test(el.tagName)) {
         return
       }
-      if (document.querySelector('[role="dialog"]')) {
+      if (document.querySelector('[role="dialog"], [role="alertdialog"]')) {
         return
       }
       if (el?.closest('[role="radiogroup"]')) {
@@ -258,7 +258,7 @@ export default function DashboardPage() {
               rate, pace and where your money goes.
             </p>
             <Button asChild>
-              <Link href="/spending">Go to Spending</Link>
+              <Link href="/transactions">Go to Transactions</Link>
             </Button>
           </Card>
           <Panel

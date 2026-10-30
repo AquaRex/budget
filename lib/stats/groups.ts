@@ -1,5 +1,5 @@
 import { monthlySubtotals } from "@/lib/budget"
-import { placementCategoryId } from "@/lib/spending"
+import { effectiveCategoryId } from "@/lib/spending"
 import type { StatsData } from "@/lib/stats/compute"
 import { monthStatusResolver } from "@/lib/stats/coverage"
 import type { MonthStatus } from "@/lib/stats/types"
@@ -63,10 +63,9 @@ export function computeGroupsMatrix(
   const { statusOf } = monthStatusResolver(data.transactions, data.imports, today)
   const months = Array.from({ length: 12 }, (_, i) => statusOf(year, i + 1))
   const judged = (i: number) => months[i] === "complete"
-  const index = buildGroupIndex(data.categories, data.labels, data.typeMap, data.bills, data.incomes)
+  const index = buildGroupIndex(data.categories, data.typeMap, data.bills, data.incomes)
   const catById = new Map(data.categories.map((c) => [c.id, c]))
   const labelById = new Map(data.labels.map((l) => [l.id, l]))
-  const labelHome = new Map(data.labels.map((l) => [l.id, l.category_id]))
   const yearKey = String(year)
   const inYear = classifyTransactions(data.transactions, index).filter((f) => f.date.slice(0, 4) === yearKey)
 
@@ -79,9 +78,7 @@ export function computeGroupsMatrix(
         continue
       }
       const t = f.tx
-      // Labelled charges roll up under the label's home category, so a label's
-      // total spans every payment channel it was bought through.
-      const placement = placementCategoryId(t, data.typeMap, labelHome)
+      const placement = effectiveCategoryId(t, data.typeMap)
       const key = placement ?? `type:${t.type ?? ""}`
       let entry = byCat.get(key)
       if (!entry) {

@@ -12,7 +12,7 @@ import {
   Settings,
   Smartphone,
   Sun,
-  Wallet,
+  ArrowRightLeft,
   LogOut,
 } from "lucide-react"
 
@@ -24,7 +24,7 @@ import { YearSelector } from "@/components/year-selector"
 const nav = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/budget", label: "Budget", icon: Receipt },
-  { href: "/spending", label: "Spending", icon: Wallet },
+  { href: "/transactions", label: "Transactions", icon: ArrowRightLeft },
   { href: "/groups", label: "Groups", icon: Layers },
   { href: "/settings", label: "Settings", icon: Settings },
 ]

@@ -29,8 +29,6 @@ export function LabelCombobox({
   align?: "start" | "end"
 }) {
   const [open, setOpen] = useState(false)
-  const [q, setQ] = useState("")
-  const [busy, setBusy] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -46,25 +44,6 @@ export function LabelCombobox({
       document.removeEventListener("keydown", onKey)
     }
   }, [open])
-
-  const query = q.trim()
-  const filtered = labels
-    .filter((l) => l.name.toLowerCase().includes(query.toLowerCase()))
-    .sort((a, b) => a.name.localeCompare(b.name))
-  const canCreate =
-    query.length > 0 &&
-    !labels.some((l) => l.name.toLowerCase() === query.toLowerCase())
-
-  async function run(fn: () => Promise<void> | void) {
-    setBusy(true)
-    try {
-      await fn()
-      setOpen(false)
-      setQ("")
-    } finally {
-      setBusy(false)
-    }
-  }
 
   return (
     <div ref={ref} className="relative inline-block">
@@ -82,63 +61,120 @@ export function LabelCombobox({
             align === "end" ? "right-0" : "left-0",
           )}
         >
-          <div className="p-1.5">
-            <Input
-              autoFocus
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && canCreate)
-                  run(async () => onPick(await onCreate(query)))
-              }}
-              placeholder="Find or create label…"
-              className="h-8 text-xs"
-            />
-          </div>
-          <div className="max-h-56 overflow-y-auto px-1 pb-1">
-            {value != null && (
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => run(() => onPick(null))}
-                className="text-muted-foreground hover:bg-accent flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs"
-              >
-                <X className="size-3.5" />
-                Clear label
-              </button>
-            )}
-            {filtered.map((l) => (
-              <button
-                key={l.id}
-                type="button"
-                disabled={busy}
-                onClick={() => run(() => onPick(l.id))}
-                className="hover:bg-accent flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs"
-              >
-                <Tag className="size-3.5 shrink-0 opacity-70" />
-                <span className="truncate">{l.name}</span>
-                {value === l.id && <Check className="ml-auto size-3.5" />}
-              </button>
-            ))}
-            {canCreate && (
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => run(async () => onPick(await onCreate(query)))}
-                className="hover:bg-accent flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs"
-              >
-                <Plus className="size-3.5 shrink-0" />
-                Create &ldquo;<span className="truncate">{query}</span>&rdquo;
-              </button>
-            )}
-            {filtered.length === 0 && !canCreate && (
-              <div className="text-muted-foreground px-2 py-1.5 text-xs">
-                No labels yet.
-              </div>
-            )}
-          </div>
+          <LabelPickerList
+            labels={labels}
+            value={value}
+            onPick={onPick}
+            onCreate={onCreate}
+            onDone={() => setOpen(false)}
+            listClassName="max-h-56"
+          />
         </div>
       )}
     </div>
+  )
+}
+
+/** Search existing tags, create one, or clear: the body of every tag picker. */
+export function LabelPickerList({
+  labels,
+  value,
+  onPick,
+  onCreate,
+  onDone,
+  autoFocus = true,
+  allowClear = false,
+  listClassName,
+}: {
+  labels: Label[]
+  value?: string | null
+  onPick: (labelId: string | null) => void | Promise<void>
+  onCreate: (name: string) => Promise<string>
+  onDone: () => void
+  autoFocus?: boolean
+  /** Offer "Clear tag" even without a current value (bulk edits). */
+  allowClear?: boolean
+  listClassName?: string
+}) {
+  const [q, setQ] = useState("")
+  const [busy, setBusy] = useState(false)
+  const query = q.trim()
+  const filtered = labels
+    .filter((l) => l.name.toLowerCase().includes(query.toLowerCase()))
+    .sort((a, b) => a.name.localeCompare(b.name))
+  const canCreate =
+    query.length > 0 &&
+    !labels.some((l) => l.name.toLowerCase() === query.toLowerCase())
+
+  async function run(fn: () => Promise<void> | void) {
+    setBusy(true)
+    try {
+      await fn()
+      onDone()
+      setQ("")
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <>
+      <div className="p-1.5">
+        <Input
+          autoFocus={autoFocus}
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && canCreate) {
+              run(async () => onPick(await onCreate(query)))
+            }
+          }}
+          placeholder="Find or create tag…"
+          className="h-8 text-xs"
+        />
+      </div>
+      <div className={cn("overflow-y-auto px-1 pb-1", listClassName)}>
+        {(value != null || allowClear) && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => run(() => onPick(null))}
+            className="text-muted-foreground hover:bg-accent flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs"
+          >
+            <X className="size-3.5" />
+            Clear tag
+          </button>
+        )}
+        {filtered.map((l) => (
+          <button
+            key={l.id}
+            type="button"
+            disabled={busy}
+            onClick={() => run(() => onPick(l.id))}
+            className="hover:bg-accent flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs"
+          >
+            <Tag className="size-3.5 shrink-0 opacity-70" />
+            <span className="truncate">{l.name}</span>
+            {value === l.id && <Check className="ml-auto size-3.5" />}
+          </button>
+        ))}
+        {canCreate && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => run(async () => onPick(await onCreate(query)))}
+            className="hover:bg-accent flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs"
+          >
+            <Plus className="size-3.5 shrink-0" />
+            Create &ldquo;<span className="truncate">{query}</span>&rdquo;
+          </button>
+        )}
+        {filtered.length === 0 && !canCreate && (
+          <div className="text-muted-foreground px-2 py-1.5 text-xs">
+            No tags yet.
+          </div>
+        )}
+      </div>
+    </>
   )
 }

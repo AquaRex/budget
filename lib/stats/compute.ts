@@ -56,7 +56,7 @@ export function computeDashboardStats(
 ): Omit<DashboardStats, "loading"> {
   const todayKey = isoDate(today)
   const { coverage, statusOf } = monthStatusResolver(data.transactions, data.imports, todayKey)
-  const index = buildGroupIndex(data.categories, data.labels, data.typeMap, data.bills, data.incomes)
+  const index = buildGroupIndex(data.categories, data.typeMap, data.bills, data.incomes)
   const flows = classifyTransactions(data.transactions, index)
   const isSavingsEntry = (e: Entry) => !!e.category_id && index.savings.has(e.category_id)
   const spendingBills = data.bills.filter((e) => !isSavingsEntry(e))
