@@ -8,6 +8,7 @@ import {
   LayoutDashboard,
   Layers,
   Moon,
+  PiggyBank,
   Receipt,
   Settings,
   Smartphone,
@@ -26,6 +27,7 @@ const nav = [
   { href: "/budget", label: "Budget", icon: Receipt },
   { href: "/transactions", label: "Transactions", icon: ArrowRightLeft },
   { href: "/groups", label: "Groups", icon: Layers },
+  { href: "/savings", label: "Savings", icon: PiggyBank },
   { href: "/settings", label: "Settings", icon: Settings },
 ]
 

@@ -17,6 +17,7 @@ import {
   Ellipsis,
   Gauge,
   Layers,
+  PiggyBank,
   ReceiptText,
   Wallet,
   X,
@@ -37,6 +38,7 @@ const TABS = [
   { href: "/os/transactions", label: "Transactions", icon: Wallet },
   { href: "/os/budget", label: "Budget", icon: ReceiptText },
   { href: "/os/groups", label: "Groups", icon: Layers },
+  { href: "/os/savings", label: "Savings", icon: PiggyBank },
   { href: "/os/more", label: "More", icon: Ellipsis },
 ] as const
 
@@ -277,7 +279,7 @@ export function OsShell({ children }: { children: ReactNode }) {
           aria-label="App"
           className="bg-background/95 supports-backdrop-filter:backdrop-blur fixed inset-x-0 bottom-0 z-20 border-t pb-[env(safe-area-inset-bottom)] min-[600px]:hidden"
         >
-          <div className="grid h-16 grid-cols-5">
+          <div className="grid h-16 grid-cols-6">
             {TABS.map((t) => (
               <TabLink key={t.href} tab={t} active={path === t.href} />
             ))}
@@ -303,8 +305,9 @@ function TabLink({
       href={tab.href}
       aria-current={active ? "page" : undefined}
       className={cn(
-        "flex min-w-0 flex-col items-center justify-center gap-1 text-[10px] font-semibold tracking-wide uppercase transition-colors",
-        rail ? "mx-2 h-16" : "h-16",
+        "flex min-w-0 flex-col items-center justify-center gap-1 text-[10px] font-semibold transition-colors",
+        // Six tabs on a folded phone: normal case so "Transactions" fits.
+        rail ? "mx-2 h-16 tracking-wide uppercase" : "h-16",
         active
           ? "text-foreground"
           : "text-muted-foreground active:text-foreground",
