@@ -339,22 +339,32 @@ export function CategoryTree() {
       : s.transactions + s.rules + s.mappings === 0
   }
 
+  // Only the handle is draggable: a draggable row swallows clicks on its selects.
+  const dragHandle = (c: Category) => (
+    <span
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.setData(MOVE_CATEGORY, c.id)
+        e.dataTransfer.effectAllowed = "move"
+        if (e.currentTarget.parentElement) {
+          e.dataTransfer.setDragImage(e.currentTarget.parentElement, 0, 0)
+        }
+      }}
+      className="text-muted-foreground/50 hover:text-foreground shrink-0 cursor-grab"
+      aria-label="Drag onto a group to move it"
+    >
+      <GripVertical className="size-4" />
+    </span>
+  )
+
   const categoryRow = (c: Category) => {
     const s = stat(c.id)
     return (
       <div
         key={c.id}
-        draggable={renaming !== c.id}
-        onDragStart={(e) => {
-          e.dataTransfer.setData(MOVE_CATEGORY, c.id)
-          e.dataTransfer.effectAllowed = "move"
-        }}
         className="hover:bg-muted/50 flex flex-wrap items-center gap-x-3 gap-y-1 py-1.5 pr-1 pl-2"
       >
-        <GripVertical
-          className="text-muted-foreground/50 size-4 shrink-0 cursor-grab"
-          aria-label="Drag onto a group to move it"
-        />
+        {dragHandle(c)}
         <div className="flex min-w-[10rem] flex-1 items-center gap-2 text-sm">
           {nameCell(c)}
           {isUnused(c) && (
@@ -562,14 +572,9 @@ export function CategoryTree() {
             {needsSorting.map((c) => (
               <div
                 key={c.id}
-                draggable
-                onDragStart={(e) => {
-                  e.dataTransfer.setData(MOVE_CATEGORY, c.id)
-                  e.dataTransfer.effectAllowed = "move"
-                }}
                 className="flex flex-wrap items-center gap-x-3 gap-y-1 py-1.5 pr-1 pl-2"
               >
-                <GripVertical className="text-muted-foreground/50 size-4 shrink-0 cursor-grab" />
+                {dragHandle(c)}
                 <div className="flex min-w-[10rem] flex-1 items-center gap-2 text-sm">
                   {nameCell(c)}
                   {isUnused(c) && (
