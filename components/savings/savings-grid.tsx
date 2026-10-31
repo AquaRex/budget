@@ -4,6 +4,7 @@ import { Fragment, useState } from "react"
 import { MoreHorizontal, Plus } from "lucide-react"
 import { toast } from "sonner"
 
+import { errMessage } from "@/lib/errors"
 import { MONTHS_SHORT } from "@/lib/budget"
 import { cn } from "@/lib/utils"
 import { formatNumber } from "@/lib/format"
@@ -30,15 +31,28 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { HoldingDialog } from "@/components/savings/holding-dialog"
-import { TradeDialog, type TradeTarget } from "@/components/savings/trade-dialog"
-import { KIND_LABEL, formatUnitsShort, parseNumber } from "@/components/savings/format"
+import {
+  TradeDialog,
+  type TradeTarget,
+} from "@/components/savings/trade-dialog"
+import {
+  KIND_LABEL,
+  formatUnitsShort,
+  parseNumber,
+} from "@/components/savings/format"
 import { up } from "@/components/stats/display"
 
 const sticky = "sm:sticky sm:left-0 sm:z-10"
 const MONTHS = Array.from({ length: 12 }, (_, i) => i + 1)
 
 /** Holdings × months for one year: what was bought/sold, the price, what it's worth. */
-export function SavingsGrid({ model, year }: { model: SavingsModel; year: number }) {
+export function SavingsGrid({
+  model,
+  year,
+}: {
+  model: SavingsModel
+  year: number
+}) {
   const { holdings, results, trades, prices, todayIndex, mutate } = model
   const [editing, setEditing] = useState<Holding | null>(null)
   const [adding, setAdding] = useState(false)
@@ -58,7 +72,7 @@ export function SavingsGrid({ model, year }: { model: SavingsModel; year: number
       await deleteHolding(h.id)
       mutate()
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not delete.")
+      toast.error(errMessage(e, "Could not delete."))
     }
   }
 
@@ -67,12 +81,15 @@ export function SavingsGrid({ model, year }: { model: SavingsModel; year: number
       await setPrice(h.id, year, month, price)
       mutate()
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not save the price.")
+      toast.error(errMessage(e, "Could not save the price."))
     }
   }
 
   const totalValue = (i: number) =>
-    results.reduce((s, r) => s + (r.months.find((m) => m.monthIndex === i)?.value ?? 0), 0)
+    results.reduce(
+      (s, r) => s + (r.months.find((m) => m.monthIndex === i)?.value ?? 0),
+      0,
+    )
   const paidIn = (r: HoldingResult, i: number) => {
     const at = r.months.find((m) => m.monthIndex === i)
     if (!at) {
@@ -86,9 +103,9 @@ export function SavingsGrid({ model, year }: { model: SavingsModel; year: number
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between gap-3">
         <p className="text-muted-foreground text-xs">
-          Click a month to enter what you bought or sold. Linked holdings take the
-          market price each month; type a price to override it, or for holdings
-          entered by hand.
+          Click a month to enter what you bought or sold. Linked holdings take
+          the market price each month; type a price to override it, or for
+          holdings entered by hand.
         </p>
         <Button size="sm" onClick={() => setAdding(true)}>
           <Plus className="size-4" />
@@ -98,14 +115,20 @@ export function SavingsGrid({ model, year }: { model: SavingsModel; year: number
 
       {holdings.length === 0 ? (
         <div className="text-muted-foreground border py-12 text-center text-sm">
-          No holdings yet. Add a fund, stock or your employee share plan to start.
+          No holdings yet. Add a fund, stock or your employee share plan to
+          start.
         </div>
       ) : (
         <div className="overflow-x-auto border">
           <table className="w-full min-w-[1100px] border-collapse text-sm">
             <thead>
               <tr className="bg-muted text-muted-foreground border-b text-[11px] tracking-wider uppercase">
-                <th className={cn(sticky, "bg-muted w-56 px-3 py-2 text-left font-medium")}>
+                <th
+                  className={cn(
+                    sticky,
+                    "bg-muted w-56 px-3 py-2 text-left font-medium",
+                  )}
+                >
                   {year}
                 </th>
                 {MONTHS.map((m, k) => (
@@ -119,13 +142,16 @@ export function SavingsGrid({ model, year }: { model: SavingsModel; year: number
                     {MONTHS_SHORT[m - 1]}
                   </th>
                 ))}
-                <th className="border-l px-3 py-2 text-right font-medium">Year</th>
+                <th className="border-l px-3 py-2 text-right font-medium">
+                  Year
+                </th>
               </tr>
             </thead>
             <tbody>
               {results.map((r) => {
                 const h = r.holding
-                const at = (i: number) => r.months.find((m) => m.monthIndex === i)
+                const at = (i: number) =>
+                  r.months.find((m) => m.monthIndex === i)
                 const bonusAt = (i: number) =>
                   r.lots
                     .filter((l) => l.source === "bonus" && l.monthIndex === i)
@@ -133,18 +159,29 @@ export function SavingsGrid({ model, year }: { model: SavingsModel; year: number
                 const tradeAt = (month: number, side: "buy" | "sell") =>
                   trades.find(
                     (t) =>
-                      t.holding_id === h.id && t.year === year && t.month === month && t.side === side,
+                      t.holding_id === h.id &&
+                      t.year === year &&
+                      t.month === month &&
+                      t.side === side,
                   )
                 const yearPaid = indices.reduce((s, i) => s + paidIn(r, i), 0)
-                const lastShown = [...indices].reverse().find((i) => shown(i) && at(i))
-                const yearEnd = lastShown !== undefined ? at(lastShown) : undefined
+                const lastShown = [...indices]
+                  .reverse()
+                  .find((i) => shown(i) && at(i))
+                const yearEnd =
+                  lastShown !== undefined ? at(lastShown) : undefined
                 return (
                   <Fragment key={h.id}>
                     <tr className="bg-muted/40 border-t">
-                      <td className={cn(sticky, "bg-muted px-3 py-1.5")} colSpan={1}>
+                      <td
+                        className={cn(sticky, "bg-muted px-3 py-1.5")}
+                        colSpan={1}
+                      >
                         <div className="flex items-center gap-2">
                           <span className="flex min-w-0 flex-col">
-                            <span className="truncate font-semibold">{h.name}</span>
+                            <span className="truncate font-semibold">
+                              {h.name}
+                            </span>
                             <span className="text-muted-foreground text-[10px]">
                               {h.symbol ?? "prices by hand"}
                             </span>
@@ -165,8 +202,13 @@ export function SavingsGrid({ model, year }: { model: SavingsModel; year: number
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem onSelect={() => setEditing(h)}>Edit…</DropdownMenuItem>
-                              <DropdownMenuItem variant="destructive" onSelect={() => setRemoving(h)}>
+                              <DropdownMenuItem onSelect={() => setEditing(h)}>
+                                Edit…
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                variant="destructive"
+                                onSelect={() => setRemoving(h)}
+                              >
                                 Delete…
                               </DropdownMenuItem>
                             </DropdownMenuContent>
@@ -186,7 +228,9 @@ export function SavingsGrid({ model, year }: { model: SavingsModel; year: number
                           <td key={m} className="px-0.5 py-0.5 align-top">
                             <button
                               type="button"
-                              onClick={() => setTarget({ holding: h, year, month: m })}
+                              onClick={() =>
+                                setTarget({ holding: h, year, month: m })
+                              }
                               title={
                                 buy?.trade_date
                                   ? `Bought ${buy.trade_date}${buy.trade_time ? ` ${buy.trade_time}` : ""}`
@@ -194,10 +238,16 @@ export function SavingsGrid({ model, year }: { model: SavingsModel; year: number
                               }
                               className="hover:bg-muted flex min-h-9 w-full flex-col items-end justify-center px-1 text-right tabular-nums"
                             >
-                              {!buy && !sell && !bonus && <span className="text-muted-foreground/40">–</span>}
+                              {!buy && !sell && !bonus && (
+                                <span className="text-muted-foreground/40">
+                                  –
+                                </span>
+                              )}
                               {buy && (
                                 <>
-                                  <span className="font-medium">+{formatUnitsShort(buy.units)}</span>
+                                  <span className="font-medium">
+                                    +{formatUnitsShort(buy.units)}
+                                  </span>
                                   <span className="text-muted-foreground text-[10px]">
                                     {formatNumber(buy.amount)} kr
                                   </span>
@@ -209,7 +259,12 @@ export function SavingsGrid({ model, year }: { model: SavingsModel; year: number
                                 </span>
                               )}
                               {bonus > 0 && (
-                                <span className={cn("text-[10px] font-semibold", up)}>
+                                <span
+                                  className={cn(
+                                    "text-[10px] font-semibold",
+                                    up,
+                                  )}
+                                >
                                   +{formatUnitsShort(bonus)} bonus
                                 </span>
                               )}
@@ -238,7 +293,9 @@ export function SavingsGrid({ model, year }: { model: SavingsModel; year: number
                         )
                       })}
                       <td className="border-l px-3 text-right tabular-nums">
-                        {yearEnd?.price != null ? formatNumber(yearEnd.price) : "–"}
+                        {yearEnd?.price != null
+                          ? formatNumber(yearEnd.price)
+                          : "–"}
                       </td>
                     </tr>
 
@@ -247,8 +304,13 @@ export function SavingsGrid({ model, year }: { model: SavingsModel; year: number
                       {indices.map((i) => {
                         const month = at(i)
                         return (
-                          <td key={i} className="px-1.5 py-1 text-right text-xs tabular-nums">
-                            {shown(i) && month ? formatUnitsShort(month.units) : ""}
+                          <td
+                            key={i}
+                            className="px-1.5 py-1 text-right text-xs tabular-nums"
+                          >
+                            {shown(i) && month
+                              ? formatUnitsShort(month.units)
+                              : ""}
                           </td>
                         )
                       })}
@@ -262,7 +324,10 @@ export function SavingsGrid({ model, year }: { model: SavingsModel; year: number
                       {indices.map((i) => {
                         const month = at(i)
                         return (
-                          <td key={i} className="px-1.5 py-1 text-right tabular-nums">
+                          <td
+                            key={i}
+                            className="px-1.5 py-1 text-right tabular-nums"
+                          >
                             {shown(i) && month ? formatNumber(month.value) : ""}
                           </td>
                         )
@@ -275,16 +340,22 @@ export function SavingsGrid({ model, year }: { model: SavingsModel; year: number
                 )
               })}
               <tr className="bg-muted border-t-2 font-semibold">
-                <td className={cn(sticky, "bg-muted px-3 py-2 text-left")}>Total value</td>
+                <td className={cn(sticky, "bg-muted px-3 py-2 text-left")}>
+                  Total value
+                </td>
                 {indices.map((i) => (
                   <td key={i} className="px-1.5 py-2 text-right tabular-nums">
-                    {shown(i) && totalValue(i) ? formatNumber(totalValue(i)) : ""}
+                    {shown(i) && totalValue(i)
+                      ? formatNumber(totalValue(i))
+                      : ""}
                   </td>
                 ))}
                 <td className="border-l px-3 text-right tabular-nums">
                   {(() => {
                     const last = [...indices].reverse().find(shown)
-                    return last !== undefined && totalValue(last) ? `${formatNumber(totalValue(last))} kr` : "–"
+                    return last !== undefined && totalValue(last)
+                      ? `${formatNumber(totalValue(last))} kr`
+                      : "–"
                   })()}
                 </td>
               </tr>
@@ -310,13 +381,16 @@ export function SavingsGrid({ model, year }: { model: SavingsModel; year: number
         onClose={() => setTarget(null)}
         onSaved={mutate}
       />
-      <AlertDialog open={!!removing} onOpenChange={(o) => !o && setRemoving(null)}>
+      <AlertDialog
+        open={!!removing}
+        onOpenChange={(o) => !o && setRemoving(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete {removing?.name}?</AlertDialogTitle>
             <AlertDialogDescription>
-              This removes the holding with every buy, sale and price entered for it, in all
-              years. It can&apos;t be undone.
+              This removes the holding with every buy, sale and price entered
+              for it, in all years. It can&apos;t be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -333,7 +407,12 @@ export function SavingsGrid({ model, year }: { model: SavingsModel; year: number
 
 function RowLabel({ children }: { children: React.ReactNode }) {
   return (
-    <td className={cn(sticky, "bg-card text-muted-foreground px-3 py-1 pl-6 text-xs")}>
+    <td
+      className={cn(
+        sticky,
+        "bg-card text-muted-foreground px-3 py-1 pl-6 text-xs",
+      )}
+    >
       {children}
     </td>
   )
@@ -405,11 +484,15 @@ function PriceCell({
       }
       className={cn(
         "hover:bg-muted h-8 w-full min-w-16 px-1 text-right tabular-nums",
-        explicit ? "text-foreground font-medium" : market ? "text-foreground" : "text-muted-foreground",
+        explicit
+          ? "text-foreground font-medium"
+          : market
+            ? "text-foreground"
+            : "text-muted-foreground",
         price === null && "text-muted-foreground/40",
       )}
     >
-      {price === null ? "–" : new Intl.NumberFormat("nb-NO", { maximumFractionDigits: 2 }).format(price)}
+      {price === null ? "–" : formatUnitsShort(price)}
     </button>
   )
 }

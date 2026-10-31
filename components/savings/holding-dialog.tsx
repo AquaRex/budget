@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { toast } from "sonner"
 
+import { errMessage } from "@/lib/errors"
 import type { Holding, HoldingKind } from "@/lib/savings/types"
 import { createHolding, updateHolding, type HoldingInput } from "@/lib/data/savings"
 import { Button } from "@/components/ui/button"
@@ -101,7 +102,7 @@ function HoldingForm({
       onSaved()
       onClose()
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not save.")
+      toast.error(errMessage(e, "Could not save."))
     } finally {
       setSaving(false)
     }

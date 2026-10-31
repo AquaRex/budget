@@ -1,3 +1,5 @@
+import { isDemoMode, MASK } from "@/lib/demo-mode"
+
 const nok = new Intl.NumberFormat("nb-NO", {
   style: "currency",
   currency: "NOK",
@@ -13,6 +15,9 @@ const nokWithDecimals = new Intl.NumberFormat("nb-NO", {
 
 /** Format a number as Norwegian kroner, e.g. 12500 -> "12 500 kr". */
 export function formatNOK(amount: number, withDecimals = false): string {
+  if (isDemoMode()) {
+    return `${MASK} kr`
+  }
   return (withDecimals ? nokWithDecimals : nok).format(amount || 0)
 }
 
@@ -20,6 +25,9 @@ const number0 = new Intl.NumberFormat("nb-NO", { maximumFractionDigits: 0 })
 
 /** Plain grouped number without a currency symbol, e.g. 12500 -> "12 500". */
 export function formatNumber(amount: number): string {
+  if (isDemoMode()) {
+    return MASK
+  }
   return number0.format(Math.round(amount || 0))
 }
 

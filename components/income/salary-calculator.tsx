@@ -15,6 +15,7 @@ import { formatNOK, formatNumber } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import { setDragAmount } from "@/lib/dnd"
 import { useYear } from "@/lib/year"
+import { useDemoMode } from "@/lib/demo-mode"
 import { useSalaryProfile } from "@/lib/data/use-budget"
 import { saveSalaryProfile, ensureSalaryEntry } from "@/lib/data/salary"
 import { Button } from "@/components/ui/button"
@@ -68,6 +69,7 @@ function seed(p: SalaryProfile): State {
 
 export function SalaryCalculator({ onChanged }: { onChanged: () => void }) {
   const year = useYear()
+  const demo = useDemoMode()
   const { profile, mutate } = useSalaryProfile()
 
   const [state, setState] = useState<State>(() =>
@@ -160,7 +162,10 @@ export function SalaryCalculator({ onChanged }: { onChanged: () => void }) {
           <span className="text-muted-foreground flex shrink-0 items-center gap-1 text-xs font-medium">
             {open ? "Hide" : "Edit salary"}
             <ChevronDown
-              className={cn("size-4 transition-transform", open && "rotate-180")}
+              className={cn(
+                "size-4 transition-transform",
+                open && "rotate-180",
+              )}
             />
           </span>
         </button>
@@ -218,6 +223,7 @@ export function SalaryCalculator({ onChanged }: { onChanged: () => void }) {
                 </div>
                 {state.driver === "yearly" ? (
                   <Input
+                    type={demo ? "password" : "text"}
                     inputMode="decimal"
                     placeholder="Yearly before tax"
                     value={state.yearly}
@@ -225,6 +231,7 @@ export function SalaryCalculator({ onChanged }: { onChanged: () => void }) {
                   />
                 ) : (
                   <Input
+                    type={demo ? "password" : "text"}
                     inputMode="decimal"
                     placeholder="Monthly after tax"
                     value={state.monthlyAfterTax}
@@ -367,7 +374,9 @@ export function SalaryCalculator({ onChanged }: { onChanged: () => void }) {
               </div>
               <div className="flex justify-between">
                 <span>Vacation basis</span>
-                <span className="tabular-nums">{formatNOK(r.vacationBasis)}</span>
+                <span className="tabular-nums">
+                  {formatNOK(r.vacationBasis)}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span>Feriepenger</span>

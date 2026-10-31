@@ -136,7 +136,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           href="/settings"
           className="block bg-amber-400 px-4 py-1.5 text-center text-xs font-semibold text-amber-950"
         >
-          Demo mode · amounts are scrambled and saving is off — turn off in
+          Demo mode · amounts are hidden and saving is off — turn off in
           Settings
         </Link>
       )}

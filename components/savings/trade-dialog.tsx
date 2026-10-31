@@ -5,6 +5,7 @@ import useSWR from "swr"
 import { Trash2 } from "lucide-react"
 import { toast } from "sonner"
 
+import { errMessage } from "@/lib/errors"
 import { cn } from "@/lib/utils"
 import { useToday } from "@/lib/stats/use-dashboard-stats"
 import { fetchPriceAt } from "@/lib/savings/market"
@@ -172,7 +173,7 @@ function TradeForm({
       onSaved()
       onClose()
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not save.")
+      toast.error(errMessage(e, "Could not save."))
     } finally {
       setSaving(false)
     }
@@ -185,7 +186,7 @@ function TradeForm({
       onSaved()
       onClose()
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not remove.")
+      toast.error(errMessage(e, "Could not remove."))
     } finally {
       setSaving(false)
     }
@@ -206,7 +207,7 @@ function TradeForm({
         <SectionTitle title="Bought" onRemove={buy ? () => remove("buy") : undefined} disabled={saving} />
         <div className="grid grid-cols-2 gap-3">
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="buy-date">Date</Label>
+            <Label htmlFor="buy-date">Date (optional)</Label>
             <Input
               id="buy-date"
               type="date"

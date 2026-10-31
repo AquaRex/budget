@@ -6,6 +6,7 @@ import type {
   PeriodSummary,
 } from "@/lib/stats/types"
 import { formatNumber } from "@/lib/format"
+import { isDemoMode, MASK } from "@/lib/demo-mode"
 
 export const up = "text-emerald-600 dark:text-emerald-400"
 export const down = "text-rose-600 dark:text-rose-400"
@@ -36,6 +37,9 @@ export function signedKr(amount: number): string {
 
 /** Axis ticks: 0 / 850 / 12k / 1.2M */
 export function compact(v: number): string {
+  if (isDemoMode()) {
+    return MASK
+  }
   const a = Math.abs(v)
   if (a >= 1_000_000) {
     return `${(v / 1_000_000).toFixed(1)}M`
@@ -218,7 +222,10 @@ export function leftThisMonth(
 export type MonthLeft = ReturnType<typeof leftThisMonth>
 
 /** How a transaction counts, for list rows; null for plain spending. */
-export function flowLabel(row: { flow: Flow; counted: boolean }): string | null {
+export function flowLabel(row: {
+  flow: Flow
+  counted: boolean
+}): string | null {
   switch (row.flow) {
     case "income":
       return "Income"
