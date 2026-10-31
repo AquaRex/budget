@@ -3,6 +3,7 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { EntriesGrid } from "@/components/entries/entries-grid"
 import { BudgetSummary } from "@/components/entries/budget-summary"
+import { EmptyYear } from "@/components/entries/empty-year"
 
 export default function BudgetPage() {
   return (
@@ -13,6 +14,8 @@ export default function BudgetPage() {
           Your expected bills and income, month by month. Amounts in NOK.
         </p>
       </div>
+
+      <EmptyYear />
 
       <BudgetSummary />
 

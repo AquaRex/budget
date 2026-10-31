@@ -20,6 +20,7 @@ import {
   fetchTxRules,
 } from "@/lib/data/transactions"
 import { fetchTypeCategories } from "@/lib/data/type-categories"
+import { fetchTrades } from "@/lib/data/savings"
 import { buildAmountMap, type BudgetContext } from "@/lib/budget"
 import type { SalaryProfile } from "@/lib/salary"
 import type {
@@ -90,11 +91,15 @@ export function useEntryCounts() {
 export function useAvailableYears(): number[] {
   const { years: budgetYears } = useBudgetYears()
   const { transactions } = useTransactions()
+  const { data: trades } = useSWR("holding_trades", fetchTrades)
   const set = new Set<number>(budgetYears)
   set.add(new Date().getFullYear())
   for (const t of transactions) {
     const y = Number((t.tx_date ?? t.booked_date).slice(0, 4))
     if (Number.isFinite(y)) set.add(y)
+  }
+  for (const t of trades ?? []) {
+    set.add(t.year)
   }
   return Array.from(set).sort((a, b) => a - b)
 }
