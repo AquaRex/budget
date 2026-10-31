@@ -1,5 +1,7 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js"
 
+import { demoFetch } from "@/lib/demo-mode"
+
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL
 const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
@@ -20,6 +22,7 @@ export function getSupabase(): SupabaseClient {
         autoRefreshToken: true,
         detectSessionInUrl: false,
       },
+      global: { fetch: demoFetch },
     })
   }
   return client

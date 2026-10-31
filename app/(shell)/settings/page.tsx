@@ -3,6 +3,7 @@
 import { useCategories } from "@/lib/data/use-budget"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Organize } from "@/components/settings/organize"
+import { DemoModeToggle } from "@/components/settings/demo-mode-toggle"
 import { DateModeToggle } from "@/components/settings/date-mode-toggle"
 import { TransfersToggle } from "@/components/settings/transfers-toggle"
 import { ThemeToggle } from "@/components/settings/theme-toggle"
@@ -65,10 +66,11 @@ export default function SettingsPage() {
         title="General"
         description="How the whole site looks and counts your money."
       >
-        <div className="grid gap-4 lg:grid-cols-3">
+        <div className="grid gap-4 lg:grid-cols-2">
           <ThemeToggle />
           <DateModeToggle />
           <TransfersToggle />
+          <DemoModeToggle />
         </div>
       </Section>
 
@@ -87,8 +89,8 @@ export default function SettingsPage() {
           <>
             Groups hold categories; Groups, the dashboard and the budget all
             count by group. Rename, reorder, merge or delete here, mark savings
-            groups, sort what&apos;s in Needs sorting, and categorise merchants —
-            one decision covers a merchant&apos;s past and future charges.
+            groups, sort what&apos;s in Needs sorting, and categorise merchants
+            — one decision covers a merchant&apos;s past and future charges.
           </>
         }
       >
