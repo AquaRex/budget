@@ -37,14 +37,31 @@ export function PlanTimeline({
   const width = (a: number, b: number) =>
     `${((Math.min(b, end) - Math.max(a, start)) / SPAN) * 100}%`
   const visible = (a: number, b: number) => b > start && a < end
+  const todayLine = visible(todayIndex, todayIndex + 1) && (
+    <span
+      className="bg-foreground pointer-events-none absolute inset-y-0 z-10 w-0.5"
+      style={{ left: pct(todayIndex) }}
+      aria-hidden
+    />
+  )
 
   return (
     <div className="flex flex-col gap-3">
       <div className="overflow-x-auto">
         <div className="min-w-[720px]">
-          <div className="grid grid-cols-[9rem_1fr] text-[11px]">
+          <div className="relative grid grid-cols-[auto_1fr]">
             <span />
-            <div className="relative flex">
+            <div className="relative flex text-[11px]">
+              {todayLine && (
+                <span
+                  className="bg-foreground text-background pointer-events-none absolute top-0 z-10 px-1 text-[9px] font-semibold tracking-wider uppercase"
+                  style={{ left: `calc(${pct(todayIndex)} + 4px)` }}
+                  aria-hidden
+                >
+                  Today
+                </span>
+              )}
+              {todayLine}
               {Array.from({ length: YEARS }, (_, k) => (
                 <span
                   key={k}
@@ -59,9 +76,6 @@ export function PlanTimeline({
                 </span>
               ))}
             </div>
-          </div>
-
-          <div className="relative grid grid-cols-[9rem_1fr]">
             {buys.length === 0 && (
               <>
                 <span />
@@ -82,7 +96,7 @@ export function PlanTimeline({
               const soldOut = buy.held === 0
               return (
                 <div key={buy.monthIndex} className="contents">
-                  <div className="bg-card sticky left-0 z-20 flex flex-col justify-center border-t py-1.5 pr-2 text-xs">
+                  <div className="bg-card sticky left-0 z-20 flex flex-col justify-center border-t py-1.5 pr-3 text-xs whitespace-nowrap">
                     <span className="font-medium">
                       {monthLabel(buy.monthIndex)}
                     </span>
@@ -173,25 +187,11 @@ export function PlanTimeline({
                         )}
                       </>
                     )}
+                    {todayLine}
                   </div>
                 </div>
               )
             })}
-            {todayIndex >= start && todayIndex < end && (
-              <span
-                className="pointer-events-none absolute inset-y-0 right-0 left-[9rem]"
-                aria-hidden
-              >
-                <span
-                  className="bg-foreground absolute inset-y-0 w-0.5"
-                  style={{ left: pct(todayIndex) }}
-                >
-                  <span className="bg-foreground text-background absolute -top-0.5 left-1 px-1 text-[9px] font-semibold tracking-wider uppercase">
-                    Today
-                  </span>
-                </span>
-              </span>
-            )}
           </div>
         </div>
       </div>
@@ -210,8 +210,9 @@ export function PlanTimeline({
         </span>
       </div>
       <p className="text-muted-foreground text-xs">
-        Based on the purchases entered so far. Each new purchase joins the queue, so
-        it pushes the &quot;all free&quot; date of the bonus shares before it later.
+        Based on the purchases entered so far. Each new purchase joins the
+        queue, so it pushes the &quot;all free&quot; date of the bonus shares
+        before it later.
       </p>
     </div>
   )

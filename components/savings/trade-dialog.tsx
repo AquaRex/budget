@@ -1,8 +1,13 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import useSWR from "swr"
 import { Trash2 } from "lucide-react"
 import { toast } from "sonner"
+
+import { cn } from "@/lib/utils"
+import { useToday } from "@/lib/stats/use-dashboard-stats"
+import { fetchPriceAt } from "@/lib/savings/market"
 
 import { MONTHS_LONG } from "@/lib/budget"
 import type { Holding, Price, Trade } from "@/lib/savings/types"
@@ -25,7 +30,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { formatPrice, formatUnits, parseNumber } from "@/components/savings/format"
-import { kr } from "@/components/stats/display"
+import { formatShortDate, kr } from "@/components/stats/display"
 
 export type TradeTarget = { holding: Holding; year: number; month: number }
 
@@ -93,12 +98,37 @@ function TradeForm({
   const [sellAmount, setSellAmount] = useState(draft(sell?.amount))
   const [saving, setSaving] = useState(false)
 
-  // This month's price (entered beats market) fills in what you leave blank.
+  const today = useToday()
+  const mm = String(month).padStart(2, "0")
+  const firstDay = `${year}-${mm}-01`
+  const lastDay = `${year}-${mm}-${String(new Date(year, month, 0).getDate()).padStart(2, "0")}`
+  const [buyDate, setBuyDate] = useState(
+    buy?.trade_date ?? (!buy && today >= firstDay && today <= lastDay ? today : ""),
+  )
+  const [buyTime, setBuyTime] = useState(buy?.trade_time ?? "")
+  // Linked holdings: the market price at the purchase's day (and time).
+  const priceAt = useSWR(
+    holding.symbol && buyDate ? ["price-at", holding.symbol, buyDate, buyTime || null] : null,
+    () => fetchPriceAt(holding.symbol as string, buyDate, buyTime || null),
+    { revalidateOnFocus: false },
+  )
+  const pickDate = (date: string, time: string) => {
+    setBuyDate(date)
+    setBuyTime(time)
+    // A new moment means a new price: let it re-derive what you didn't type here.
+    if (isPlan) {
+      setBuyPrice("")
+    } else if (!unitsTouched) {
+      setBuyUnits("")
+    }
+  }
+
+  // The purchase's own price, else this month's (entered beats market), fills in what you leave blank.
   const monthPrice = (market: boolean) =>
     prices.find(
       (p) => p.holding_id === holding.id && p.year === year && p.month === month && !!p.market === market,
     )?.price
-  const knownPrice = monthPrice(false) ?? monthPrice(true) ?? null
+  const knownPrice = priceAt.data?.price ?? monthPrice(false) ?? monthPrice(true) ?? null
 
   const bp = parseNumber(buyPrice) ?? knownPrice
   const typedUnits = parseNumber(buyUnits)
@@ -129,7 +159,15 @@ function TradeForm({
   async function save() {
     setSaving(true)
     try {
-      await setTrade(holding.id, year, month, "buy", !buyEmpty && bu ? { units: bu, amount: ba ?? 0 } : null)
+      await setTrade(
+        holding.id,
+        year,
+        month,
+        "buy",
+        !buyEmpty && bu
+          ? { units: bu, amount: ba ?? 0, trade_date: buyDate || null, trade_time: buyDate && buyTime ? buyTime : null }
+          : null,
+      )
       await setTrade(holding.id, year, month, "sell", su ? { units: su, amount: sa ?? 0 } : null)
       onSaved()
       onClose()
@@ -166,6 +204,47 @@ function TradeForm({
 
       <section className="flex flex-col gap-3">
         <SectionTitle title="Bought" onRemove={buy ? () => remove("buy") : undefined} disabled={saving} />
+        <div className="grid grid-cols-2 gap-3">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="buy-date">Date</Label>
+            <Input
+              id="buy-date"
+              type="date"
+              min={firstDay}
+              max={lastDay}
+              value={buyDate}
+              onChange={(e) => pickDate(e.target.value, buyTime)}
+            />
+          </div>
+          {holding.symbol && (
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="buy-time">Time (optional)</Label>
+              <Input
+                id="buy-time"
+                type="time"
+                value={buyTime}
+                disabled={!buyDate}
+                onChange={(e) => pickDate(buyDate, e.target.value)}
+              />
+            </div>
+          )}
+        </div>
+        {holding.symbol && buyDate && (
+          <p
+            className={cn(
+              "text-xs",
+              priceAt.error ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground",
+            )}
+          >
+            {priceAt.isLoading
+              ? "Looking up the price…"
+              : priceAt.error
+                ? `Couldn't look up the price (${priceAt.error instanceof Error ? priceAt.error.message : "error"}) — using ${MONTHS_LONG[month - 1]}'s price.`
+                : priceAt.data
+                  ? `Price ${priceAt.data.time ? `at ${priceAt.data.time}` : "at close"} on ${formatShortDate(priceAt.data.date)}: ${formatPrice(priceAt.data.price)}${priceAt.data.date !== buyDate ? " (last trading day)" : ""}`
+                  : null}
+          </p>
+        )}
         {isPlan ? (
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">
@@ -230,7 +309,7 @@ function TradeForm({
           <p className="text-muted-foreground text-xs">
             {isPlan
               ? `You pay ${kr(ba)} (${holding.discount_pct}% below ${kr(bu * (bp ?? 0))} market value). Bonus: ${formatUnits(bu * holding.bonus_ratio)} shares in ${MONTHS_LONG[month - 1]} ${year + holding.bonus_years} if you still hold them.`
-              : `${formatUnits(bu)} units at ${formatPrice(ba / bu)} per unit${typedUnits ? "" : ` (${MONTHS_LONG[month - 1]}'s price — adjust the units to match your statement)`}.`}
+              : `${formatUnits(bu)} units at ${formatPrice(ba / bu)} per unit${typedUnits || priceAt.data ? "" : ` (${MONTHS_LONG[month - 1]}'s price — pick the date for the exact price, or adjust the units to match your statement)`}.`}
           </p>
         )}
       </section>

@@ -92,7 +92,7 @@ export async function setTrade(
   year: number,
   month: number,
   side: TradeSide,
-  trade: { units: number; amount: number } | null,
+  trade: { units: number; amount: number; trade_date?: string | null; trade_time?: string | null } | null,
 ): Promise<void> {
   const supabase = getSupabase()
   if (!trade) {

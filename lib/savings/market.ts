@@ -36,6 +36,25 @@ export function fetchHistory(symbol: string): Promise<MarketHistory> {
   return quotes<MarketHistory>({ history: symbol })
 }
 
+export type PriceAt = {
+  price: number // NOK per unit
+  date: string // the trading day the price is from (a weekend gives Friday)
+  time: string | null // set when it's an intraday price
+}
+
+/** Price per unit in NOK at a date (and optional HH:MM, exchange time). */
+export async function fetchPriceAt(symbol: string, date: string, time: string | null): Promise<PriceAt> {
+  type Quote = { currency: string | null; price: number; date: string; time: string | null }
+  const q = await quotes<Quote>(time ? { quote: symbol, date, time } : { quote: symbol, date })
+  const pence = q.currency === "GBp"
+  const currency = pence ? "GBP" : q.currency
+  if (!currency || currency === "NOK") {
+    return { price: q.price, date: q.date, time: q.time }
+  }
+  const fx = await quotes<Quote>({ quote: `${currency}NOK=X`, date })
+  return { price: (q.price * fx.price) / (pence ? 100 : 1), date: q.date, time: q.time }
+}
+
 const key = (year: number, month: number) => year * 12 + month - 1
 
 /** Monthly closes in NOK: other currencies convert at that month's rate (GBp is pence). */

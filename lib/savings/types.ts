@@ -21,6 +21,8 @@ export type Trade = {
   side: TradeSide
   units: number
   amount: number // NOK paid (buy) or received (sell)
+  trade_date: string | null // YYYY-MM-DD within year/month
+  trade_time: string | null // HH:MM, exchange time
 }
 
 export type Price = {

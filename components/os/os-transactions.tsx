@@ -13,6 +13,7 @@ import {
   ArrowUpRight,
   Check,
   ChevronRight,
+  Pencil,
   Search,
   Upload,
   X,
@@ -165,8 +166,7 @@ export function OsTransactions() {
   const shown = useMemo(
     () =>
       rows.filter(
-        (f) =>
-          matchesKind(f, kind) && (!q || haystacks.get(f)?.includes(q)),
+        (f) => matchesKind(f, kind) && (!q || haystacks.get(f)?.includes(q)),
       ),
     [rows, haystacks, kind, q],
   )
@@ -240,7 +240,7 @@ export function OsTransactions() {
         </label>
         <div
           data-no-swipe
-          className="-mx-3 flex gap-1 overflow-x-auto px-2 [scrollbar-width:none] min-[600px]:-mx-4 min-[600px]:px-3"
+          className="-mx-3 flex [scrollbar-width:none] gap-1 overflow-x-auto px-2 min-[600px]:-mx-4 min-[600px]:px-3"
         >
           {KINDS.map((k) => (
             <button
@@ -269,8 +269,8 @@ export function OsTransactions() {
           ))}
         </div>
         <p className="text-muted-foreground text-xs tabular-nums">
-          {totals.count} {totals.count === 1 ? "transaction" : "transactions"}{" "}
-          · out {kr(totals.spent)} · in {kr(totals.income)}
+          {totals.count} {totals.count === 1 ? "transaction" : "transactions"} ·
+          out {kr(totals.spent)} · in {kr(totals.income)}
         </p>
       </div>
 
@@ -405,7 +405,11 @@ const DaySection = memo(function DaySection({
                   {f.merchant}
                 </p>
                 <p className="text-muted-foreground truncate text-xs">
-                  {[flowLabel(f), groupName(f.groupId), f.tx.tx_at?.slice(11, 16)]
+                  {[
+                    flowLabel(f),
+                    groupName(f.groupId),
+                    f.tx.tx_at?.slice(11, 16),
+                  ]
                     .filter(Boolean)
                     .join(" · ")}
                 </p>
@@ -474,6 +478,7 @@ function TxSheet({
 }) {
   const { mutate } = useTransactions()
   const { mutate: mutateRules } = useTxRules()
+  const [editing, setEditing] = useState(false)
   const [onlyThis, setOnlyThis] = useState(false)
   const [query, setQuery] = useState("")
   const [saving, setSaving] = useState(false)
@@ -523,7 +528,10 @@ function TxSheet({
     }))
     .filter((sec) => sec.items.length > 0)
 
+  const assigned = categories.find((c) => c.id === tx?.category_id)
+
   function reset() {
+    setEditing(false)
     setQuery("")
     setOnlyThis(false)
   }
@@ -632,70 +640,94 @@ function TxSheet({
                 <h3 className="text-muted-foreground text-[11px] font-semibold tracking-widest uppercase">
                   Category
                 </h3>
-                {wholeMerchant || onlyThis ? (
-                  <div className="grid grid-cols-2 border">
-                    {[
-                      { only: false, label: `All ${sameSource}` },
-                      { only: true, label: "Only this one" },
-                    ].map((o) => (
-                      <button
-                        key={o.label}
-                        type="button"
-                        aria-pressed={onlyThis === o.only}
-                        onClick={() => setOnlyThis(o.only)}
-                        className={cn(
-                          "h-11 text-xs font-semibold tracking-widest uppercase",
-                          onlyThis === o.only
-                            ? "bg-primary text-primary-foreground"
-                            : "text-muted-foreground active:bg-muted",
-                        )}
-                      >
-                        {o.label}
-                      </button>
-                    ))}
+                {!editing ? (
+                  <div className="bg-card ring-foreground/5 flex min-h-11 items-center gap-2 px-3 ring-1">
+                    <span className="min-w-0 flex-1 truncate text-sm">
+                      {assigned ? assigned.name : "None (bank type)"}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setEditing(true)}
+                      className="text-muted-foreground active:bg-muted -mr-3 flex h-11 items-center gap-1.5 px-3 text-xs font-semibold tracking-widest uppercase"
+                    >
+                      <Pencil className="size-3.5" aria-hidden /> Change
+                    </button>
                   </div>
-                ) : null}
-                <p className="text-muted-foreground text-xs">
-                  {wholeMerchant ? (
-                    <>
-                      Applies to all {sameSource} transactions from{" "}
-                      <span className="capitalize">{row.merchant}</span>, past
-                      and future.
-                    </>
-                  ) : (
-                    "Applies to this transaction only."
-                  )}
-                </p>
-                {categories.length > 12 && (
-                  <label className="bg-muted flex h-11 items-center gap-2 px-3">
-                    <Search
-                      className="text-muted-foreground size-4 shrink-0"
-                      aria-hidden
-                    />
-                    <input
-                      value={query}
-                      onChange={(e) => setQuery(e.target.value)}
-                      placeholder="Find a category"
-                      className="h-11 min-w-0 flex-1 bg-transparent text-base outline-none select-text placeholder:text-sm"
-                    />
-                  </label>
-                )}
-                <ul className="bg-card ring-foreground/5 divide-y ring-1">
-                  {!q && option(null, "No category (use bank type)")}
-                  {shownSections.map((sec) =>
-                    sec.items.map((c) =>
-                      option(
-                        c,
-                        c.name,
-                        c.id === sec.key ? undefined : sec.title,
-                      ),
-                    ),
-                  )}
-                </ul>
-                {q && shownSections.length === 0 && (
-                  <p className="text-muted-foreground text-xs">
-                    No category matches.
-                  </p>
+                ) : (
+                  <>
+                    {wholeMerchant || onlyThis ? (
+                      <div className="grid grid-cols-2 border">
+                        {[
+                          { only: false, label: `All ${sameSource}` },
+                          { only: true, label: "Only this one" },
+                        ].map((o) => (
+                          <button
+                            key={o.label}
+                            type="button"
+                            aria-pressed={onlyThis === o.only}
+                            onClick={() => setOnlyThis(o.only)}
+                            className={cn(
+                              "h-11 text-xs font-semibold tracking-widest uppercase",
+                              onlyThis === o.only
+                                ? "bg-primary text-primary-foreground"
+                                : "text-muted-foreground active:bg-muted",
+                            )}
+                          >
+                            {o.label}
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+                    <p className="text-muted-foreground text-xs">
+                      {wholeMerchant ? (
+                        <>
+                          Applies to all {sameSource} transactions from{" "}
+                          <span className="capitalize">{row.merchant}</span>,
+                          past and future.
+                        </>
+                      ) : (
+                        "Applies to this transaction only."
+                      )}
+                    </p>
+                    {categories.length > 12 && (
+                      <label className="bg-muted flex h-11 items-center gap-2 px-3">
+                        <Search
+                          className="text-muted-foreground size-4 shrink-0"
+                          aria-hidden
+                        />
+                        <input
+                          value={query}
+                          onChange={(e) => setQuery(e.target.value)}
+                          placeholder="Find a category"
+                          className="h-11 min-w-0 flex-1 bg-transparent text-base outline-none select-text placeholder:text-sm"
+                        />
+                      </label>
+                    )}
+                    <ul className="bg-card ring-foreground/5 divide-y ring-1">
+                      {!q && option(null, "No category (use bank type)")}
+                      {shownSections.map((sec) =>
+                        sec.items.map((c) =>
+                          option(
+                            c,
+                            c.name,
+                            c.id === sec.key ? undefined : sec.title,
+                          ),
+                        ),
+                      )}
+                    </ul>
+                    {q && shownSections.length === 0 && (
+                      <p className="text-muted-foreground text-xs">
+                        No category matches.
+                      </p>
+                    )}
+                    <button
+                      type="button"
+                      onClick={reset}
+                      className="text-muted-foreground active:bg-muted flex min-h-11 items-center justify-center border text-xs font-semibold tracking-widest uppercase"
+                    >
+                      Cancel
+                    </button>
+                  </>
                 )}
                 <Link
                   href="/settings"

@@ -187,6 +187,11 @@ export function SavingsGrid({ model, year }: { model: SavingsModel; year: number
                             <button
                               type="button"
                               onClick={() => setTarget({ holding: h, year, month: m })}
+                              title={
+                                buy?.trade_date
+                                  ? `Bought ${buy.trade_date}${buy.trade_time ? ` ${buy.trade_time}` : ""}`
+                                  : undefined
+                              }
                               className="hover:bg-muted flex min-h-9 w-full flex-col items-end justify-center px-1 text-right tabular-nums"
                             >
                               {!buy && !sell && !bonus && <span className="text-muted-foreground/40">–</span>}
