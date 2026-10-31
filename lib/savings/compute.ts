@@ -178,6 +178,20 @@ export function savingsSeries(results: HoldingResult[], horizon: number): Saving
 }
 
 /**
+ * First month a lot can be sold without losing any bonus. FIFO sells every lot
+ * queued before it first, so it waits for all of those purchases to vest.
+ */
+export function freeFrom(lots: Lot[], lot: Lot): number {
+  let at = lot.monthIndex
+  for (const l of lots.slice(0, lots.indexOf(lot) + 1)) {
+    if (l.source === "buy" && l.vestIndex !== null && l.held > 0) {
+      at = Math.max(at, l.vestIndex)
+    }
+  }
+  return at
+}
+
+/**
  * Units of a plan that can be sold at `at` without losing any bonus: FIFO
  * takes oldest lots first, so it's everything held up to the first purchase
  * whose bonus hasn't arrived yet (bonus shares queue behind earlier buys).

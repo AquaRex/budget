@@ -50,7 +50,7 @@ export default function SavingsPage() {
           )}
           {model.holdings.length > 0 && <SavingsOverview model={model} />}
           {model.results
-            .filter((r) => r.holding.kind === "plan" && r.lots.length > 0)
+            .filter((r) => r.holding.kind === "plan")
             .map((r) => (
               <PlanSchedule key={r.holding.id} result={r} todayIndex={model.todayIndex} />
             ))}
