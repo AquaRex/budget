@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import { Trash2 } from "lucide-react"
 import { toast } from "sonner"
 
 import { MONTHS_LONG } from "@/lib/budget"
@@ -108,7 +109,9 @@ function TradeForm({
   const ba = isPlan ? (bu !== null && bp !== null ? bu * bp * (1 - discount) : null) : typedAmount
   const su = parseNumber(sellUnits)
   const sa = parseNumber(sellAmount)
-  const buyValid = (!typedUnits && !typedAmount) || (!!bu && ba !== null)
+  // Clearing the field that drives the purchase (shares for a plan, the amount otherwise) removes it.
+  const buyEmpty = isPlan ? !typedUnits : !typedAmount
+  const buyValid = buyEmpty || (!!bu && ba !== null)
   const sellValid = !su || sa !== null
 
   // What a plan sale this month can take without losing bonus (FIFO).
@@ -126,12 +129,25 @@ function TradeForm({
   async function save() {
     setSaving(true)
     try {
-      await setTrade(holding.id, year, month, "buy", bu ? { units: bu, amount: ba ?? 0 } : null)
+      await setTrade(holding.id, year, month, "buy", !buyEmpty && bu ? { units: bu, amount: ba ?? 0 } : null)
       await setTrade(holding.id, year, month, "sell", su ? { units: su, amount: sa ?? 0 } : null)
       onSaved()
       onClose()
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not save.")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function remove(side: "buy" | "sell") {
+    setSaving(true)
+    try {
+      await setTrade(holding.id, year, month, side, null)
+      onSaved()
+      onClose()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not remove.")
     } finally {
       setSaving(false)
     }
@@ -144,12 +160,12 @@ function TradeForm({
           {holding.name} · {MONTHS_LONG[month - 1]} {year}
         </DialogTitle>
         <DialogDescription>
-          Clear the fields to remove a buy or sell.
+          Use Remove to delete a purchase or sale, or clear its {isPlan ? "shares" : "amount"} and save.
         </DialogDescription>
       </DialogHeader>
 
       <section className="flex flex-col gap-3">
-        <h3 className="text-xs font-semibold tracking-widest uppercase">Bought</h3>
+        <SectionTitle title="Bought" onRemove={buy ? () => remove("buy") : undefined} disabled={saving} />
         {isPlan ? (
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">
@@ -220,7 +236,7 @@ function TradeForm({
       </section>
 
       <section className="flex flex-col gap-3">
-        <h3 className="text-xs font-semibold tracking-widest uppercase">Sold</h3>
+        <SectionTitle title="Sold" onRemove={sell ? () => remove("sell") : undefined} disabled={saving} />
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="sell-units">{isPlan ? "Shares" : "Units"}</Label>
@@ -266,5 +282,28 @@ function TradeForm({
         </Button>
       </DialogFooter>
     </>
+  )
+}
+
+/** Section heading; an existing buy or sale gets a one-tap Remove. */
+function SectionTitle({
+  title,
+  onRemove,
+  disabled,
+}: {
+  title: string
+  onRemove?: () => void
+  disabled: boolean
+}) {
+  return (
+    <div className="flex min-h-9 items-center justify-between gap-2">
+      <h3 className="text-xs font-semibold tracking-widest uppercase">{title}</h3>
+      {onRemove && (
+        <Button variant="destructive" size="sm" onClick={onRemove} disabled={disabled}>
+          <Trash2 className="size-4" />
+          Remove
+        </Button>
+      )}
+    </div>
   )
 }

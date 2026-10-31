@@ -1,12 +1,9 @@
 "use client"
 
 import { useState } from "react"
-import Link from "next/link"
-import { ArrowUpRight } from "lucide-react"
-import { toast } from "sonner"
 
-import type { Entry } from "@/lib/types"
-import { effectiveAmount, hasOverride } from "@/lib/budget"
+import type { BudgetContext } from "@/lib/budget"
+import { effectiveAmount, hasOverride, MONTHS_LONG } from "@/lib/budget"
 import { dayLabel } from "@/lib/format"
 import {
   useAmounts,
@@ -15,11 +12,8 @@ import {
   useEntries,
   useSalaryProfile,
 } from "@/lib/data/use-budget"
-import { setAmount } from "@/lib/data/entries"
-import { MONTHS_LONG } from "@/lib/budget"
+import type { Entry } from "@/lib/types"
 import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   Sheet,
@@ -30,31 +24,58 @@ import {
 } from "@/components/ui/sheet"
 import { down, kr, signedKr, up } from "@/components/stats/display"
 import { useOs } from "@/components/os/os-shell"
+import {
+  AmountForm,
+  EmptyBudget,
+  Figure,
+  groupEntries,
+  kindOrder,
+  WebsiteLink,
+  type Group,
+  type Kind,
+} from "@/components/os/os-budget-parts"
+import { YearBudget } from "@/components/os/os-budget-year"
 
 type Line = { entry: Entry; amount: number }
-type Section = {
-  key: string
-  title: string
-  lines: Line[]
-  total: number
-  kind: "income" | "bill" | "savings"
-}
+type Section = Omit<Group, "entries"> & { lines: Line[]; total: number }
 
-/** The focused month of the budget template: what comes in, goes out and is set aside. */
+/** The budget template: what comes in, goes out and is set aside — per month or for the year. */
 export function OsBudget() {
-  const { year, month, stats } = useOs()
+  const { year, period } = useOs()
   const { entries: bills, isLoading: lb } = useEntries("bill")
   const { entries: incomes, isLoading: li } = useEntries("income")
   const { amounts, isLoading: la } = useAmounts()
   const { profile } = useSalaryProfile()
   const { categories } = useCategories()
   const ctx = useBudgetContext(amounts, profile)
+
+  if (lb || li || la) {
+    return (
+      <div className="flex flex-col gap-3">
+        <Skeleton className="h-28" />
+        <Skeleton className="h-48" />
+        <Skeleton className="h-48" />
+      </div>
+    )
+  }
+  if (bills.length === 0 && incomes.length === 0) {
+    return <EmptyBudget year={year} />
+  }
+
+  const groups = groupEntries(incomes, bills, categories)
+  return period === "year" ? (
+    <YearBudget groups={groups} ctx={ctx} />
+  ) : (
+    <MonthBudget groups={groups} ctx={ctx} />
+  )
+}
+
+function MonthBudget({ groups, ctx }: { groups: Group[]; ctx: BudgetContext }) {
+  const { year, month, stats } = useOs()
   const [editing, setEditing] = useState<Line | null>(null)
 
-  const catById = new Map(categories.map((c) => [c.id, c]))
   const lines = (entries: Entry[]) =>
     entries
-      .filter((e) => e.is_active)
       .map((entry) => ({ entry, amount: effectiveAmount(entry, ctx, month) }))
       // Zeroed recurring/overridden entries stay listed (muted) so they can be restored;
       // one-time entries without a value this month are just not part of it.
@@ -66,41 +87,19 @@ export function OsBudget() {
       )
       .sort((a, b) => a.entry.due_day - b.entry.due_day)
 
-  const sections: Section[] = []
-  const incomeLines = lines(incomes)
-  sections.push({
-    key: "income",
-    title: "Income",
-    lines: incomeLines,
-    total: incomeLines.reduce((s, l) => s + l.amount, 0),
-    kind: "income",
-  })
-  const byCategory = new Map<string, Line[]>()
-  for (const l of lines(bills)) {
-    const key = l.entry.category_id ?? "none"
-    byCategory.set(key, [...(byCategory.get(key) ?? []), l])
-  }
-  for (const [key, ls] of byCategory) {
-    const cat = catById.get(key)
-    sections.push({
-      key,
-      title: cat?.name ?? "No group",
-      lines: ls,
-      total: ls.reduce((s, l) => s + l.amount, 0),
-      kind: cat?.is_savings ? "savings" : "bill",
+  const sections: Section[] = groups
+    .map(({ entries, ...g }) => {
+      const ls = lines(entries)
+      return { ...g, lines: ls, total: ls.reduce((s, l) => s + l.amount, 0) }
     })
-  }
-  sections.sort((a, b) => order(a) - order(b) || b.total - a.total)
+    .filter((s) => s.kind === "income" || s.lines.length > 0)
+    .sort((a, b) => kindOrder(a.kind) - kindOrder(b.kind) || b.total - a.total)
 
-  const income = sections
-    .filter((s) => s.kind === "income")
-    .reduce((s, x) => s + x.total, 0)
-  const billsTotal = sections
-    .filter((s) => s.kind === "bill")
-    .reduce((s, x) => s + x.total, 0)
-  const savings = sections
-    .filter((s) => s.kind === "savings")
-    .reduce((s, x) => s + x.total, 0)
+  const sum = (kind: Kind) =>
+    sections.filter((s) => s.kind === kind).reduce((s, x) => s + x.total, 0)
+  const income = sum("income")
+  const billsTotal = sum("bill")
+  const savings = sum("savings")
   const left = income - billsTotal - savings
 
   // Still to come this month (current month only): due after the imported data.
@@ -117,16 +116,6 @@ export function OsBudget() {
         .filter((l) => l.amount !== 0 && l.entry.due_day > throughDay)
         .sort((a, b) => a.entry.due_day - b.entry.due_day)
     : []
-
-  if (lb || li || la) {
-    return (
-      <div className="flex flex-col gap-3">
-        <Skeleton className="h-28" />
-        <Skeleton className="h-48" />
-        <Skeleton className="h-48" />
-      </div>
-    )
-  }
 
   return (
     <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-3 min-[600px]:grid-cols-2">
@@ -175,13 +164,7 @@ export function OsBudget() {
           </section>
         )}
 
-        <Link
-          href="/budget"
-          className="text-muted-foreground flex min-h-11 items-center justify-center gap-2 text-xs"
-        >
-          <ArrowUpRight className="size-4" aria-hidden /> Edit the whole year on
-          the website
-        </Link>
+        <WebsiteLink />
       </div>
 
       <div className="flex min-w-0 flex-col gap-3">
@@ -240,145 +223,43 @@ export function OsBudget() {
         ))}
       </div>
 
-      <AmountSheet
-        line={editing}
-        year={year}
-        month={month}
-        onClose={() => setEditing(null)}
-      />
-    </div>
-  )
-}
-
-function order(s: Section) {
-  return s.kind === "income" ? 0 : s.kind === "bill" ? 1 : 2
-}
-
-function Figure({
-  label,
-  value,
-  className,
-  big = false,
-}: {
-  label: string
-  value: string
-  className?: string
-  big?: boolean
-}) {
-  return (
-    <div className="flex min-w-0 flex-col">
-      <span className="text-muted-foreground text-[11px] font-semibold tracking-widest uppercase">
-        {label}
-      </span>
-      <span
-        className={cn(
-          "truncate font-semibold tracking-tight",
-          big ? "text-2xl" : "text-xl",
-          className,
-        )}
+      <Sheet
+        open={editing != null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setEditing(null)
+          }
+        }}
       >
-        {value}
-      </span>
+        <SheetContent
+          side="bottom"
+          className="gap-0 pb-[env(safe-area-inset-bottom)]"
+        >
+          {editing && (
+            <>
+              <SheetHeader className="border-b p-5 pr-14">
+                <SheetTitle className="truncate text-base">
+                  {editing.entry.name}
+                </SheetTitle>
+                <SheetDescription>
+                  {MONTHS_LONG[month - 1]} {year} · now {kr(editing.amount)}
+                </SheetDescription>
+              </SheetHeader>
+              <div className="p-5">
+                <AmountForm
+                  key={editing.entry.id}
+                  entry={editing.entry}
+                  year={year}
+                  month={month}
+                  amount={editing.amount}
+                  overridden={hasOverride(ctx.amounts, editing.entry.id, month)}
+                  onDone={() => setEditing(null)}
+                />
+              </div>
+            </>
+          )}
+        </SheetContent>
+      </Sheet>
     </div>
-  )
-}
-
-/** Override one month's amount (or clear the override back to the default). */
-function AmountSheet({
-  line,
-  year,
-  month,
-  onClose,
-}: {
-  line: Line | null
-  year: number
-  month: number
-  onClose: () => void
-}) {
-  const { mutate } = useAmounts()
-  const [value, setValue] = useState("")
-  const [saving, setSaving] = useState(false)
-
-  async function save(amount: number | null) {
-    if (!line) {
-      return
-    }
-    setSaving(true)
-    try {
-      await setAmount(line.entry.id, year, month, amount)
-      await mutate()
-      toast.success("Budget updated")
-      onClose()
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not save.")
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const parsed = Number(value.replace(/\s/g, "").replace(",", "."))
-  const valid = value.trim() !== "" && Number.isFinite(parsed) && parsed >= 0
-
-  return (
-    <Sheet
-      open={line != null}
-      onOpenChange={(open) => {
-        if (open) {
-          return
-        }
-        setValue("")
-        onClose()
-      }}
-    >
-      <SheetContent
-        side="bottom"
-        className="gap-0 pb-[env(safe-area-inset-bottom)]"
-      >
-        {line && (
-          <>
-            <SheetHeader className="border-b p-5 pr-14">
-              <SheetTitle className="truncate text-base">
-                {line.entry.name}
-              </SheetTitle>
-              <SheetDescription>
-                {MONTHS_LONG[month - 1]} {year} · now {kr(line.amount)}
-              </SheetDescription>
-            </SheetHeader>
-            <form
-              className="flex flex-col gap-3 p-5"
-              onSubmit={(e) => {
-                e.preventDefault()
-                if (valid) {
-                  // Like the desktop grid: 0 clears the month's override.
-                  void save(parsed === 0 ? null : parsed)
-                }
-              }}
-            >
-              <Input
-                autoFocus
-                inputMode="decimal"
-                placeholder={String(Math.round(line.amount))}
-                value={value}
-                onChange={(e) => setValue(e.target.value)}
-                className="h-12 text-lg tabular-nums"
-                aria-label={`Amount for ${MONTHS_LONG[month - 1]}`}
-              />
-              <Button type="submit" size="lg" disabled={!valid || saving}>
-                Save for {MONTHS_LONG[month - 1]}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="lg"
-                disabled={saving}
-                onClick={() => void save(null)}
-              >
-                Reset to the usual amount
-              </Button>
-            </form>
-          </>
-        )}
-      </SheetContent>
-    </Sheet>
   )
 }

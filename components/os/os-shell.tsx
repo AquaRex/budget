@@ -45,14 +45,22 @@ const TABS = [
 const SWIPE_MIN = 60
 const INSTALL_DISMISSED = "budget.os.installDismissed"
 const MONTH_KEY = "budget.os.month"
+const PERIOD_KEY = "budget.os.period"
+
+export type OsPeriod = "month" | "year"
 
 type OsContextValue = {
   year: number
-  month: number
+  month: number // the focused month; in year view, the month a drill-down opens
+  period: OsPeriod
   direction: 1 | -1
-  step: (delta: 1 | -1) => void
+  step: (delta: 1 | -1) => void // a month or a year, by period
   setMonth: (month: number) => void
-  stats: DashboardStats // month scope for the focused month, shared by every tab
+  setPeriod: (period: OsPeriod) => void
+  openMonth: (month: number) => void // drill from year view into a month
+  // Month view: the focused month. Year view: the year so far, incomplete
+  // months included (on the phone you want "this year until now").
+  stats: DashboardStats
 }
 
 const OsContext = createContext<OsContextValue | null>(null)
@@ -86,13 +94,26 @@ export function OsShell({ children }: { children: ReactNode }) {
       sessionStorage.setItem(MONTH_KEY, String(m))
     } catch {}
   }
+  const [period, setPeriodState] = useState<OsPeriod>(() => {
+    try {
+      return sessionStorage.getItem(PERIOD_KEY) === "year" ? "year" : "month"
+    } catch {
+      return "month"
+    }
+  })
+  const setPeriod = (p: OsPeriod) => {
+    setPeriodState(p)
+    try {
+      sessionStorage.setItem(PERIOD_KEY, p)
+    } catch {}
+  }
   const [direction, setDirection] = useState<1 | -1>(1)
   const touch = useRef<{ x: number; y: number } | null>(null)
   const stats = useDashboardStats({
     year,
     month,
-    scope: "month",
-    includeIncomplete: false,
+    scope: period,
+    includeIncomplete: period === "year",
   })
   const { canInstall, installed } = useInstall()
   const countTransfers = useCountTransfers()
@@ -125,6 +146,10 @@ export function OsShell({ children }: { children: ReactNode }) {
 
   const step = (delta: 1 | -1) => {
     setDirection(delta)
+    if (period === "year") {
+      setYear(year + delta)
+      return
+    }
     const next = month + delta
     if (next < 1) {
       setYear(year - 1)
@@ -141,6 +166,13 @@ export function OsShell({ children }: { children: ReactNode }) {
     const now = new Date()
     setYear(now.getFullYear())
     setMonth(now.getMonth() + 1)
+  }
+
+  const openMonth = (m: number) => {
+    setDirection(1)
+    setMonth(m)
+    setPeriod("month")
+    window.scrollTo({ top: 0 })
   }
 
   const monthTabs = path !== "/os/more"
@@ -168,17 +200,38 @@ export function OsShell({ children }: { children: ReactNode }) {
     }
   }
 
-  const isCurrent = stats.months[month - 1]?.status === "current"
+  const isCurrent =
+    period === "year"
+      ? year === new Date().getFullYear()
+      : stats.months[month - 1]?.status === "current"
   const stale =
     stats.dataThrough != null &&
     (Date.parse(stats.today) - Date.parse(stats.dataThrough)) / 86_400_000 > 3
   const title = TABS.find((t) => t.href === path)?.label ?? "Home"
+  // The Budget tab shows the plan, not actuals, so "so far" doesn't apply.
+  const isPlan = period === "year" && path === "/os/budget"
+  const hints = [
+    stats.dataThrough && `data ${formatShortDate(stats.dataThrough)}`,
+    countTransfers && "transfers counted",
+    !isCurrent && "tap for today",
+    period === "year" && isCurrent && !isPlan && "incl. this month",
+  ].filter(Boolean)
   const showInstall =
     path === "/os" && canInstall && !installed && !installDismissed
 
   return (
     <OsContext.Provider
-      value={{ year, month, direction, step, setMonth, stats }}
+      value={{
+        year,
+        month,
+        period,
+        direction,
+        step,
+        setMonth,
+        setPeriod,
+        openMonth,
+        stats,
+      }}
     >
       <div className="bg-background flex min-h-dvh w-full overflow-x-clip pr-[env(safe-area-inset-right)] pl-[env(safe-area-inset-left)] select-none [-webkit-tap-highlight-color:transparent]">
         <nav
@@ -198,7 +251,7 @@ export function OsShell({ children }: { children: ReactNode }) {
                 <>
                   <button
                     type="button"
-                    aria-label="Previous month"
+                    aria-label={`Previous ${period}`}
                     onClick={() => step(-1)}
                     className="active:bg-muted flex size-11 shrink-0 items-center justify-center"
                   >
@@ -208,13 +261,24 @@ export function OsShell({ children }: { children: ReactNode }) {
                     type="button"
                     onClick={goToday}
                     className="flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center self-stretch leading-tight"
-                    aria-label={`${MONTHS_LONG[month - 1]} ${year}${isCurrent ? "" : ", jump to this month"}`}
+                    aria-label={`${period === "year" ? year : `${MONTHS_LONG[month - 1]} ${year}`}${isCurrent ? "" : ", jump to today"}`}
                   >
                     <span className="truncate text-base font-semibold tracking-tight">
-                      {MONTHS_LONG[month - 1]}{" "}
-                      <span className="text-muted-foreground font-normal">
-                        {year}
-                      </span>
+                      {period === "year" ? (
+                        <>
+                          {year}{" "}
+                          <span className="text-muted-foreground font-normal">
+                            {isPlan ? "plan" : isCurrent ? "so far" : ""}
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          {MONTHS_LONG[month - 1]}{" "}
+                          <span className="text-muted-foreground font-normal">
+                            {year}
+                          </span>
+                        </>
+                      )}
                     </span>
                     <span className="text-muted-foreground flex max-w-full items-center gap-1.5 text-[10px] tracking-widest uppercase">
                       {stats.dataThrough && (
@@ -227,26 +291,47 @@ export function OsShell({ children }: { children: ReactNode }) {
                         />
                       )}
                       <span className="truncate">
-                        {[
-                          title,
-                          stats.dataThrough &&
-                            `data ${formatShortDate(stats.dataThrough)}`,
-                          countTransfers && "transfers counted",
-                          !isCurrent && "tap for today",
-                        ]
-                          .filter(Boolean)
-                          .join(" · ")}
+                        {/* The bottom tab bar already names the tab on a phone. */}
+                        <span className="max-[599px]:hidden">
+                          {title}
+                          {hints.length > 0 && " · "}
+                        </span>
+                        {hints.join(" · ")}
                       </span>
                     </span>
                   </button>
                   <button
                     type="button"
-                    aria-label="Next month"
+                    aria-label={`Next ${period}`}
                     onClick={() => step(1)}
                     className="active:bg-muted flex size-11 shrink-0 items-center justify-center"
                   >
                     <ChevronRight className="size-5" />
                   </button>
+                  <div
+                    role="radiogroup"
+                    aria-label="View"
+                    className="ml-1 grid h-9 shrink-0 grid-cols-2 border"
+                  >
+                    {(["month", "year"] as const).map((p) => (
+                      <button
+                        key={p}
+                        type="button"
+                        role="radio"
+                        aria-checked={period === p}
+                        aria-label={p === "month" ? "Month view" : "Year view"}
+                        onClick={() => setPeriod(p)}
+                        className={cn(
+                          "w-9 text-xs font-semibold uppercase",
+                          period === p
+                            ? "bg-primary text-primary-foreground"
+                            : "text-muted-foreground active:bg-muted",
+                        )}
+                      >
+                        {p === "month" ? "M" : "Y"}
+                      </button>
+                    ))}
+                  </div>
                 </>
               ) : (
                 <span className="flex-1 px-2 text-base font-semibold tracking-tight">
@@ -306,8 +391,8 @@ function TabLink({
       aria-current={active ? "page" : undefined}
       className={cn(
         "flex min-w-0 flex-col items-center justify-center gap-1 text-[10px] font-semibold transition-colors",
-        // Six tabs on a folded phone: normal case so "Transactions" fits.
-        rail ? "mx-2 h-16 tracking-wide uppercase" : "h-16",
+        // Normal case so "Transactions" fits, in the bottom bar and the rail.
+        rail ? "mx-2 h-16" : "h-16",
         active
           ? "text-foreground"
           : "text-muted-foreground active:text-foreground",

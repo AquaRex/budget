@@ -1,8 +1,22 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import {
+  memo,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react"
 import Link from "next/link"
-import { ArrowUpRight, Check, Search, Upload, X } from "lucide-react"
+import {
+  ArrowUpRight,
+  Check,
+  ChevronRight,
+  Search,
+  Upload,
+  X,
+} from "lucide-react"
 import { toast } from "sonner"
 
 import {
@@ -23,6 +37,7 @@ import {
   txMatchesSource,
 } from "@/lib/spending"
 import type { Category, Transaction } from "@/lib/types"
+import { MONTHS_LONG } from "@/lib/budget"
 import { cn } from "@/lib/utils"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
@@ -56,13 +71,60 @@ function amountTone(f: ClassifiedTx) {
   return f.flow === "income" || f.flow === "refund" ? up : "text-foreground"
 }
 
-/** The month's transactions, newest first, grouped by day and searchable. */
+const PAGE = 150
+
+type Kind = "all" | "out" | "in" | "unsorted"
+const KINDS: { kind: Kind; label: string }[] = [
+  { kind: "all", label: "All" },
+  { kind: "out", label: "Out" },
+  { kind: "in", label: "In" },
+  { kind: "unsorted", label: "Needs sorting" },
+]
+const EMPTY_KIND: Record<Kind, string> = {
+  all: "No transactions",
+  out: "No money out",
+  in: "No money in",
+  unsorted: "Nothing needs sorting",
+}
+
+function matchesKind(f: ClassifiedTx, kind: Kind) {
+  switch (kind) {
+    case "out":
+      return Number(f.tx.amount) < 0
+    case "in":
+      return Number(f.tx.amount) > 0
+    case "unsorted":
+      return f.groupId == null
+    default:
+      return true
+  }
+}
+
+type Totals = { count: number; spent: number; income: number }
+
+function totalsOf(rows: ClassifiedTx[]): Totals {
+  return {
+    count: rows.length,
+    spent: rows.reduce((s, f) => s + f.spent, 0),
+    income: rows.reduce((s, f) => s + f.income, 0),
+  }
+}
+
+type Day = { date: string; rows: ClassifiedTx[] }
+type MonthBlock = { key: string; days: Day[] }
+
+/**
+ * The month's or year's transactions, newest first, grouped by month and day,
+ * searchable. Rows render a page at a time as you scroll.
+ */
 export function OsTransactions() {
-  const { year, month } = useOs()
+  const { year, month, period, openMonth } = useOs()
   const { data, loading } = useStatsData()
   const [query, setQuery] = useState("")
+  const [kind, setKind] = useState<Kind>("all")
   const [selected, setSelected] = useState<ClassifiedTx | null>(null)
-  const period = periodKey(year, month)
+  const prefix = period === "year" ? String(year) : periodKey(year, month)
+  const q = useDeferredValue(query.trim().toLowerCase())
 
   const index = useMemo(
     () =>
@@ -72,19 +134,19 @@ export function OsTransactions() {
   const rows = useMemo(
     () =>
       classifyTransactions(data.transactions, index)
-        .filter((f) => f.date.slice(0, 7) === period)
+        .filter((f) => f.date.startsWith(prefix))
         .sort((a, b) =>
           (b.tx.tx_at ?? b.date).localeCompare(a.tx.tx_at ?? a.date),
         ),
-    [data.transactions, index, period],
+    [data.transactions, index, prefix],
   )
-  const names = useMemo(
-    () => new Map([...data.categories, ...data.labels].map((c) => [c.id, c.name])),
-    [data.categories, data.labels],
-  )
-  const q = query.trim().toLowerCase()
-  const shown = q
-    ? rows.filter((f) =>
+  const haystacks = useMemo(() => {
+    const names = new Map(
+      [...data.categories, ...data.labels].map((c) => [c.id, c.name]),
+    )
+    return new Map(
+      rows.map((f) => [
+        f,
         [
           f.merchant,
           f.tx.description,
@@ -96,21 +158,59 @@ export function OsTransactions() {
           String(Math.abs(Number(f.tx.amount))),
         ]
           .join(" ")
-          .toLowerCase()
-          .includes(q),
-      )
-    : rows
-  const days: { date: string; rows: ClassifiedTx[] }[] = []
-  for (const f of shown) {
-    const last = days[days.length - 1]
-    if (last?.date === f.date) {
-      last.rows.push(f)
-    } else {
-      days.push({ date: f.date, rows: [f] })
+          .toLowerCase(),
+      ]),
+    )
+  }, [rows, index, data.categories, data.labels, data.typeMap])
+  const shown = useMemo(
+    () =>
+      rows.filter(
+        (f) =>
+          matchesKind(f, kind) && (!q || haystacks.get(f)?.includes(q)),
+      ),
+    [rows, haystacks, kind, q],
+  )
+  const totals = useMemo(() => totalsOf(shown), [shown])
+  const monthTotals = useMemo(() => {
+    const byMonth = new Map<string, ClassifiedTx[]>()
+    for (const f of shown) {
+      const key = f.date.slice(0, 7)
+      const list = byMonth.get(key)
+      if (list) {
+        list.push(f)
+      } else {
+        byMonth.set(key, [f])
+      }
     }
-  }
-  const spent = shown.reduce((s, f) => s + f.spent, 0)
-  const income = shown.reduce((s, f) => s + f.income, 0)
+    return new Map([...byMonth].map(([key, list]) => [key, totalsOf(list)]))
+  }, [shown])
+  const unsortedCount = useMemo(
+    () => rows.filter((f) => matchesKind(f, "unsorted")).length,
+    [rows],
+  )
+
+  // How many rows to render; starts over when the list itself changes.
+  const listKey = `${prefix}|${kind}|${q}`
+  const [more, setMore] = useState({ key: listKey, limit: PAGE })
+  const limit = more.key === listKey ? more.limit : PAGE
+  const months = useMemo(() => {
+    const out: MonthBlock[] = []
+    for (const f of shown.slice(0, limit)) {
+      const key = f.date.slice(0, 7)
+      let m = out[out.length - 1]
+      if (m?.key !== key) {
+        m = { key, days: [] }
+        out.push(m)
+      }
+      const d = m.days[m.days.length - 1]
+      if (d?.date === f.date) {
+        d.rows.push(f)
+      } else {
+        m.days.push({ date: f.date, rows: [f] })
+      }
+    }
+    return out
+  }, [shown, limit])
 
   return (
     <div className="flex min-w-0 flex-col gap-3">
@@ -138,8 +238,39 @@ export function OsTransactions() {
             </button>
           )}
         </label>
+        <div
+          data-no-swipe
+          className="-mx-3 flex gap-1 overflow-x-auto px-2 [scrollbar-width:none] min-[600px]:-mx-4 min-[600px]:px-3"
+        >
+          {KINDS.map((k) => (
+            <button
+              key={k.kind}
+              type="button"
+              aria-pressed={kind === k.kind}
+              onClick={() => setKind(k.kind)}
+              className="flex h-11 shrink-0 items-center px-1"
+            >
+              <span
+                className={cn(
+                  "flex h-8 items-center gap-1.5 border px-3 text-xs font-semibold whitespace-nowrap",
+                  kind === k.kind
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "text-muted-foreground active:bg-muted",
+                )}
+              >
+                {k.label}
+                {k.kind === "unsorted" && unsortedCount > 0 && (
+                  <span className="tabular-nums opacity-70">
+                    {unsortedCount}
+                  </span>
+                )}
+              </span>
+            </button>
+          ))}
+        </div>
         <p className="text-muted-foreground text-xs tabular-nums">
-          {shown.length} transactions · out {kr(spent)} · in {kr(income)}
+          {totals.count} {totals.count === 1 ? "transaction" : "transactions"}{" "}
+          · out {kr(totals.spent)} · in {kr(totals.income)}
         </p>
       </div>
 
@@ -149,66 +280,41 @@ export function OsTransactions() {
             <Skeleton key={i} className="h-14" />
           ))}
         </div>
-      ) : days.length === 0 ? (
+      ) : months.length === 0 ? (
         <p className="text-muted-foreground py-16 text-center text-sm">
           {q
             ? "Nothing matches your search."
-            : "No transactions this month yet."}
+            : kind !== "all" && rows.length > 0
+              ? `${EMPTY_KIND[kind]} this ${period}.`
+              : `No transactions this ${period} yet.`}
         </p>
       ) : (
-        days.map((d) => {
-          const daySpent = d.rows.reduce((s, f) => s + f.spent, 0)
-          return (
-            <section key={d.date} className="flex min-w-0 flex-col">
-              <h2 className="text-muted-foreground flex justify-between px-1 pb-1 text-[11px] font-semibold tracking-widest uppercase">
-                <span>{dayHeading.format(new Date(`${d.date}T00:00`))}</span>
-                {daySpent !== 0 && (
-                  <span className="tabular-nums">{kr(daySpent)}</span>
-                )}
-              </h2>
-              <ul className="bg-card ring-foreground/5 divide-y shadow-sm ring-1">
-                {d.rows.map((f) => {
-                  const tag = flowLabel(f)
-                  return (
-                    <li key={f.tx.id}>
-                      <button
-                        type="button"
-                        onClick={() => setSelected(f)}
-                        className={cn(
-                          "active:bg-muted flex min-h-14 w-full items-center gap-3 px-3 py-2 text-left",
-                          !f.counted && "opacity-60",
-                        )}
-                      >
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-medium capitalize">
-                            {f.merchant}
-                          </p>
-                          <p className="text-muted-foreground truncate text-xs">
-                            {[
-                              tag,
-                              index.nameOf(f.groupId),
-                              f.tx.tx_at?.slice(11, 16),
-                            ]
-                              .filter(Boolean)
-                              .join(" · ")}
-                          </p>
-                        </div>
-                        <span
-                          className={cn(
-                            "shrink-0 text-sm font-semibold tabular-nums",
-                            amountTone(f),
-                          )}
-                        >
-                          {signedKr(Number(f.tx.amount))}
-                        </span>
-                      </button>
-                    </li>
-                  )
-                })}
-              </ul>
-            </section>
-          )
-        })
+        months.map((m) => (
+          <div key={m.key} className="flex min-w-0 flex-col gap-3">
+            {period === "year" && (
+              <MonthHeader
+                monthKey={m.key}
+                totals={monthTotals.get(m.key)}
+                onOpen={openMonth}
+              />
+            )}
+            {m.days.map((d) => (
+              <DaySection
+                key={d.date}
+                day={d}
+                groupName={index.nameOf}
+                onSelect={setSelected}
+              />
+            ))}
+          </div>
+        ))
+      )}
+
+      {!loading && shown.length > limit && (
+        <MoreSentinel
+          left={shown.length - limit}
+          onMore={() => setMore({ key: listKey, limit: limit + PAGE })}
+        />
       )}
 
       <Link
@@ -224,10 +330,130 @@ export function OsTransactions() {
         groupName={selected ? index.nameOf(selected.groupId) : ""}
         categories={data.categories}
         transactions={data.transactions}
-        period={period}
+        period={selected?.date.slice(0, 7) ?? prefix}
         onClose={() => setSelected(null)}
       />
     </div>
+  )
+}
+
+function MonthHeader({
+  monthKey,
+  totals,
+  onOpen,
+}: {
+  monthKey: string
+  totals: Totals | undefined
+  onOpen: (month: number) => void
+}) {
+  const m = Number(monthKey.slice(5, 7))
+  return (
+    <button
+      type="button"
+      onClick={() => onOpen(m)}
+      aria-label={`Open ${MONTHS_LONG[m - 1]}`}
+      className="active:bg-muted mt-2 flex min-h-11 w-full items-center gap-2 border-b px-1 text-left"
+    >
+      <span className="min-w-0 flex-1 truncate text-base font-semibold tracking-tight">
+        {MONTHS_LONG[m - 1]}
+      </span>
+      {totals && (
+        <span className="text-muted-foreground shrink-0 text-xs tabular-nums">
+          out {kr(totals.spent)} · in{" "}
+          <span className={totals.income > 0 ? up : undefined}>
+            {kr(totals.income)}
+          </span>
+        </span>
+      )}
+      <ChevronRight
+        className="text-muted-foreground size-4 shrink-0"
+        aria-hidden
+      />
+    </button>
+  )
+}
+
+const DaySection = memo(function DaySection({
+  day,
+  groupName,
+  onSelect,
+}: {
+  day: Day
+  groupName: (groupId: string | null) => string
+  onSelect: (row: ClassifiedTx) => void
+}) {
+  const daySpent = day.rows.reduce((s, f) => s + f.spent, 0)
+  return (
+    <section className="flex min-w-0 flex-col">
+      <h2 className="text-muted-foreground flex justify-between px-1 pb-1 text-[11px] font-semibold tracking-widest uppercase">
+        <span>{dayHeading.format(new Date(`${day.date}T00:00`))}</span>
+        {daySpent !== 0 && <span className="tabular-nums">{kr(daySpent)}</span>}
+      </h2>
+      <ul className="bg-card ring-foreground/5 divide-y shadow-sm ring-1">
+        {day.rows.map((f) => (
+          <li key={f.tx.id}>
+            <button
+              type="button"
+              onClick={() => onSelect(f)}
+              className={cn(
+                "active:bg-muted flex min-h-14 w-full items-center gap-3 px-3 py-2 text-left",
+                !f.counted && "opacity-60",
+              )}
+            >
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium capitalize">
+                  {f.merchant}
+                </p>
+                <p className="text-muted-foreground truncate text-xs">
+                  {[flowLabel(f), groupName(f.groupId), f.tx.tx_at?.slice(11, 16)]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </p>
+              </div>
+              <span
+                className={cn(
+                  "shrink-0 text-sm font-semibold tabular-nums",
+                  amountTone(f),
+                )}
+              >
+                {signedKr(Number(f.tx.amount))}
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+})
+
+/** Loads the next page when scrolled near; also a plain button. */
+function MoreSentinel({ left, onMore }: { left: number; onMore: () => void }) {
+  const ref = useRef<HTMLButtonElement>(null)
+  useEffect(() => {
+    const el = ref.current
+    if (!el) {
+      return
+    }
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          onMore()
+        }
+      },
+      { rootMargin: "800px 0px" },
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [onMore])
+  return (
+    <button
+      ref={ref}
+      type="button"
+      onClick={onMore}
+      className="text-muted-foreground active:bg-muted flex min-h-11 items-center justify-center text-xs"
+    >
+      Show more · {left} left
+    </button>
   )
 }
 
@@ -430,9 +656,15 @@ function TxSheet({
                   </div>
                 ) : null}
                 <p className="text-muted-foreground text-xs">
-                  {wholeMerchant
-                    ? `Applies to all ${sameSource} transactions from ${row.merchant}, past and future.`
-                    : "Applies to this transaction only."}
+                  {wholeMerchant ? (
+                    <>
+                      Applies to all {sameSource} transactions from{" "}
+                      <span className="capitalize">{row.merchant}</span>, past
+                      and future.
+                    </>
+                  ) : (
+                    "Applies to this transaction only."
+                  )}
                 </p>
                 {categories.length > 12 && (
                   <label className="bg-muted flex h-11 items-center gap-2 px-3">

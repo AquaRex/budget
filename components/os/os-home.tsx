@@ -26,18 +26,32 @@ import {
   up,
 } from "@/components/stats/display"
 import { useOs } from "@/components/os/os-shell"
+import { OsHomeYear } from "@/components/os/os-home-year"
 
 /**
  * Home tab. Folded (narrow) = the glance column fills one screen;
- * unfolded (≥600px) = glance + detail side by side.
+ * unfolded (≥600px) = glance + detail side by side. Year view: OsHomeYear.
  */
 export function OsHome() {
-  const { year, month, direction, setMonth, stats } = useOs()
-  const { heatMonths, scale, palette } = useVizData(stats)
+  const { year, month, period, direction, setMonth, stats } = useOs()
+  const viz = useVizData(stats)
+  const { heatMonths, scale, palette } = viz
   const [selectedDay, setSelectedDay] = useState<string | null>(null)
 
   const focus = stats.months[month - 1]
   const isCurrent = focus?.status === "current"
+  const isYear = period === "year"
+  const empty = !stats.hasData || (!isYear && focus?.status === "future")
+  const notStarted = isYear
+    ? year > Number(stats.today.slice(0, 4))
+    : focus?.status === "future"
+  const budgetMonths = isYear ? stats.months : focus ? [focus] : []
+  const budgetTotal = (key: "budgetIncome" | "budgetBills" | "budgetSavings") =>
+    budgetMonths.reduce((s, m) => s + m[key], 0)
+  const hasBudget = budgetMonths.some(
+    (m) => m.budgetIncome || m.budgetBills || m.budgetSavings,
+  )
+  const periodName = isYear ? String(year) : `${MONTHS_LONG[month - 1]} ${year}`
   const monthDays = heatMonths[month - 1]
   const { summary, pace } = stats
 
@@ -90,20 +104,29 @@ export function OsHome() {
           <Skeleton className="h-20" />
           <Skeleton className="h-72" />
         </div>
-      ) : !stats.hasData ? (
+      ) : empty ? (
         <div className="flex flex-col gap-3">
-          <Panel title={`Budget · ${MONTHS_LONG[month - 1]}`}>
+          <Panel title={`Budget · ${isYear ? year : MONTHS_LONG[month - 1]}`}>
             <BudgetKpi
-              income={focus?.budgetIncome ?? 0}
-              bills={focus?.budgetBills ?? 0}
-              savings={focus?.budgetSavings ?? 0}
+              income={budgetTotal("budgetIncome")}
+              bills={budgetTotal("budgetBills")}
+              savings={budgetTotal("budgetSavings")}
             />
           </Panel>
           <p className="text-muted-foreground py-8 text-center text-sm">
-            No bank data for {year} yet. Import transactions on the full site to
-            see spending here.
+            {notStarted
+              ? hasBudget
+                ? `${periodName} hasn't started yet. This is what the budget plans.`
+                : `${periodName} hasn't started yet, and has no budget.`
+              : `No bank data for ${periodName} yet. Import transactions on the full site to see spending here.`}
           </p>
         </div>
+      ) : isYear ? (
+        <OsHomeYear
+          viz={viz}
+          selectedDay={selectedDay}
+          onSelectDay={setSelectedDay}
+        />
       ) : (
         <div
           key={`${year}-${month}`}

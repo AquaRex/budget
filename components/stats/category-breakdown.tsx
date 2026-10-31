@@ -138,7 +138,8 @@ export function CategoryBreakdown({
                     {!compareBaseline && " · "}
                   </>
                 )}
-                {!compareBaseline && `${c.txCount} transactions`}
+                {!compareBaseline &&
+                  `${c.txCount} ${c.txCount === 1 ? "transaction" : "transactions"}`}
               </span>
             )}
           </li>

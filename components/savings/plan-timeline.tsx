@@ -82,7 +82,7 @@ export function PlanTimeline({
               const soldOut = buy.held === 0
               return (
                 <div key={buy.monthIndex} className="contents">
-                  <div className="flex flex-col justify-center border-t py-1.5 pr-2 text-xs">
+                  <div className="bg-card sticky left-0 z-20 flex flex-col justify-center border-t py-1.5 pr-2 text-xs">
                     <span className="font-medium">
                       {monthLabel(buy.monthIndex)}
                     </span>
