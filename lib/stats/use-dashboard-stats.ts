@@ -40,13 +40,19 @@ export function useToday(): string {
 
 /**
  * The (SWR-deduped) sources the stats engine reads. Budget entries/amounts
- * follow the globally selected year (`useYear()`).
+ * follow the globally selected year (`useYear()`) unless `year` is given.
  */
-export function useStatsData(): { data: StatsData; loading: boolean } {
-  const { entries: bills, isLoading: billsLoading } = useEntries("bill")
-  const { entries: incomes, isLoading: incomesLoading } = useEntries("income")
-  const { amounts, isLoading: amountsLoading } = useAmounts()
-  const { profile, isLoading: salaryLoading } = useSalaryProfile()
+export function useStatsData(year?: number): {
+  data: StatsData
+  loading: boolean
+} {
+  const { entries: bills, isLoading: billsLoading } = useEntries("bill", year)
+  const { entries: incomes, isLoading: incomesLoading } = useEntries(
+    "income",
+    year,
+  )
+  const { amounts, isLoading: amountsLoading } = useAmounts(year)
+  const { profile, isLoading: salaryLoading } = useSalaryProfile(year)
   const ctx = useBudgetContext(amounts, profile)
   const { categories, isLoading: categoriesLoading } = useCategories()
   const { labels, isLoading: labelsLoading } = useLabels()
@@ -56,7 +62,16 @@ export function useStatsData(): { data: StatsData; loading: boolean } {
 
   const typeMap = useMemo(() => buildTypeMap(typeCategories), [typeCategories])
   const data = useMemo(
-    () => ({ transactions, categories, labels, typeMap, imports, bills, incomes, ctx }),
+    () => ({
+      transactions,
+      categories,
+      labels,
+      typeMap,
+      imports,
+      bills,
+      incomes,
+      ctx,
+    }),
     [transactions, categories, labels, typeMap, imports, bills, incomes, ctx],
   )
   const loading =

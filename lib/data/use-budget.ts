@@ -36,8 +36,10 @@ import type {
   TypeCategory,
 } from "@/lib/types"
 
-export function useEntries(kind: EntryKind) {
-  const year = useYear()
+/** `year` defaults to the globally selected year. */
+export function useEntries(kind: EntryKind, year?: number) {
+  const selected = useYear()
+  year ??= selected
   const { data, error, isLoading, mutate } = useSWR<Entry[]>(
     ["entries", kind, year],
     () => fetchEntries(kind, year),
@@ -45,8 +47,9 @@ export function useEntries(kind: EntryKind) {
   return { entries: data ?? [], error, isLoading, mutate }
 }
 
-export function useAmounts() {
-  const year = useYear()
+export function useAmounts(year?: number) {
+  const selected = useYear()
+  year ??= selected
   const { data, error, isLoading, mutate } = useSWR<EntryAmount[]>(
     ["amounts", year],
     () => fetchAmounts(year),
@@ -80,7 +83,14 @@ export function useEntryCounts() {
     "entry_counts",
     fetchEntryCountsByCategory,
   )
-  return { counts: data ?? new Map<string, { total: number; byYear: Record<number, number> }>(), error, isLoading, mutate }
+  return {
+    counts:
+      data ??
+      new Map<string, { total: number; byYear: Record<number, number> }>(),
+    error,
+    isLoading,
+    mutate,
+  }
 }
 
 /**
@@ -128,8 +138,9 @@ export function useMethods() {
   return { methods: data ?? [], error, isLoading, mutate }
 }
 
-export function useSalaryProfile() {
-  const year = useYear()
+export function useSalaryProfile(year?: number) {
+  const selected = useYear()
+  year ??= selected
   const { data, error, isLoading, mutate } = useSWR<SalaryProfile | null>(
     ["salary", year],
     () => fetchSalaryProfile(year),

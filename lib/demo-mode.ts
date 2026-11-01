@@ -72,6 +72,7 @@ const SCRAMBLE: Record<
   salary_settings: { key: () => "salary", money: ["yearly_salary"] },
   bills: { key: (r) => r.id, money: ["amount"] },
   incomes: { key: (r) => r.id, money: ["amount"] },
+  goals: { key: (r) => r.id, money: ["target_amount", "start_amount"] },
   // Units scale with the amount, so the price per unit stays the real market price.
   holding_trades: {
     key: (r) => r.holding_id,

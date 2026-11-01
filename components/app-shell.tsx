@@ -57,7 +57,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </Link>
           <nav className="flex h-full shrink-0 items-center">
             {nav.map(({ href, label, icon: Icon }) => {
-              const active = path === href
+              const active =
+                path === href || (href !== "/" && path.startsWith(`${href}/`))
               return (
                 <Link
                   key={href}
