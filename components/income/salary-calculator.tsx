@@ -223,7 +223,7 @@ export function SalaryCalculator({ onChanged }: { onChanged: () => void }) {
                 </div>
                 {state.driver === "yearly" ? (
                   <Input
-                    type={demo ? "password" : "text"}
+                    type={demo === "mask" ? "password" : "text"}
                     inputMode="decimal"
                     placeholder="Yearly before tax"
                     value={state.yearly}
@@ -231,7 +231,7 @@ export function SalaryCalculator({ onChanged }: { onChanged: () => void }) {
                   />
                 ) : (
                   <Input
-                    type={demo ? "password" : "text"}
+                    type={demo === "mask" ? "password" : "text"}
                     inputMode="decimal"
                     placeholder="Monthly after tax"
                     value={state.monthlyAfterTax}

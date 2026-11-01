@@ -4,7 +4,7 @@ import * as React from "react"
 import * as RechartsPrimitive from "recharts"
 import type { TooltipValueType } from "recharts"
 
-import { isDemoMode, MASK } from "@/lib/demo-mode"
+import { isMasked, MASK } from "@/lib/demo-mode"
 import { cn } from "@/lib/utils"
 
 // Format: { THEME_NAME: CSS_SELECTOR }
@@ -256,7 +256,7 @@ function ChartTooltipContent({
                       {item.value != null && (
                         <span className="text-foreground font-mono font-medium tabular-nums">
                           {typeof item.value === "number"
-                            ? isDemoMode()
+                            ? isMasked()
                               ? MASK
                               : item.value.toLocaleString()
                             : String(item.value)}

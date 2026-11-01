@@ -131,13 +131,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <ArrowRight className="size-3.5" />
         </span>
       </Link>
-      {demo && (
+      {demo !== "off" && (
         <Link
           href="/settings"
           className="block bg-amber-400 px-4 py-1.5 text-center text-xs font-semibold text-amber-950"
         >
-          Demo mode · amounts are hidden and saving is off — turn off in
-          Settings
+          Demo mode · amounts are{" "}
+          {demo === "scramble" ? "scrambled (not real)" : "hidden"} and saving
+          is off — turn off in Settings
         </Link>
       )}
       <main className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 2xl:max-w-[1600px]">
