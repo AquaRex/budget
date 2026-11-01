@@ -24,7 +24,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { SavingsTabs } from "@/components/savings/savings-tabs"
 import { GoalCard } from "@/components/goals/goal-card"
 import { GoalDialog } from "@/components/goals/goal-dialog"
 
@@ -87,13 +86,12 @@ export default function GoalsPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-0.5">
-        <h1 className="text-2xl font-semibold tracking-tight">Savings</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Goals</h1>
         <p className="text-muted-foreground text-sm">
           Set an amount to reach by a certain month, and see when your budget —
           and your actual spending — gets you there.
         </p>
       </div>
-      <SavingsTabs />
 
       {error ? (
         <Alert variant="destructive">

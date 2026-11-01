@@ -7,7 +7,6 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { SavingsOverview } from "@/components/savings/savings-overview"
 import { SavingsGrid } from "@/components/savings/savings-grid"
 import { PlanSchedule } from "@/components/savings/plan-schedule"
-import { SavingsTabs } from "@/components/savings/savings-tabs"
 
 export default function SavingsPage() {
   const year = useYear()
@@ -22,7 +21,6 @@ export default function SavingsPage() {
           it&apos;s worth, and when bonus shares unlock.
         </p>
       </div>
-      <SavingsTabs />
 
       {model.error ? (
         <Alert variant="destructive">
