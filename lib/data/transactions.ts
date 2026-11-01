@@ -3,10 +3,13 @@ import type { ImportBatch, Transaction, TxRule } from "@/lib/types"
 import type { ParsedTx } from "@/lib/csv"
 import {
   classifyImport,
+  descMatches,
+  effectiveCategoryId,
   ruleCategoryFor,
   sourceKeyFor,
   txMatchesSource,
   type ImportPlan,
+  type TypeMap,
 } from "@/lib/spending"
 
 export async function fetchTransactions(): Promise<Transaction[]> {
@@ -238,7 +241,9 @@ export async function categorizeBySource(
   // Every matching row across all time (paged: a bare select stops at 1000 rows).
   const all = await fetchTransactions()
   const ids = new Set(
-    all.filter((t) => txMatchesSource(t, src.matchType, src.pattern)).map((t) => t.id),
+    all
+      .filter((t) => txMatchesSource(t, src.matchType, src.pattern))
+      .map((t) => t.id),
   )
   ids.add(tx.id) // always apply to the one the user clicked
   await setCategoryForIds(Array.from(ids), categoryId)
@@ -248,7 +253,10 @@ export async function categorizeBySource(
 const UPDATE_CHUNK = 200 // keeps the `id=in.(…)` URL well under length limits
 
 /** Set one category on many transactions, a chunk of ids per update statement. */
-export async function setCategoryForIds(ids: string[], categoryId: string | null): Promise<void> {
+export async function setCategoryForIds(
+  ids: string[],
+  categoryId: string | null,
+): Promise<void> {
   const supabase = getSupabase()
   for (let i = 0; i < ids.length; i += UPDATE_CHUNK) {
     const { error } = await supabase
@@ -340,7 +348,42 @@ export async function saveRuleAndApply(
   const matches = (await fetchTransactions()).filter(
     (t) => t.category_id === null && ruleCategoryFor(t, [r]) === categoryId,
   )
-  await setCategoryForIds(matches.map((t) => t.id), categoryId)
+  await setCategoryForIds(
+    matches.map((t) => t.id),
+    categoryId,
+  )
+  return matches.length
+}
+
+/**
+ * Add a "text contains" rule typed by hand, then give its category to every
+ * matching transaction that has none yet — not even through its bank type.
+ * Never overwrites an existing rule or any category already set. Returns how
+ * many transactions were filled in.
+ */
+export async function addTextRule(
+  pattern: string,
+  categoryId: string,
+  typeMap: TypeMap,
+): Promise<number> {
+  const supabase = getSupabase()
+  const { error } = await supabase
+    .from("tx_rules")
+    .insert({ match_type: "description", pattern, category_id: categoryId })
+  if (error) {
+    throw error.code === "23505"
+      ? new Error(`A rule for "${pattern}" already exists.`)
+      : error
+  }
+  const matches = (await fetchTransactions()).filter(
+    (t) =>
+      effectiveCategoryId(t, typeMap) === null &&
+      descMatches(t.description, pattern),
+  )
+  await setCategoryForIds(
+    matches.map((t) => t.id),
+    categoryId,
+  )
   return matches.length
 }
 

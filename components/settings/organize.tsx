@@ -52,6 +52,7 @@ import {
 import { CategoryTree } from "@/components/settings/category-tree"
 import { BankTypeCleanup } from "@/components/settings/bank-type-cleanup"
 import { TagsManager } from "@/components/settings/tags-manager"
+import { RulesManager } from "@/components/settings/rules-manager"
 
 function fmtDate(iso: string): string {
   const [y, m, d] = iso.split("-")
@@ -78,6 +79,7 @@ export function Organize() {
     <div className="flex flex-col gap-6">
       <CategoryTree />
       <BankTypeCleanup onChanged={refresh} />
+      <RulesManager onChanged={refresh} />
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
         <TriagePanel
           transactions={transactions}
@@ -125,19 +127,24 @@ function TriagePanel({
   // null when none/mixed.
   const merchantCat = (g: MerchantGroup): string | null => {
     const cats = new Set(
-      g.txns.map((t) => effectiveCategoryId(t, typeMap)).filter(Boolean) as string[],
+      g.txns
+        .map((t) => effectiveCategoryId(t, typeMap))
+        .filter(Boolean) as string[],
     )
     return cats.size === 1 ? [...cats][0] : null
   }
   const catName = (id: string | null) =>
     categories.find((c) => c.id === id)?.name ?? null
   const categoryLabels = useMemo(
-    () => new Map(categoryOptions(categories).map((o) => [o.id, optionLabel(o)])),
+    () =>
+      new Map(categoryOptions(categories).map((o) => [o.id, optionLabel(o)])),
     [categories],
   )
 
   const covered = spending.filter((t) => effectiveCategoryId(t, typeMap)).length
-  const pct = spending.length ? Math.round((covered / spending.length) * 100) : 100
+  const pct = spending.length
+    ? Math.round((covered / spending.length) * 100)
+    : 100
 
   const q = search.trim().toLowerCase()
   const shown = merchants.filter((g) => {
@@ -153,7 +160,13 @@ function TriagePanel({
   } | null>(null)
 
   function pickMerchant(g: MerchantGroup, catId: string | null) {
-    const mix = merchantMix(transactions, g.sample, catId, typeMap, (id) => catName(id) ?? "Uncategorised")
+    const mix = merchantMix(
+      transactions,
+      g.sample,
+      catId,
+      typeMap,
+      (id) => catName(id) ?? "Uncategorised",
+    )
     if (mix) {
       setMixed({ mix, group: g, catId })
       return
@@ -180,13 +193,19 @@ function TriagePanel({
       <CardHeader className="gap-3">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <CardTitle className="text-base">Merchants · needs sorting</CardTitle>
+            <CardTitle className="text-base">
+              Merchants · needs sorting
+            </CardTitle>
             <CardDescription>
               {covered.toLocaleString("nb-NO")} /{" "}
               {spending.length.toLocaleString("nb-NO")} categorised ({pct}%)
             </CardDescription>
           </div>
-          <Button variant="outline" size="sm" onClick={() => setMapperOpen(true)}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setMapperOpen(true)}
+          >
             <Tags className="size-4" />
             Bank types
           </Button>
@@ -256,7 +275,9 @@ function TriagePanel({
                         categories={categories}
                         value={cat}
                         onChange={(id) => pickMerchant(g, id)}
-                        noneLabel={mixed ? "Mixed / uncategorised" : "Uncategorised"}
+                        noneLabel={
+                          mixed ? "Mixed / uncategorised" : "Uncategorised"
+                        }
                         className="h-8 text-xs"
                       />
                     </div>
@@ -265,7 +286,11 @@ function TriagePanel({
                   {isOpen && (
                     <ExpandedMerchant
                       group={g}
-                      categoryName={(t) => categoryLabels.get(effectiveCategoryId(t, typeMap) ?? "") ?? null}
+                      categoryName={(t) =>
+                        categoryLabels.get(
+                          effectiveCategoryId(t, typeMap) ?? "",
+                        ) ?? null
+                      }
                       labels={labels}
                       onChanged={onChanged}
                     />
@@ -377,11 +402,15 @@ function ExpandedMerchant({
           <span className="text-muted-foreground w-14 shrink-0 tabular-nums">
             {fmtDate(effectiveDate(t))}
           </span>
-          <span className="min-w-0 flex-1 truncate">{t.description || t.type}</span>
+          <span className="min-w-0 flex-1 truncate">
+            {t.description || t.type}
+          </span>
           <span
             className={cn(
               "max-w-[40%] shrink-0 truncate",
-              categoryName(t) ? "text-foreground" : "text-amber-600 dark:text-amber-400",
+              categoryName(t)
+                ? "text-foreground"
+                : "text-amber-600 dark:text-amber-400",
             )}
           >
             {categoryName(t) ?? "Uncategorised"}
