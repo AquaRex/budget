@@ -18,7 +18,16 @@ const MAX_MONTHS = 50 * 12
 
 export type GoalPoint = { monthIndex: number; budget: number; actual: number }
 
-export type OverBudget = { id: string | null; name: string; perMonth: number }
+// perMonth: actual minus budget (+ = over budget, − = under)
+export type GroupDiff = {
+  id: string | null
+  name: string
+  perMonth: number
+  actual: number // spent per month
+  budget: number // budgeted per month
+}
+
+export type RecentMonth = { monthIndex: number; actual: number; budget: number }
 
 export type GoalVerdict =
   | "reached"
@@ -41,8 +50,12 @@ export type GoalProjection = {
   reachActual: number | null
   verdict: GoalVerdict
   points: GoalPoint[] // today, then month by month
-  overBudget: OverBudget[] // groups over budget this year, per month, largest first
+  groupDiffs: GroupDiff[] // every spending group vs its budget this year, per month, most over first
+  overBudget: GroupDiff[] // the top groups over budget
+  incomeDiffPerMonth: number // income minus budgeted income this year, per month
   incomeShortPerMonth: number // income below budget this year, per month (0 when at or above)
+  diffMonths: number // complete months this year the group and income figures cover
+  recent: RecentMonth[] // up to 12 latest complete months with a budget: saved (net) vs budgeted surplus
 }
 
 export type GoalInputs = {
@@ -115,6 +128,29 @@ export function projectGoal(input: GoalInputs): GoalProjection {
   const monthsLeft = Math.max(0, deadline - todayIndex)
   const budgetPerMonth = monthsLeft ? budgetSum / monthsLeft : 0
   const counted = Math.max(1, summary.monthsCounted)
+  const groupDiffs = summary.monthsCounted
+    ? categories
+        .map((c) => ({
+          id: c.id,
+          name: c.name,
+          perMonth: (c.amount - c.budget) / counted,
+          actual: c.amount / counted,
+          budget: c.budget / counted,
+        }))
+        .filter((c) => Math.abs(c.perMonth) >= 1)
+        .sort((a, b) => b.perMonth - a.perMonth)
+    : []
+  const incomeDiffPerMonth = summary.monthsCounted
+    ? (summary.income - summary.budgetIncome) / counted
+    : 0
+  const recent = [...prevMonths, ...months]
+    .filter((m) => m.status === "complete" && m.budgetIncome > 0)
+    .slice(-12)
+    .map((m) => ({
+      monthIndex: monthIndexOf(m.year, m.month),
+      actual: m.net,
+      budget: budgetNet(m),
+    }))
 
   return {
     now,
@@ -139,19 +175,11 @@ export function projectGoal(input: GoalInputs): GoalProjection {
               ? "overspending"
               : "budget-short",
     points: shown,
-    overBudget: summary.monthsCounted
-      ? categories
-          .map((c) => ({
-            id: c.id,
-            name: c.name,
-            perMonth: (c.amount - c.budget) / counted,
-          }))
-          .filter((c) => c.perMonth >= 1)
-          .sort((a, b) => b.perMonth - a.perMonth)
-          .slice(0, 5)
-      : [],
-    incomeShortPerMonth: summary.monthsCounted
-      ? Math.max(0, (summary.budgetIncome - summary.income) / counted)
-      : 0,
+    groupDiffs,
+    overBudget: groupDiffs.filter((g) => g.perMonth > 0).slice(0, 5),
+    incomeDiffPerMonth,
+    incomeShortPerMonth: Math.max(0, -incomeDiffPerMonth),
+    diffMonths: summary.monthsCounted,
+    recent,
   }
 }

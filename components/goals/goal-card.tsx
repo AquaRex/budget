@@ -17,6 +17,7 @@ import { Panel } from "@/components/stats/panel"
 import { kr } from "@/components/stats/display"
 import { monthLabel } from "@/components/savings/format"
 import { GoalChart } from "@/components/goals/goal-chart"
+import { GoalBreakdown } from "@/components/goals/goal-breakdown"
 
 const VERDICT: Record<
   GoalVerdict,
@@ -142,6 +143,7 @@ export function GoalCard({
             </div>
             <GoalChart projection={p} />
             <Advice p={p} need={need} />
+            <GoalBreakdown p={p} />
           </>
         )}
         {p.verdict === "past" && (
@@ -151,10 +153,10 @@ export function GoalCard({
         )}
 
         <p className="text-muted-foreground text-xs">
-          &quot;On budget&quot; uses your {budgetYear} budget month by month
-          (repeated for later years): income minus bills, with money budgeted
-          into savings groups counting towards the goal. &quot;Actual pace&quot;
-          adjusts it by how your last{" "}
+          “On budget” uses your {budgetYear} budget month by month (repeated for
+          later years): income minus bills, with money budgeted into savings
+          groups counting towards the goal. “Actual pace” adjusts it by how your
+          last{" "}
           {p.gapMonths
             ? plural(p.gapMonths, "complete month")
             : "complete months"}{" "}
@@ -245,36 +247,21 @@ function Advice({ p, need }: { p: GoalProjection; need: number }) {
 
       {(p.overBudget.length > 0 || p.incomeShortPerMonth >= 1) &&
         p.verdict !== "on-track" && (
-          <div className="flex flex-col gap-1.5">
-            <span className="text-muted-foreground text-[11px] font-semibold tracking-widest uppercase">
-              Where this year goes over budget
-            </span>
-            <ul className="flex flex-col divide-y border-y">
-              {p.incomeShortPerMonth >= 1 && (
-                <li className="flex justify-between gap-3 py-1.5">
-                  <span>Income below budget</span>
-                  <span className="tabular-nums">
-                    −{perMonth(p.incomeShortPerMonth)}
-                  </span>
-                </li>
-              )}
-              {p.overBudget.map((g) => (
-                <li
-                  key={g.id ?? "none"}
-                  className="flex justify-between gap-3 py-1.5"
-                >
-                  <span className="truncate">{g.name}</span>
-                  <span className="tabular-nums">+{perMonth(g.perMonth)}</span>
-                </li>
-              ))}
-            </ul>
-            <Link
-              href="/budget"
-              className="text-primary text-xs hover:underline"
-            >
+          <p>
+            Biggest drains this year:{" "}
+            {[
+              ...(p.incomeShortPerMonth >= 1
+                ? [`income below budget (${perMonth(p.incomeShortPerMonth)})`]
+                : []),
+              ...p.overBudget
+                .slice(0, 3)
+                .map((g) => `${g.name} (+${perMonth(g.perMonth)})`),
+            ].join(", ")}
+            .{" "}
+            <Link href="/budget" className="text-primary hover:underline">
               Adjust the budget →
             </Link>
-          </div>
+          </p>
         )}
     </div>
   )
