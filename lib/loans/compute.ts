@@ -47,7 +47,10 @@ export type LoanProjection = {
   years: LoanYear[]
 }
 
-/** Payments per month index: money out in the loan's category or its group. */
+/**
+ * Payments per month index: money out in the loan's category or its group,
+ * all months — those before the start month only feed the average payment.
+ */
 export function loanPayments(
   loan: Loan,
   transactions: Transaction[],
@@ -59,7 +62,6 @@ export function loanPayments(
   if (!loan.category_id) {
     return out
   }
-  const start = monthIndexOf(loan.start_year, loan.start_month)
   for (const t of transactions) {
     if (t.is_excluded) {
       continue
@@ -73,9 +75,7 @@ export function loanPayments(
     }
     const date = effectiveDate(t)
     const i = monthIndexOf(Number(date.slice(0, 4)), Number(date.slice(5, 7)))
-    if (i >= start) {
-      out.set(i, (out.get(i) ?? 0) - Number(t.amount))
-    }
+    out.set(i, (out.get(i) ?? 0) - Number(t.amount))
   }
   return out
 }
