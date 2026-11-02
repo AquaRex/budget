@@ -33,7 +33,7 @@ import {
 import { formatPrice, formatUnits, parseNumber } from "@/components/savings/format"
 import { formatShortDate, kr } from "@/components/stats/display"
 
-export type TradeTarget = { holding: Holding; year: number; month: number }
+export type TradeTarget = { holding: Holding; year: number; month: number; bank?: number }
 
 /** Edit a holding's buy and sell for one month. */
 export function TradeDialog({
@@ -205,6 +205,12 @@ function TradeForm({
 
       <section className="flex flex-col gap-3">
         <SectionTitle title="Bought" onRemove={buy ? () => remove("buy") : undefined} disabled={saving} />
+        {!!target.bank && (
+          <p className="text-muted-foreground text-xs">
+            {kr(Math.round(target.bank))} from bank payments this month is added automatically. Enter
+            only what you bought some other way.
+          </p>
+        )}
         <div className="grid grid-cols-2 gap-3">
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="buy-date">Date (optional)</Label>

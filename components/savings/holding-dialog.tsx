@@ -19,6 +19,8 @@ import {
 } from "@/components/ui/dialog"
 import { KIND_LABEL, parseNumber } from "@/components/savings/format"
 import { QuoteSearch } from "@/components/savings/quote-search"
+import { CategorySelect } from "@/components/spending/category-picker"
+import { useCategories } from "@/lib/data/use-budget"
 import { cn } from "@/lib/utils"
 
 const KINDS: { kind: HoldingKind; hint: string }[] = [
@@ -79,6 +81,9 @@ function HoldingForm({
       ? ""
       : String(holding.expected_return_pct),
   )
+  const { categories } = useCategories()
+  const [categoryId, setCategoryId] = useState<string | null>(holding?.category_id ?? null)
+  const [share, setShare] = useState(String(holding?.category_share_pct ?? 100))
   const [searching, setSearching] = useState(!holding)
   const [saving, setSaving] = useState(false)
 
@@ -89,7 +94,21 @@ function HoldingForm({
     const r = isPlan ? parseNumber(ratio) : 1
     const e = expected.trim() ? parseNumber(expected) : null
     const badExpected = expected.trim() !== "" && (e === null || e <= -100 || e > 100)
-    if (!name.trim() || d === null || d >= 100 || y === null || y < 1 || y > 10 || r === null || badExpected) {
+    const linked = isPlan ? null : categoryId
+    const s = linked ? parseNumber(share) : 100
+    if (
+      !name.trim() ||
+      d === null ||
+      d >= 100 ||
+      y === null ||
+      y < 1 ||
+      y > 10 ||
+      r === null ||
+      badExpected ||
+      s === null ||
+      s <= 0 ||
+      s > 100
+    ) {
       return null
     }
     return {
@@ -100,6 +119,8 @@ function HoldingForm({
       bonus_ratio: r,
       symbol,
       expected_return_pct: e,
+      category_id: linked,
+      category_share_pct: s,
     }
   })()
 
@@ -239,6 +260,36 @@ function HoldingForm({
               Each purchase earns {ratio || "?"} bonus share(s) per share still held{" "}
               {years || "?"} years later. Sales take the oldest shares first (FIFO); selling
               shares before their bonus date loses the bonus on them.
+            </p>
+          </div>
+        )}
+        {!isPlan && (
+          <div className="flex flex-col gap-1.5">
+            <Label>Paid from category (optional)</Label>
+            <div className="flex gap-2">
+              <CategorySelect
+                categories={categories}
+                value={categoryId}
+                onChange={setCategoryId}
+                noneLabel="Not paid from a category"
+              />
+              {categoryId && (
+                <div className="flex shrink-0 items-center gap-1.5">
+                  <Input
+                    aria-label="Share of each payment %"
+                    inputMode="decimal"
+                    value={share}
+                    onChange={(e) => setShare(e.target.value)}
+                    className="w-20 text-right"
+                  />
+                  <span className="text-muted-foreground text-sm">%</span>
+                </div>
+              )}
+            </div>
+            <p className="text-muted-foreground text-xs">
+              Every payment out in this category (a group counts every category in it) is a buy
+              here on the day it was paid. Split one category between holdings by giving each
+              its share, e.g. 50 % and 50 %.
             </p>
           </div>
         )}

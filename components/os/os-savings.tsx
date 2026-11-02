@@ -41,7 +41,9 @@ export function OsSavings() {
   const [range, setRange] = useState<number | null>(null)
   const [target, setTarget] = useState<TradeTarget | null>(null)
   const [picking, setPicking] = useState<Holding | null>(null)
-  const { results, series, todayIndex, trades, prices, mutate } = model
+  const { results, series, todayIndex, trades, enteredTrades, prices, mutate } = model
+  const bankAt = (h: Holding, m: number) =>
+    trades.find((t) => t.holding_id === h.id && t.year === year && t.month === m && t.side === "buy")?.bank
 
   if (model.isLoading) {
     return (
@@ -78,7 +80,7 @@ export function OsSavings() {
     if (period === "year") {
       setPicking(h)
     } else {
-      setTarget({ holding: h, year, month })
+      setTarget({ holding: h, year, month, bank: bankAt(h, month) })
     }
   }
 
@@ -186,7 +188,7 @@ export function OsSavings() {
                   type="button"
                   onClick={() => {
                     if (picking) {
-                      setTarget({ holding: picking, year, month: i + 1 })
+                      setTarget({ holding: picking, year, month: i + 1, bank: bankAt(picking, i + 1) })
                     }
                     setPicking(null)
                   }}
@@ -206,7 +208,7 @@ export function OsSavings() {
 
       <TradeDialog
         target={target}
-        trades={trades}
+        trades={enteredTrades}
         prices={prices}
         onClose={() => setTarget(null)}
         onSaved={mutate}

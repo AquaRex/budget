@@ -1,7 +1,7 @@
 "use client"
 
 import { Fragment, useState } from "react"
-import { MoreHorizontal, Plus } from "lucide-react"
+import { Landmark, MoreHorizontal, Plus } from "lucide-react"
 import { toast } from "sonner"
 
 import { errMessage } from "@/lib/errors"
@@ -53,7 +53,23 @@ export function SavingsGrid({
   model: SavingsModel
   year: number
 }) {
-  const { holdings, results, trades, prices, todayIndex, mutate } = model
+  const {
+    holdings,
+    categories,
+    results,
+    trades,
+    enteredTrades,
+    unpriced,
+    prices,
+    todayIndex,
+    mutate,
+  } = model
+  const categoryName = (id: string) =>
+    categories.find((c) => c.id === id)?.name ?? "a category"
+  const shareOf = (categoryId: string) =>
+    holdings
+      .filter((x) => x.category_id === categoryId && x.kind !== "plan")
+      .reduce((s, x) => s + x.category_share_pct, 0)
   const [editing, setEditing] = useState<Holding | null>(null)
   const [adding, setAdding] = useState(false)
   const [removing, setRemoving] = useState<Holding | null>(null)
@@ -184,7 +200,29 @@ export function SavingsGrid({
                             </span>
                             <span className="text-muted-foreground text-[10px]">
                               {h.symbol ?? "prices by hand"}
+                              {h.category_id &&
+                                h.kind !== "plan" &&
+                                ` · ${h.category_share_pct < 100 ? `${h.category_share_pct.toLocaleString("nb-NO")} % of ` : ""}${categoryName(h.category_id)}`}
                             </span>
+                            {h.category_id &&
+                              h.kind !== "plan" &&
+                              Math.round(shareOf(h.category_id)) !== 100 && (
+                                <span className="text-[10px] text-amber-700 dark:text-amber-400">
+                                  Holdings from {categoryName(h.category_id)}{" "}
+                                  share{" "}
+                                  {shareOf(h.category_id).toLocaleString(
+                                    "nb-NO",
+                                  )}{" "}
+                                  %, not 100 %
+                                </span>
+                              )}
+                            {!!unpriced.get(h.id) && (
+                              <span className="text-[10px] text-amber-700 dark:text-amber-400">
+                                {unpriced.get(h.id)} bank payment
+                                {unpriced.get(h.id) === 1 ? "" : "s"} need a
+                                price entered for their month
+                              </span>
+                            )}
                           </span>
                           <Badge variant="secondary" className="font-normal">
                             {KIND_LABEL[h.kind]}
@@ -229,12 +267,19 @@ export function SavingsGrid({
                             <button
                               type="button"
                               onClick={() =>
-                                setTarget({ holding: h, year, month: m })
+                                setTarget({
+                                  holding: h,
+                                  year,
+                                  month: m,
+                                  bank: buy?.bank,
+                                })
                               }
                               title={
-                                buy?.trade_date
-                                  ? `Bought ${buy.trade_date}${buy.trade_time ? ` ${buy.trade_time}` : ""}`
-                                  : undefined
+                                buy?.bank
+                                  ? `${formatNumber(buy.bank)} kr from bank payments, the last on ${buy.trade_date}`
+                                  : buy?.trade_date
+                                    ? `Bought ${buy.trade_date}${buy.trade_time ? ` ${buy.trade_time}` : ""}`
+                                    : undefined
                               }
                               className="hover:bg-muted flex min-h-9 w-full flex-col items-end justify-center px-1 text-right tabular-nums"
                             >
@@ -248,7 +293,13 @@ export function SavingsGrid({
                                   <span className="font-medium">
                                     +{formatUnitsShort(buy.units)}
                                   </span>
-                                  <span className="text-muted-foreground text-[10px]">
+                                  <span className="text-muted-foreground flex items-center gap-0.5 text-[10px]">
+                                    {!!buy.bank && (
+                                      <Landmark
+                                        className="size-2.5"
+                                        aria-label="from bank payments"
+                                      />
+                                    )}
                                     {formatNumber(buy.amount)} kr
                                   </span>
                                 </>
@@ -376,7 +427,7 @@ export function SavingsGrid({
       />
       <TradeDialog
         target={target}
-        trades={trades}
+        trades={enteredTrades}
         prices={prices}
         onClose={() => setTarget(null)}
         onSaved={mutate}

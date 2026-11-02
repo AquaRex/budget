@@ -40,6 +40,15 @@ export default function SavingsPage() {
         </div>
       ) : (
         <>
+          {model.holdings.some((h) => !("category_id" in h)) && (
+            <Alert variant="destructive">
+              <AlertTitle>Savings needs a database update</AlertTitle>
+              <AlertDescription>
+                Run <code>supabase/migrations/0025_holding_category.sql</code>{" "}
+                in the Supabase SQL Editor, then reload this page.
+              </AlertDescription>
+            </Alert>
+          )}
           {model.marketError && (
             <Alert variant="destructive">
               <AlertTitle>Market prices couldn&apos;t load</AlertTitle>

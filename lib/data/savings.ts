@@ -23,7 +23,7 @@ export async function fetchHoldings(): Promise<Holding[]> {
     throw error
   }
   return (data ?? []).map((h) => ({
-    ...num(h as Holding, ["discount_pct", "bonus_years", "bonus_ratio"]),
+    ...num(h as Holding, ["discount_pct", "bonus_years", "bonus_ratio", "category_share_pct"]),
     expected_return_pct: h.expected_return_pct === null ? null : Number(h.expected_return_pct),
   }))
 }
@@ -64,6 +64,8 @@ export type HoldingInput = {
   bonus_ratio: number
   symbol: string | null
   expected_return_pct: number | null
+  category_id: string | null
+  category_share_pct: number
 }
 
 export async function createHolding(input: HoldingInput, sortOrder: number): Promise<void> {

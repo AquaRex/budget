@@ -10,6 +10,8 @@ export type Holding = {
   sort_order: number
   symbol: string | null // market ticker; null = prices entered by hand
   expected_return_pct: number | null // yearly growth Goals assume; null = none
+  category_id: string | null // payments out in this category buy into it
+  category_share_pct: number // share of each of those payments, 0-100
 }
 
 export type TradeSide = "buy" | "sell"
@@ -24,6 +26,7 @@ export type Trade = {
   amount: number // NOK paid (buy) or received (sell)
   trade_date: string | null // YYYY-MM-DD within year/month
   trade_time: string | null // HH:MM, exchange time
+  bank?: number // NOK of this buy that came from payments in the holding's category
 }
 
 export type Price = {
