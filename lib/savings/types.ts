@@ -9,6 +9,7 @@ export type Holding = {
   bonus_ratio: number // plan: bonus shares per share still held at that point
   sort_order: number
   symbol: string | null // market ticker; null = prices entered by hand
+  expected_return_pct: number | null // yearly growth Goals assume; null = none
 }
 
 export type TradeSide = "buy" | "sell"

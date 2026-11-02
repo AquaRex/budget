@@ -228,6 +228,17 @@ export async function setCategorySavings(id: string, isSavings: boolean): Promis
   }
 }
 
+/** Money out in this category (or group) counts as progress towards Goals. */
+export async function setCategoryCountsToGoals(id: string, counts: boolean): Promise<void> {
+  const { error } = await getSupabase()
+    .from("categories")
+    .update({ counts_to_goals: counts })
+    .eq("id", id)
+  if (error) {
+    throw error
+  }
+}
+
 /** A category that is really a bank "Type" (named after one), with what still uses it. */
 export type BankTypeCategory = {
   category: Category

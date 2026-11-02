@@ -74,6 +74,11 @@ function HoldingForm({
   const [years, setYears] = useState(String(holding?.bonus_years ?? 3))
   const [ratio, setRatio] = useState(String(holding?.bonus_ratio ?? 1))
   const [symbol, setSymbol] = useState<string | null>(holding?.symbol ?? null)
+  const [expected, setExpected] = useState(
+    holding?.expected_return_pct === null || holding?.expected_return_pct === undefined
+      ? ""
+      : String(holding.expected_return_pct),
+  )
   const [searching, setSearching] = useState(!holding)
   const [saving, setSaving] = useState(false)
 
@@ -82,10 +87,20 @@ function HoldingForm({
     const d = isPlan ? parseNumber(discount) : 0
     const y = isPlan ? parseNumber(years) : 3
     const r = isPlan ? parseNumber(ratio) : 1
-    if (!name.trim() || d === null || d >= 100 || y === null || y < 1 || y > 10 || r === null) {
+    const e = expected.trim() ? parseNumber(expected) : null
+    const badExpected = expected.trim() !== "" && (e === null || e <= -100 || e > 100)
+    if (!name.trim() || d === null || d >= 100 || y === null || y < 1 || y > 10 || r === null || badExpected) {
       return null
     }
-    return { name: name.trim(), kind, discount_pct: d, bonus_years: Math.round(y), bonus_ratio: r, symbol }
+    return {
+      name: name.trim(),
+      kind,
+      discount_pct: d,
+      bonus_years: Math.round(y),
+      bonus_ratio: r,
+      symbol,
+      expected_return_pct: e,
+    }
   })()
 
   async function save() {
@@ -227,6 +242,20 @@ function HoldingForm({
             </p>
           </div>
         )}
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="holding-expected">Expected return per year % (optional)</Label>
+          <Input
+            id="holding-expected"
+            inputMode="decimal"
+            value={expected}
+            onChange={(e) => setExpected(e.target.value)}
+            placeholder="e.g. 7"
+            className="sm:max-w-40"
+          />
+          <p className="text-muted-foreground text-xs">
+            Only an estimate — Goals grow this holding&apos;s value by it each year.
+          </p>
+        </div>
       </div>
       <DialogFooter>
         <Button variant="ghost" onClick={onClose}>

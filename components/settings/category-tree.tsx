@@ -8,6 +8,7 @@ import {
   GripVertical,
   MoreHorizontal,
   Plus,
+  Target,
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -15,6 +16,7 @@ import type { Category } from "@/lib/types"
 import { annualTotal } from "@/lib/budget"
 import { formatNOK } from "@/lib/format"
 import { cn } from "@/lib/utils"
+import { errMessage } from "@/lib/errors"
 import { useYear } from "@/lib/year"
 import { buildTypeMap, effectiveCategoryId, effectiveDate } from "@/lib/spending"
 import {
@@ -34,6 +36,7 @@ import {
   renameCategory,
   reorderCategories,
   setCategoryIsGroup,
+  setCategoryCountsToGoals,
   setCategorySavings,
 } from "@/lib/data/categories"
 import { setCategoryGroup } from "@/lib/data/groups"
@@ -124,7 +127,7 @@ export function CategoryTree() {
       await fn()
       refresh()
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : err)
+      toast.error(errMessage(e, err))
     }
   }
 
@@ -314,6 +317,18 @@ export function CategoryTree() {
             Move to group…
           </DropdownMenuItem>
         )}
+        {!c.is_savings && (
+          <DropdownMenuItem
+            onSelect={() =>
+              act(
+                () => setCategoryCountsToGoals(c.id, !c.counts_to_goals),
+                "Could not update the category.",
+              )
+            }
+          >
+            {c.counts_to_goals ? "Stop counting towards Goals" : "Count towards Goals"}
+          </DropdownMenuItem>
+        )}
         <DropdownMenuItem onSelect={() => setMerge(c)}>Merge into…</DropdownMenuItem>
         <DropdownMenuItem
           onSelect={() =>
@@ -362,6 +377,7 @@ export function CategoryTree() {
               unused
             </span>
           )}
+          {c.counts_to_goals && <GoalsBadge />}
         </div>
         {moving === c.id ? (
           <div className="w-56">
@@ -468,6 +484,7 @@ export function CategoryTree() {
                 </span>
                 <div className="flex min-w-0 flex-1 items-center gap-2 font-semibold">
                   {nameCell(g)}
+                  {g.counts_to_goals && !g.is_savings && <GoalsBadge />}
                   {isUnused(g) && (
                     <span className="text-muted-foreground border px-1 text-[10px] font-normal tracking-wide uppercase">
                       unused
@@ -649,5 +666,16 @@ export function CategoryTree() {
         onDone={refresh}
       />
     </div>
+  )
+}
+
+function GoalsBadge() {
+  return (
+    <span
+      title="Money out here counts as progress towards Goals"
+      className="flex items-center gap-1 border border-sky-500/40 px-1 text-[10px] font-normal tracking-wide text-sky-700 uppercase dark:text-sky-400"
+    >
+      <Target className="size-3" /> goals
+    </span>
   )
 }

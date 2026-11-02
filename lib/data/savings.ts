@@ -22,7 +22,10 @@ export async function fetchHoldings(): Promise<Holding[]> {
   if (error) {
     throw error
   }
-  return (data ?? []).map((h) => num(h as Holding, ["discount_pct", "bonus_years", "bonus_ratio"]))
+  return (data ?? []).map((h) => ({
+    ...num(h as Holding, ["discount_pct", "bonus_years", "bonus_ratio"]),
+    expected_return_pct: h.expected_return_pct === null ? null : Number(h.expected_return_pct),
+  }))
 }
 
 // Paged past PostgREST's 1000-row cap.
@@ -60,6 +63,7 @@ export type HoldingInput = {
   bonus_years: number
   bonus_ratio: number
   symbol: string | null
+  expected_return_pct: number | null
 }
 
 export async function createHolding(input: HoldingInput, sortOrder: number): Promise<void> {

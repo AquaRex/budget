@@ -11,7 +11,12 @@ import { monthIndexOf, monthOf } from "@/lib/savings/compute"
 //   actual pace  the same months minus your average shortfall against the
 //                budget (income below it, spending above it) over the last
 //                complete months that had a budget
-// Projection starts next month; growth on investments isn't assumed.
+//   towards      money out in categories flagged counts_to_goals is still
+//   goals        spending, but its average over the same lookback months is
+//                added back to every coming month on both paths
+//   growth       with include_holdings, each holding's value today grows at its
+//                expected yearly return (compounded monthly); new savings don't
+// Projection starts next month.
 
 export const LOOKBACK_MONTHS = 6
 const MAX_MONTHS = 50 * 12
@@ -26,8 +31,6 @@ export type GroupDiff = {
   actual: number // spent per month
   budget: number // budgeted per month
 }
-
-export type RecentMonth = { monthIndex: number; actual: number; budget: number }
 
 export type GoalVerdict =
   | "reached"
@@ -51,16 +54,18 @@ export type GoalProjection = {
   verdict: GoalVerdict
   points: GoalPoint[] // today, then month by month
   groupDiffs: GroupDiff[] // every spending group vs its budget this year, per month, most over first
-  overBudget: GroupDiff[] // the top groups over budget
   incomeDiffPerMonth: number // income minus budgeted income this year, per month
   incomeShortPerMonth: number // income below budget this year, per month (0 when at or above)
   diffMonths: number // complete months this year the group and income figures cover
-  recent: RecentMonth[] // up to 12 latest complete months with a budget: saved (net) vs budgeted surplus
+  growthByDeadline: number // expected growth on holdings by the goal month
+  towardsGoalsPerMonth: number // average spent in categories that count towards Goals
 }
+
+export type HoldingValue = { value: number; returnPct: number | null }
 
 export type GoalInputs = {
   goal: Goal
-  holdingsValue: number
+  holdings: HoldingValue[] // value today and expected yearly return
   todayIndex: number
   months: MonthStat[] // this year
   prevMonths: MonthStat[] // last year
@@ -76,8 +81,13 @@ export function hasBudget(months: MonthStat[]): boolean {
 
 export function projectGoal(input: GoalInputs): GoalProjection {
   const { goal, todayIndex, months, prevMonths, categories, summary } = input
-  const now =
-    goal.start_amount + (goal.include_holdings ? input.holdingsValue : 0)
+  const holdings = goal.include_holdings ? input.holdings : []
+  const now = goal.start_amount + holdings.reduce((s, h) => s + h.value, 0)
+  const growth = (k: number) =>
+    holdings.reduce(
+      (s, h) => s + h.value * ((1 + (h.returnPct ?? 0) / 100) ** (k / 12) - 1),
+      0,
+    )
   const target = goal.target_amount
   const deadline = monthIndexOf(goal.target_year, goal.target_month)
   const pattern = new Map(months.map((m) => [m.month, budgetNet(m)]))
@@ -87,6 +97,9 @@ export function projectGoal(input: GoalInputs): GoalProjection {
     .slice(-LOOKBACK_MONTHS)
   const gapPerMonth = lookback.length
     ? lookback.reduce((s, m) => s + budgetNet(m) - m.net, 0) / lookback.length
+    : 0
+  const towardsGoalsPerMonth = lookback.length
+    ? lookback.reduce((s, m) => s + m.towardsGoals, 0) / lookback.length
     : 0
 
   const points: GoalPoint[] = [
@@ -99,19 +112,20 @@ export function projectGoal(input: GoalInputs): GoalProjection {
   let budgetSum = 0
   for (let k = 1; k <= MAX_MONTHS; k++) {
     const i = todayIndex + k
-    const planned = pattern.get(monthOf(i)) ?? 0
+    const planned = (pattern.get(monthOf(i)) ?? 0) + towardsGoalsPerMonth
     budget += planned
     actual += planned - gapPerMonth
+    const g = growth(k)
     if (i <= deadline) {
       budgetSum += planned
     }
-    if (reachBudget === null && budget >= target) {
+    if (reachBudget === null && budget + g >= target) {
       reachBudget = i
     }
-    if (reachActual === null && actual >= target) {
+    if (reachActual === null && actual + g >= target) {
       reachActual = i
     }
-    points.push({ monthIndex: i, budget, actual })
+    points.push({ monthIndex: i, budget: budget + g, actual: actual + g })
     if (i >= deadline && reachBudget !== null && reachActual !== null) {
       break
     }
@@ -127,6 +141,7 @@ export function projectGoal(input: GoalInputs): GoalProjection {
 
   const monthsLeft = Math.max(0, deadline - todayIndex)
   const budgetPerMonth = monthsLeft ? budgetSum / monthsLeft : 0
+  const growthByDeadline = growth(monthsLeft)
   const counted = Math.max(1, summary.monthsCounted)
   const groupDiffs = summary.monthsCounted
     ? categories
@@ -143,21 +158,15 @@ export function projectGoal(input: GoalInputs): GoalProjection {
   const incomeDiffPerMonth = summary.monthsCounted
     ? (summary.income - summary.budgetIncome) / counted
     : 0
-  const recent = [...prevMonths, ...months]
-    .filter((m) => m.status === "complete" && m.budgetIncome > 0)
-    .slice(-12)
-    .map((m) => ({
-      monthIndex: monthIndexOf(m.year, m.month),
-      actual: m.net,
-      budget: budgetNet(m),
-    }))
 
   return {
     now,
     target,
     deadline,
     monthsLeft,
-    needPerMonth: monthsLeft ? Math.max(0, target - now) / monthsLeft : null,
+    needPerMonth: monthsLeft
+      ? Math.max(0, target - now - growthByDeadline) / monthsLeft
+      : null,
     budgetPerMonth,
     actualPerMonth: budgetPerMonth - gapPerMonth,
     gapPerMonth,
@@ -176,10 +185,10 @@ export function projectGoal(input: GoalInputs): GoalProjection {
               : "budget-short",
     points: shown,
     groupDiffs,
-    overBudget: groupDiffs.filter((g) => g.perMonth > 0).slice(0, 5),
     incomeDiffPerMonth,
     incomeShortPerMonth: Math.max(0, -incomeDiffPerMonth),
     diffMonths: summary.monthsCounted,
-    recent,
+    growthByDeadline,
+    towardsGoalsPerMonth,
   }
 }

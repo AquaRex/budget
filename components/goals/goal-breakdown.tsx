@@ -1,29 +1,11 @@
 "use client"
 
-import {
-  Bar,
-  CartesianGrid,
-  ComposedChart,
-  Line,
-  ReferenceLine,
-  XAxis,
-  YAxis,
-} from "recharts"
-
 import type { GoalProjection } from "@/lib/goals/compute"
 import { cn } from "@/lib/utils"
-import {
-  ChartContainer,
-  ChartLegend,
-  ChartLegendContent,
-  ChartTooltip,
-  ChartTooltipContent,
-  type ChartConfig,
-} from "@/components/ui/chart"
-import { compact, kr } from "@/components/stats/display"
-import { monthLabel } from "@/components/savings/format"
+import { kr } from "@/components/stats/display"
 
 const MAX_GROUPS = 8
+const MAX_CULPRITS = 5
 
 type Impact = { key: string; label: string; detail: string; value: number }
 
@@ -82,15 +64,14 @@ export function GoalBreakdown({ p }: { p: GoalProjection }) {
   const max = Math.max(1, ...rows.map((r) => Math.abs(r.value)))
 
   return (
-    <section className="flex flex-col gap-4">
-      <div className="flex flex-col gap-0.5">
+    <section className="flex flex-col gap-6">
+      {p.verdict !== "on-track" && <Culprits p={p} need={need} />}
+
+      <div className="flex items-baseline justify-between gap-3">
         <h3 className="text-sm font-semibold">Where the gap comes from</h3>
-        <p className="text-muted-foreground text-xs">
-          Per month. Bars to the left push the goal away, bars to the right
-          help.
-          {p.diffMonths > 0 &&
-            ` Income and groups compare this year's ${p.diffMonths} complete month${p.diffMonths === 1 ? "" : "s"} with the budget.`}
-        </p>
+        <span className="text-muted-foreground text-[11px]">
+          ← hurts · helps →
+        </span>
       </div>
 
       <ul className="flex flex-col">
@@ -140,102 +121,95 @@ export function GoalBreakdown({ p }: { p: GoalProjection }) {
           )
         })}
       </ul>
-
-      {p.recent.length > 1 && <RecentMonths p={p} need={need} />}
     </section>
   )
 }
 
-const config: ChartConfig = {
-  actual: { label: "Saved", color: "var(--viz-cat-1)" },
-  budget: { label: "Budget planned", color: "var(--viz-baseline)" },
-}
+const CULPRIT_COLORS = [1, 2, 4, 5, 7].map((n) => `var(--viz-cat-${n})`)
 
-/** What each recent month actually saved, against the budget's plan and what the goal needs. */
-function RecentMonths({ p, need }: { p: GoalProjection; need: number }) {
-  const data = p.recent.map((m) => ({
-    label: monthLabel(m.monthIndex),
-    actual: Math.round(m.actual),
-    budget: Math.round(m.budget),
-  }))
-  const short = p.recent.filter((m) => m.actual < need).length
+/** One bar of everything costing the goal money each month, biggest first. */
+function Culprits({ p, need }: { p: GoalProjection; need: number }) {
+  const ranked = [
+    {
+      key: "budget",
+      label: "Budget too small",
+      value: Math.max(0, need - p.budgetPerMonth),
+    },
+    {
+      key: "income",
+      label: "Income below budget",
+      value: p.incomeShortPerMonth,
+    },
+    ...p.groupDiffs
+      .filter((g) => g.perMonth > 0)
+      .map((g) => ({
+        key: `g-${g.id ?? "none"}`,
+        label: `${g.name} over budget`,
+        value: g.perMonth,
+      })),
+  ]
+    .filter((c) => c.value >= 1)
+    .sort((a, b) => b.value - a.value)
+  const rest = ranked.slice(MAX_CULPRITS)
+  const culprits = [
+    ...ranked
+      .slice(0, MAX_CULPRITS)
+      .map((c, i) => ({ ...c, color: CULPRIT_COLORS[i] })),
+    ...(rest.length
+      ? [
+          {
+            key: "rest",
+            label: `${rest.length} more`,
+            value: rest.reduce((s, c) => s + c.value, 0),
+            color: "var(--viz-other)",
+          },
+        ]
+      : []),
+  ]
+  if (!culprits.length) {
+    return null
+  }
+  const total = culprits.reduce((s, c) => s + c.value, 0)
+  const pct = (v: number) => Math.round((v / total) * 100)
+
   return (
-    <div className="flex flex-col gap-1">
-      <h4 className="text-sm font-semibold">Month by month</h4>
-      <p className="text-muted-foreground text-xs">
-        What you actually saved (income minus spending) each month, against what
-        the budget planned. {short} of the last {p.recent.length} months saved
-        less than the goal needs ({perMonth(need)}).
-      </p>
-      <ChartContainer
-        config={config}
-        style={{ height: 220 }}
-        className="aspect-auto w-full"
-      >
-        <ComposedChart
-          data={data}
-          margin={{ top: 16, right: 64, bottom: 0, left: 0 }}
-        >
-          <CartesianGrid vertical={false} />
-          <XAxis
-            dataKey="label"
-            tickLine={false}
-            axisLine={false}
-            tickMargin={8}
-            fontSize={10}
-          />
-          <YAxis
-            tickLine={false}
-            axisLine={false}
-            width={44}
-            tickFormatter={(v) => compact(Number(v))}
-          />
-          <ChartTooltip
-            content={
-              <ChartTooltipContent
-                formatter={(value, name) => (
-                  <div className="flex w-full justify-between gap-3">
-                    <span className="text-muted-foreground">
-                      {config[name as keyof typeof config]?.label}
-                    </span>
-                    <span className="font-medium tabular-nums">
-                      {kr(Number(value))}
-                    </span>
-                  </div>
-                )}
-              />
-            }
-          />
-          <ChartLegend content={<ChartLegendContent />} />
-          <ReferenceLine y={0} stroke="var(--border)" />
-          {need > 0 && (
-            <ReferenceLine
-              y={need}
-              stroke="var(--foreground)"
-              strokeDasharray="4 4"
-              label={{
-                value: "Goal needs",
-                position: "right",
-                fontSize: 10,
-                fill: "var(--muted-foreground)",
-              }}
+    <div className="flex flex-col gap-3">
+      <div className="flex items-baseline justify-between gap-3">
+        <h3 className="text-sm font-semibold">What&apos;s holding you back</h3>
+        <span className="text-sm font-semibold text-rose-700 tabular-nums dark:text-rose-400">
+          −{perMonth(total)}
+        </span>
+      </div>
+      <div className="flex h-9 w-full gap-0.5 overflow-hidden rounded-sm">
+        {culprits.map((c) => (
+          <div
+            key={c.key}
+            className="flex min-w-0 items-center justify-center text-xs font-semibold text-white"
+            style={{ flexGrow: c.value, flexBasis: 0, background: c.color }}
+            title={`${c.label}: ${perMonth(c.value)} (${pct(c.value)}%)`}
+          >
+            {pct(c.value) >= 10 && `${pct(c.value)}%`}
+          </div>
+        ))}
+      </div>
+      <ul className="grid grid-cols-1 gap-x-6 gap-y-1.5 sm:grid-cols-2">
+        {culprits.map((c, i) => (
+          <li key={c.key} className="flex items-center gap-2 text-sm">
+            <span
+              className="size-3 shrink-0 rounded-sm"
+              style={{ background: c.color }}
             />
-          )}
-          <Bar
-            dataKey="actual"
-            fill="var(--viz-cat-1)"
-            radius={[4, 4, 0, 0]}
-            maxBarSize={28}
-          />
-          <Line
-            dataKey="budget"
-            type="step"
-            stroke="var(--viz-baseline)"
-            strokeWidth={2}
-            dot={false}
-          />
-        </ComposedChart>
-      </ChartContainer>
+            <span
+              className={cn("min-w-0 truncate", i === 0 && "font-semibold")}
+            >
+              {c.label}
+            </span>
+            <span className="text-muted-foreground ml-auto tabular-nums">
+              {perMonth(c.value)}
+            </span>
+          </li>
+        ))}
+      </ul>
     </div>
   )
 }

@@ -209,7 +209,7 @@ function GoalForm({
             </span>
             <span className="text-muted-foreground text-xs">
               Adds what your funds and shares are worth today (
-              {kr(holdingsValue)}).
+              {kr(holdingsValue)}), growing by each one&apos;s expected return.
             </span>
           </span>
           <Switch

@@ -1,5 +1,5 @@
 import type { Category, Entry, ImportBatch, Label, Transaction } from "@/lib/types"
-import type { TypeMap } from "@/lib/spending"
+import { effectiveCategoryId, type TypeMap } from "@/lib/spending"
 import { effectiveAmount, monthTotal, type BudgetContext } from "@/lib/budget"
 import type {
   CategoryHistory,
@@ -61,6 +61,10 @@ export function computeDashboardStats(
   const isSavingsEntry = (e: Entry) => !!e.category_id && index.savings.has(e.category_id)
   const spendingBills = data.bills.filter((e) => !isSavingsEntry(e))
   const savingsBills = data.bills.filter(isSavingsEntry)
+  const goalCategories = new Set(data.categories.filter((c) => c.counts_to_goals).map((c) => c.id))
+  const countsToGoals = (f: ClassifiedTx) =>
+    goalCategories.has(effectiveCategoryId(f.tx, data.typeMap) ?? "") ||
+    (!!f.groupId && goalCategories.has(f.groupId))
 
   const flowsByMonth = new Map<string, ClassifiedTx[]>()
   const dayStats = new Map<string, DayStat>()
@@ -95,6 +99,7 @@ export function computeDashboardStats(
       savingsRate: savingsRate(income - spent, income),
       cumulativeNet: 0,
       saved: sumBy(monthFlows, (f) => f.saved),
+      towardsGoals: sumBy(monthFlows.filter(countsToGoals), (f) => f.spent),
       transfersOut: sumBy(monthFlows, (f) => f.transferOut),
       transfersIn: sumBy(monthFlows, (f) => f.transferIn),
       // The budget template loaded is input.year's; other years have none here.

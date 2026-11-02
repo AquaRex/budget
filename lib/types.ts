@@ -13,6 +13,8 @@ export type Category = {
   group_id: string | null
   // A savings/investment group: money placed here is set aside, not spent.
   is_savings: boolean
+  // Money out here stays spending, but Goals count it as progress.
+  counts_to_goals: boolean
 }
 
 export type PaymentMethod = {

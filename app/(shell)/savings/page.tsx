@@ -7,6 +7,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { SavingsOverview } from "@/components/savings/savings-overview"
 import { SavingsGrid } from "@/components/savings/savings-grid"
 import { PlanSchedule } from "@/components/savings/plan-schedule"
+import { SavingsTabs } from "@/components/savings/savings-tabs"
 
 export default function SavingsPage() {
   const year = useYear()
@@ -14,6 +15,7 @@ export default function SavingsPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      <SavingsTabs />
       <div className="flex flex-col gap-0.5">
         <h1 className="text-2xl font-semibold tracking-tight">Savings</h1>
         <p className="text-muted-foreground text-sm">

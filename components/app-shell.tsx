@@ -13,7 +13,7 @@ import {
   Settings,
   Smartphone,
   Sun,
-  Target,
+  Landmark,
   ArrowRightLeft,
   LogOut,
 } from "lucide-react"
@@ -30,7 +30,7 @@ const nav = [
   { href: "/transactions", label: "Transactions", icon: ArrowRightLeft },
   { href: "/groups", label: "Groups", icon: Layers },
   { href: "/savings", label: "Savings", icon: PiggyBank },
-  { href: "/goals", label: "Goals", icon: Target },
+  { href: "/loans", label: "Loans", icon: Landmark },
   { href: "/settings", label: "Settings", icon: Settings },
 ]
 

@@ -1,6 +1,5 @@
 "use client"
 
-import Link from "next/link"
 import {
   AlertTriangle,
   CheckCircle2,
@@ -16,6 +15,7 @@ import { cn } from "@/lib/utils"
 import { Panel } from "@/components/stats/panel"
 import { kr } from "@/components/stats/display"
 import { monthLabel } from "@/components/savings/format"
+import { Figure } from "@/components/stats/figure"
 import { GoalChart } from "@/components/goals/goal-chart"
 import { GoalBreakdown } from "@/components/goals/goal-breakdown"
 
@@ -117,6 +117,10 @@ export function GoalCard({
           <p className="text-muted-foreground text-xs tabular-nums">
             {kr(p.now)} of {kr(p.target)} today ({Math.round(share * 100)}%)
             {p.monthsLeft > 0 && ` · ${plural(p.monthsLeft, "month")} left`}
+            {Math.round(p.growthByDeadline) !== 0 &&
+              ` · ${p.growthByDeadline > 0 ? "+" : "−"}${kr(Math.round(Math.abs(p.growthByDeadline)))} expected growth by ${monthLabel(p.deadline)}`}
+            {Math.round(p.towardsGoalsPerMonth) > 0 &&
+              ` · ${perMonth(p.towardsGoalsPerMonth)} from categories counted towards Goals`}
           </p>
         </div>
 
@@ -142,7 +146,6 @@ export function GoalCard({
               />
             </div>
             <GoalChart projection={p} />
-            <Advice p={p} need={need} />
             <GoalBreakdown p={p} />
           </>
         )}
@@ -160,109 +163,10 @@ export function GoalCard({
           {p.gapMonths
             ? plural(p.gapMonths, "complete month")
             : "complete months"}{" "}
-          compared with the budget. Growth on investments isn&apos;t assumed.
+          compared with the budget. Counted holdings grow by the expected return
+          set on each in Savings; new savings aren&apos;t assumed to grow.
         </p>
       </div>
     </Panel>
-  )
-}
-
-function Figure({
-  label,
-  value,
-  hint,
-  bad,
-}: {
-  label: string
-  value: string
-  hint: string
-  bad?: boolean
-}) {
-  return (
-    <div className="flex flex-col gap-0.5 border px-3 py-2">
-      <span className="text-muted-foreground text-[11px] font-semibold tracking-widest uppercase">
-        {label}
-      </span>
-      <span className="text-lg font-semibold tabular-nums">{value}</span>
-      <span
-        className={cn(
-          "text-xs",
-          bad ? "text-rose-700 dark:text-rose-400" : "text-muted-foreground",
-        )}
-      >
-        {hint}
-      </span>
-    </div>
-  )
-}
-
-function Advice({ p, need }: { p: GoalProjection; need: number }) {
-  const gap = Math.round(p.gapPerMonth)
-  const overspend =
-    p.gapMonths > 0 && gap > 0
-      ? `Over the last ${plural(p.gapMonths, "complete month")} you've ended up ${perMonth(gap)} behind your budget.`
-      : p.gapMonths > 0 && gap < 0
-        ? `Over the last ${plural(p.gapMonths, "complete month")} you've done ${perMonth(-gap)} better than your budget.`
-        : p.gapMonths === 0
-          ? "There are no complete months with a budget yet, so the actual pace equals the budget."
-          : null
-
-  return (
-    <div className="bg-muted/50 flex flex-col gap-3 border p-3 text-sm">
-      {p.verdict === "on-track" && (
-        <p>
-          You&apos;re on course: at your actual pace you reach it in{" "}
-          {reachLabel(p.reachActual)}
-          {p.reachActual !== null &&
-            p.reachActual < p.deadline &&
-            `, ${plural(p.deadline - p.reachActual, "month")} early`}
-          . You have about {perMonth(p.actualPerMonth - need)} of room before
-          the goal slips. {overspend}
-        </p>
-      )}
-      {p.verdict === "overspending" && (
-        <p>
-          Your budget gets you there in {reachLabel(p.reachBudget)}, so the
-          budget is fine — the spending isn&apos;t. {overspend} Bring it back to
-          at least {perMonth(need)} saved (
-          <span className="font-semibold">
-            {perMonth(need - p.actualPerMonth)} less spending
-          </span>
-          ) and you reach the goal on time.
-        </p>
-      )}
-      {p.verdict === "budget-short" && (
-        <p>
-          Even on budget you&apos;d reach it in {reachLabel(p.reachBudget)}
-          {p.reachBudget !== null &&
-            `, ${plural(p.reachBudget - p.deadline, "month")} late`}
-          . The budget needs{" "}
-          <span className="font-semibold">
-            {perMonth(need - p.budgetPerMonth)} more
-          </span>{" "}
-          — raise budgeted income or cut budgeted bills by that much — or move
-          the goal later. {overspend}
-        </p>
-      )}
-
-      {(p.overBudget.length > 0 || p.incomeShortPerMonth >= 1) &&
-        p.verdict !== "on-track" && (
-          <p>
-            Biggest drains this year:{" "}
-            {[
-              ...(p.incomeShortPerMonth >= 1
-                ? [`income below budget (${perMonth(p.incomeShortPerMonth)})`]
-                : []),
-              ...p.overBudget
-                .slice(0, 3)
-                .map((g) => `${g.name} (+${perMonth(g.perMonth)})`),
-            ].join(", ")}
-            .{" "}
-            <Link href="/budget" className="text-primary hover:underline">
-              Adjust the budget →
-            </Link>
-          </p>
-        )}
-    </div>
   )
 }

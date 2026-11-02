@@ -27,6 +27,7 @@ export type MonthStat = {
   savingsRate: number | null // net / income (0..1, may be negative); null when income <= 0
   cumulativeNet: number // running net from Jan of the year (wealth-building proxy)
   saved: number // net money into savings groups (withdrawals subtract)
+  towardsGoals: number // spent in categories that count towards Goals (still in spent)
   transfersOut: number // own-account transfers out, excluding savings groups; tracked even when not counted
   transfersIn: number
   budgetIncome: number // from the Budget template
