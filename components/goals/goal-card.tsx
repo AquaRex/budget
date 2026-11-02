@@ -16,6 +16,7 @@ import { Panel } from "@/components/stats/panel"
 import { kr } from "@/components/stats/display"
 import { monthLabel } from "@/components/savings/format"
 import { Figure } from "@/components/stats/figure"
+import { GoalContributions } from "@/components/goals/goal-contributions"
 import { GoalChart } from "@/components/goals/goal-chart"
 import { GoalBreakdown } from "@/components/goals/goal-breakdown"
 
@@ -119,8 +120,6 @@ export function GoalCard({
             {p.monthsLeft > 0 && ` · ${plural(p.monthsLeft, "month")} left`}
             {Math.round(p.growthByDeadline) !== 0 &&
               ` · ${p.growthByDeadline > 0 ? "+" : "−"}${kr(Math.round(Math.abs(p.growthByDeadline)))} expected growth by ${monthLabel(p.deadline)}`}
-            {Math.round(p.towardsGoalsPerMonth) > 0 &&
-              ` · ${perMonth(p.towardsGoalsPerMonth)} from categories counted towards Goals`}
           </p>
         </div>
 
@@ -145,6 +144,7 @@ export function GoalCard({
                 bad={p.actualPerMonth < need}
               />
             </div>
+            <GoalContributions contributions={p.contributions} />
             <GoalChart projection={p} />
             <GoalBreakdown p={p} />
           </>

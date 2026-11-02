@@ -59,6 +59,17 @@ export type GoalProjection = {
   diffMonths: number // complete months this year the group and income figures cover
   growthByDeadline: number // expected growth on holdings by the goal month
   towardsGoalsPerMonth: number // average spent in categories that count towards Goals
+  contributions: Contribution[] // savings groups and Goals categories, this year per month
+}
+
+// Money that already goes towards goals. perMonth: actual over this year's
+// complete months (null before the first); budget: savings groups only.
+export type Contribution = {
+  id: string | null
+  name: string
+  kind: "savings" | "goals"
+  perMonth: number | null
+  budgetPerMonth: number | null
 }
 
 export type HoldingValue = { value: number; returnPct: number | null }
@@ -71,6 +82,8 @@ export type GoalInputs = {
   prevMonths: MonthStat[] // last year
   categories: CategorySlice[] // this year's spending groups (complete months)
   summary: PeriodSummary // this year (complete months)
+  savings: CategorySlice[] // this year's savings groups (complete months)
+  towardsGoals: { id: string; name: string; amount: number }[] // same months
 }
 
 const budgetNet = (m: MonthStat) => m.budgetIncome - m.budgetBills
@@ -190,5 +203,21 @@ export function projectGoal(input: GoalInputs): GoalProjection {
     diffMonths: summary.monthsCounted,
     growthByDeadline,
     towardsGoalsPerMonth,
+    contributions: [
+      ...input.savings.map((s) => ({
+        id: s.id,
+        name: s.name,
+        kind: "savings" as const,
+        perMonth: summary.monthsCounted ? s.amount / counted : null,
+        budgetPerMonth: summary.monthsCounted ? s.budget / counted : null,
+      })),
+      ...input.towardsGoals.map((c) => ({
+        id: c.id,
+        name: c.name,
+        kind: "goals" as const,
+        perMonth: summary.monthsCounted ? c.amount / counted : null,
+        budgetPerMonth: null,
+      })),
+    ],
   }
 }

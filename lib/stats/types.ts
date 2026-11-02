@@ -132,6 +132,7 @@ export type DashboardStats = {
   pace: SpendingPace // for the focused month
   categories: CategorySlice[] // spending groups for the scope, sorted desc
   savings: CategorySlice[] // savings groups for the scope; amount = net saved, share = of income
+  towardsGoals: { id: string; name: string; amount: number }[] // categories that count towards Goals: spent in the scope
   categoryHistory: CategoryHistory // per month of the year
   topMerchants: MerchantStat[] // for the scope, sorted desc
 }

@@ -193,6 +193,18 @@ export function computeDashboardStats(
       budgetByGroup,
       index,
     ),
+    towardsGoals: data.categories
+      .filter((c) => c.counts_to_goals)
+      .map((c) => ({
+        id: c.id,
+        name: c.name,
+        amount: sumBy(
+          scopeFlows.filter(
+            (f) => effectiveCategoryId(f.tx, data.typeMap) === c.id || f.groupId === c.id,
+          ),
+          (f) => f.spent,
+        ),
+      })),
     categoryHistory: categoryHistory(input.year, flowsByMonth, index),
     topMerchants: topMerchants(scopeFlows),
   }

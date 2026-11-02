@@ -151,6 +151,8 @@ export default function GoalsPage() {
                   prevMonths: prevStats.months,
                   categories: stats.categories,
                   summary: stats.summary,
+                  savings: stats.savings,
+                  towardsGoals: stats.towardsGoals,
                 })}
                 onEdit={() => setEditing(g)}
                 onDelete={() => setRemoving(g)}
