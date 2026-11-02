@@ -8,6 +8,7 @@ import { AuthProvider } from "@/components/auth/auth-provider"
 import { AuthGate } from "@/components/auth/auth-gate"
 import { DateModeBoundary } from "@/components/date-mode-boundary"
 import { Toaster } from "@/components/ui/sonner"
+import { TextSelectMode } from "@/components/text-select-mode"
 
 const oxanium = Oxanium({ subsets: ["latin"], variable: "--font-sans" })
 
@@ -45,6 +46,7 @@ export default function RootLayout({
             </AuthGate>
           </AuthProvider>
           <Toaster richColors position="top-center" />
+          <TextSelectMode />
         </ThemeProvider>
       </body>
     </html>
