@@ -1,6 +1,7 @@
 "use client"
 
-import { Pencil, Trash2 } from "lucide-react"
+import { useState } from "react"
+import { ChevronRight, Pencil, Trash2 } from "lucide-react"
 import {
   Area,
   Bar,
@@ -23,7 +24,8 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart"
-import { Panel } from "@/components/stats/panel"
+import { cn } from "@/lib/utils"
+import { Card } from "@/components/ui/card"
 import { Figure } from "@/components/stats/figure"
 import { compact, kr } from "@/components/stats/display"
 import { monthLabel } from "@/components/savings/format"
@@ -45,15 +47,46 @@ export function LoanCard({
   onEdit: () => void
   onDelete: () => void
 }) {
+  const [open, setOpen] = useState(false)
   const paidOff = p.balanceNow <= 0
   const yearsLeft =
     p.payoff === null ? null : Math.max(0, p.payoff - todayIndex) / 12
 
   return (
-    <Panel
-      title={loan.name}
-      subtitle={`${loan.interest_pct.toLocaleString("nb-NO")} % · paid from ${categoryName ?? "no category"} · ${round(loan.balance)} owed at the start of ${monthLabel(loan.start_year * 12 + loan.start_month - 1)}`}
-      action={
+    <Card size="sm" className="gap-0 py-0">
+      <div className="flex items-center gap-2 pr-(--card-spacing)">
+        <button
+          type="button"
+          aria-expanded={open}
+          onClick={() => setOpen((o) => !o)}
+          className="hover:bg-muted/50 flex min-w-0 flex-1 items-center gap-3 py-3 pl-(--card-spacing) text-left transition-colors"
+        >
+          <ChevronRight
+            className={cn(
+              "text-muted-foreground size-4 shrink-0 transition-transform",
+              open && "rotate-90",
+            )}
+          />
+          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <span className="truncate text-sm font-semibold">{loan.name}</span>
+            <span className="text-muted-foreground truncate text-xs">
+              {loan.interest_pct.toLocaleString("nb-NO")} % · paid from{" "}
+              {categoryName ?? "no category"}
+            </span>
+          </span>
+          <span className="flex shrink-0 flex-col items-end gap-0.5 tabular-nums">
+            <span className="text-sm font-semibold">
+              {round(Math.max(0, p.balanceNow))}
+            </span>
+            <span className="text-muted-foreground text-xs">
+              {paidOff
+                ? "paid off"
+                : p.payoff === null
+                  ? "never paid off"
+                  : `paid off ${monthLabel(p.payoff)}`}
+            </span>
+          </span>
+        </button>
         <div className="flex items-center">
           <button
             type="button"
@@ -72,73 +105,80 @@ export function LoanCard({
             <Trash2 className="size-4" />
           </button>
         </div>
-      }
-    >
-      <div className="flex flex-col gap-5">
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
-          <Figure
-            label="Owed now"
-            value={round(Math.max(0, p.balanceNow))}
-            hint={`${round(p.principalSoFar)} paid down of ${round(p.firstBalance)} since ${monthLabel(p.firstIndex)}`}
-            bad={p.principalSoFar < 0}
-          />
-          <Figure
-            label="Paid off"
-            value={
-              paidOff
-                ? "Done"
-                : p.payoff === null
-                  ? "Never"
-                  : monthLabel(p.payoff)
-            }
-            hint={
-              paidOff
-                ? "nothing left to pay"
-                : p.payoff === null
-                  ? p.payment > 0
-                    ? "the payment doesn't cover the interest"
-                    : "no payments yet to project from"
-                  : `in ${yearsLeft!.toLocaleString("nb-NO", { maximumFractionDigits: 1 })} years`
-            }
-            bad={!paidOff && p.payoff === null}
-          />
-          <Figure
-            label="Monthly payment"
-            value={round(p.payment)}
-            hint={
-              p.paymentFromPlan
-                ? "as you set it"
-                : "average of your latest payments"
-            }
-          />
-          <Figure
-            label="Paid so far"
-            value={round(p.paidSoFar)}
-            hint={`since ${monthLabel(p.firstIndex)}`}
-          />
-          <Figure
-            label="Interest paid"
-            value={round(p.interestSoFar)}
-            hint="so far"
-          />
-          <Figure
-            label="Interest to come"
-            value={p.payoff === null && !paidOff ? "—" : round(p.interestLeft)}
-            hint={
-              p.payoff === null && !paidOff
-                ? "can't tell until it's paid off"
-                : `${round(p.interestSoFar + p.interestLeft)} in total`
-            }
-          />
-        </div>
-        {p.months.length > 1 && (
-          <>
-            <BalanceChart p={p} todayIndex={todayIndex} />
-            <YearChart p={p} />
-          </>
-        )}
       </div>
-    </Panel>
+      {open && (
+        <div className="flex flex-col gap-5 border-t px-(--card-spacing) py-4">
+          <p className="text-muted-foreground text-xs">
+            {round(loan.balance)} owed at the start of{" "}
+            {monthLabel(loan.start_year * 12 + loan.start_month - 1)}
+          </p>
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+            <Figure
+              label="Owed now"
+              value={round(Math.max(0, p.balanceNow))}
+              hint={`${round(p.principalSoFar)} paid down of ${round(p.firstBalance)} since ${monthLabel(p.firstIndex)}`}
+              bad={p.principalSoFar < 0}
+            />
+            <Figure
+              label="Paid off"
+              value={
+                paidOff
+                  ? "Done"
+                  : p.payoff === null
+                    ? "Never"
+                    : monthLabel(p.payoff)
+              }
+              hint={
+                paidOff
+                  ? "nothing left to pay"
+                  : p.payoff === null
+                    ? p.payment > 0
+                      ? "the payment doesn't cover the interest"
+                      : "no payments yet to project from"
+                    : `in ${yearsLeft!.toLocaleString("nb-NO", { maximumFractionDigits: 1 })} years`
+              }
+              bad={!paidOff && p.payoff === null}
+            />
+            <Figure
+              label="Monthly payment"
+              value={round(p.payment)}
+              hint={
+                p.paymentFromPlan
+                  ? "as you set it"
+                  : "average of your latest payments"
+              }
+            />
+            <Figure
+              label="Paid so far"
+              value={round(p.paidSoFar)}
+              hint={`since ${monthLabel(p.firstIndex)}`}
+            />
+            <Figure
+              label="Interest paid"
+              value={round(p.interestSoFar)}
+              hint="so far"
+            />
+            <Figure
+              label="Interest to come"
+              value={
+                p.payoff === null && !paidOff ? "—" : round(p.interestLeft)
+              }
+              hint={
+                p.payoff === null && !paidOff
+                  ? "can't tell until it's paid off"
+                  : `${round(p.interestSoFar + p.interestLeft)} in total`
+              }
+            />
+          </div>
+          {p.months.length > 1 && (
+            <>
+              <BalanceChart p={p} todayIndex={todayIndex} />
+              <YearChart p={p} />
+            </>
+          )}
+        </div>
+      )}
+    </Card>
   )
 }
 
