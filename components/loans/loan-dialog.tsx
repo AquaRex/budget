@@ -15,6 +15,7 @@ import { useCategories } from "@/lib/data/use-budget"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Switch } from "@/components/ui/switch"
 import {
   Select,
   SelectContent,
@@ -100,6 +101,7 @@ function LoanForm({
       ? ""
       : String(loan.monthly_payment),
   )
+  const [history, setHistory] = useState(loan?.include_history ?? true)
   const [saving, setSaving] = useState(false)
 
   const input: LoanInput | null = (() => {
@@ -130,6 +132,7 @@ function LoanForm({
       start_year: y,
       start_month: month,
       monthly_payment: p,
+      include_history: history,
     }
   })()
 
@@ -251,6 +254,19 @@ function LoanForm({
             payments.
           </p>
         </div>
+        <label className="flex items-center justify-between gap-3 border px-3 py-2.5">
+          <span className="flex flex-col gap-0.5">
+            <span className="text-sm font-medium">
+              Work out the history from earlier payments
+            </span>
+            <span className="text-muted-foreground text-xs">
+              Goes back through the category&apos;s payments before the start
+              month to show what you owed then. Turn off if older payments in
+              the category aren&apos;t for this loan.
+            </span>
+          </span>
+          <Switch checked={history} onCheckedChange={setHistory} />
+        </label>
       </div>
       <DialogFooter>
         <Button variant="ghost" onClick={onClose}>

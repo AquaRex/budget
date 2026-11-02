@@ -7,14 +7,15 @@ import {
 } from "@/lib/spending"
 import { monthIndexOf, yearOf } from "@/lib/savings/compute"
 
-// A loan month by month, from its start month:
+// A loan month by month, anchored on what was owed at the start month:
 //   interest  balance × yearly rate / 12, added each month
 //   payment   money out in the loan's category (or any category in its group)
 //             that month, net of money back; covers the interest first, the
 //             rest pays the balance down
-// Past months use your actual payments (this month once something is paid);
-// later months repeat the planned payment, or the average of the
-// latest payments, until the balance is gone.
+// Months before the start month are worked backwards from its amount, back to
+// the first payment. Past months use your actual payments (this month once
+// something is paid); later months repeat the planned payment, or the average
+// of the latest payments, until the balance is gone.
 
 const AVERAGE_OF = 3
 const MAX_MONTHS = 50 * 12
@@ -36,6 +37,8 @@ export type LoanYear = {
 
 export type LoanProjection = {
   balanceNow: number
+  firstIndex: number // first month shown: the earliest payment, or the start month
+  firstBalance: number // owed at the start of firstIndex (worked back from the amount entered)
   paidSoFar: number
   interestSoFar: number
   principalSoFar: number
@@ -49,7 +52,7 @@ export type LoanProjection = {
 
 /**
  * Payments per month index: money out in the loan's category or its group,
- * all months — those before the start month only feed the average payment.
+ * every month — those before the start month are worked backwards.
  */
 export function loanPayments(
   loan: Loan,
@@ -88,9 +91,32 @@ export function projectLoan(
   const rate = loan.interest_pct / 100 / 12
   const start = monthIndexOf(loan.start_year, loan.start_month)
   const months: LoanMonth[] = []
-  let balance = loan.balance
   let paidSoFar = 0
   let interestSoFar = 0
+
+  // Before the start month, undo each payment from the amount entered:
+  // owed before a month = (owed after + paid) / (1 + rate).
+  const first = loan.include_history
+    ? Math.min(start, ...payments.keys())
+    : start
+  let balance = loan.balance
+  for (let i = start - 1; i >= first; i--) {
+    const paid = payments.get(i) ?? 0
+    const after = balance
+    balance = (after + paid) / (1 + rate)
+    const interest = balance * rate
+    paidSoFar += paid
+    interestSoFar += interest
+    months.unshift({
+      monthIndex: i,
+      balance: after,
+      interest,
+      principal: paid - interest,
+      projected: false,
+    })
+  }
+  const firstBalance = balance
+  balance = loan.balance
 
   // This month only once something is paid; until then it's projected.
   const lastActual = payments.has(todayIndex) ? todayIndex : todayIndex - 1
@@ -162,7 +188,9 @@ export function projectLoan(
     balanceNow,
     paidSoFar,
     interestSoFar,
-    principalSoFar: loan.balance - balanceNow,
+    firstIndex: first,
+    firstBalance,
+    principalSoFar: firstBalance - balanceNow,
     payment,
     paymentFromPlan: loan.monthly_payment !== null,
     payoff: balance <= 0 ? payoff : null,

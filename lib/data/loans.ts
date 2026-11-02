@@ -13,6 +13,7 @@ export type Loan = {
   start_year: number
   start_month: number
   monthly_payment: number | null // projected payment; null = recent average
+  include_history: boolean // work back through payments before the start month
   sort_order: number
 }
 

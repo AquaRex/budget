@@ -79,7 +79,7 @@ export function LoanCard({
           <Figure
             label="Owed now"
             value={round(Math.max(0, p.balanceNow))}
-            hint={`${round(p.principalSoFar)} paid down so far`}
+            hint={`${round(p.principalSoFar)} paid down of ${round(p.firstBalance)} since ${monthLabel(p.firstIndex)}`}
             bad={p.principalSoFar < 0}
           />
           <Figure
@@ -114,7 +114,7 @@ export function LoanCard({
           <Figure
             label="Paid so far"
             value={round(p.paidSoFar)}
-            hint={`since ${monthLabel(loan.start_year * 12 + loan.start_month - 1)}`}
+            hint={`since ${monthLabel(p.firstIndex)}`}
           />
           <Figure
             label="Interest paid"
