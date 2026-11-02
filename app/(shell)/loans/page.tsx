@@ -29,6 +29,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { LoanCard } from "@/components/loans/loan-card"
+import { LoansSummary } from "@/components/loans/loans-summary"
 import { LoanDialog } from "@/components/loans/loan-dialog"
 
 export default function LoansPage() {
@@ -93,6 +94,15 @@ export default function LoansPage() {
         <Skeleton className="h-96" />
       ) : (
         <>
+          {loans.length > 0 && (
+            <LoansSummary
+              items={loans.map((l) => ({
+                loan: l,
+                projection: projections.get(l.id)!,
+              }))}
+              todayIndex={todayIndex}
+            />
+          )}
           <div className="flex justify-end">
             <Button onClick={() => setAdding(true)}>
               <Plus className="size-4" /> Add loan

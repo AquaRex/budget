@@ -31,6 +31,15 @@ import { compact, kr } from "@/components/stats/display"
 import { monthLabel } from "@/components/savings/format"
 
 const round = (n: number) => kr(Math.round(n))
+export const percent = (n: number) =>
+  `${n.toLocaleString("nb-NO", { maximumFractionDigits: n < 10 ? 1 : 0 })} %`
+
+/** Share of what was owed at the first month that's been paid down. */
+function paidDownShare(p: LoanProjection) {
+  return p.firstBalance > 0
+    ? Math.min(1, Math.max(0, p.principalSoFar / p.firstBalance))
+    : 0
+}
 
 export function LoanCard({
   loan,
@@ -51,6 +60,13 @@ export function LoanCard({
   const paidOff = p.balanceNow <= 0
   const yearsLeft =
     p.payoff === null ? null : Math.max(0, p.payoff - todayIndex) / 12
+  const share = paidDownShare(p)
+  const interestNow = Math.min(
+    p.payment,
+    Math.max(0, p.balanceNow) * (loan.interest_pct / 100 / 12),
+  )
+  const paymentsLeft = p.months.filter((m) => m.projected).length
+  const monthsDone = p.months.length - paymentsLeft
 
   return (
     <Card size="sm" className="gap-0 py-0">
@@ -72,6 +88,17 @@ export function LoanCard({
             <span className="text-muted-foreground truncate text-xs">
               {loan.interest_pct.toLocaleString("nb-NO")} % · paid from{" "}
               {categoryName ?? "no category"}
+            </span>
+            <span className="mt-1 flex items-center gap-2">
+              <span className="bg-muted h-1.5 flex-1">
+                <span
+                  className="block h-full bg-(--viz-cat-1)"
+                  style={{ width: `${share * 100}%` }}
+                />
+              </span>
+              <span className="text-muted-foreground text-[11px] tabular-nums">
+                {percent(share * 100)} paid
+              </span>
             </span>
           </span>
           <span className="flex shrink-0 flex-col items-end gap-0.5 tabular-nums">
@@ -112,11 +139,12 @@ export function LoanCard({
             {round(loan.balance)} owed at the start of{" "}
             {monthLabel(loan.start_year * 12 + loan.start_month - 1)}
           </p>
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+          <WholeLoan p={p} paidOff={paidOff} />
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             <Figure
               label="Owed now"
               value={round(Math.max(0, p.balanceNow))}
-              hint={`${round(p.principalSoFar)} paid down of ${round(p.firstBalance)} since ${monthLabel(p.firstIndex)}`}
+              hint={`${percent(share * 100)} of ${round(p.firstBalance)} paid down since ${monthLabel(p.firstIndex)}`}
               bad={p.principalSoFar < 0}
             />
             <Figure
@@ -169,6 +197,26 @@ export function LoanCard({
                   : `${round(p.interestSoFar + p.interestLeft)} in total`
               }
             />
+            <Figure
+              label="This month's payment"
+              value={
+                p.payment > 0
+                  ? `${percent((interestNow / p.payment) * 100)} interest`
+                  : "—"
+              }
+              hint={
+                p.payment > 0
+                  ? `${round(interestNow)} interest · ${round(p.payment - interestNow)} paid down`
+                  : "no payments yet"
+              }
+            />
+            <Figure
+              label="Payments left"
+              value={
+                paidOff ? "0" : p.payoff === null ? "—" : String(paymentsLeft)
+              }
+              hint={`${monthsDone} month${monthsDone === 1 ? "" : "s"} paid so far`}
+            />
           </div>
           {p.months.length > 1 && (
             <>
@@ -179,6 +227,95 @@ export function LoanCard({
         </div>
       )}
     </Card>
+  )
+}
+
+/** Everything the loan costs, start to finish: paid so far vs still to come. */
+function WholeLoan({ p, paidOff }: { p: LoanProjection; paidOff: boolean }) {
+  const known = paidOff || p.payoff !== null
+  const parts = [
+    {
+      label: "Paid down",
+      value: Math.max(0, p.principalSoFar),
+      color: "var(--viz-cat-1)",
+      faded: false,
+    },
+    {
+      label: "Interest paid",
+      value: p.interestSoFar,
+      color: "var(--viz-cat-2)",
+      faded: false,
+    },
+    {
+      label: "Left to pay down",
+      value: Math.max(0, p.balanceNow),
+      color: "var(--viz-cat-1)",
+      faded: true,
+    },
+    {
+      label: "Interest to come",
+      value: known ? p.interestLeft : 0,
+      color: "var(--viz-cat-2)",
+      faded: true,
+    },
+  ].filter((part) => Math.round(part.value) > 0)
+  const total = parts.reduce((s, part) => s + part.value, 0)
+  const paid = parts
+    .filter((part) => !part.faded)
+    .reduce((s, part) => s + part.value, 0)
+  if (total <= 0) {
+    return null
+  }
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-baseline justify-between gap-3">
+        <h3 className="text-sm font-semibold">The whole loan</h3>
+        <span className="text-muted-foreground text-xs tabular-nums">
+          {percent((paid / total) * 100)} paid of the {round(total)}
+          {known ? " it costs in total" : " counted so far"}, interest included
+        </span>
+      </div>
+      <div className="flex h-6 gap-0.5">
+        {parts.map((part) => (
+          <div
+            key={part.label}
+            title={`${part.label}: ${round(part.value)}`}
+            className="min-w-0.5"
+            style={{
+              flexGrow: part.value,
+              background: part.color,
+              opacity: part.faded ? 0.4 : 1,
+            }}
+          />
+        ))}
+      </div>
+      <ul className="grid grid-cols-1 gap-x-6 gap-y-1 text-xs sm:grid-cols-2">
+        {parts.map((part) => (
+          <li key={part.label} className="flex items-center gap-2">
+            <span
+              className="size-2.5 shrink-0"
+              style={{
+                background: part.color,
+                opacity: part.faded ? 0.4 : 1,
+              }}
+            />
+            <span className="flex-1">{part.label}</span>
+            <span className="font-medium tabular-nums">
+              {round(part.value)}
+            </span>
+            <span className="text-muted-foreground w-12 text-right tabular-nums">
+              {percent((part.value / total) * 100)}
+            </span>
+          </li>
+        ))}
+      </ul>
+      {!known && (
+        <p className="text-muted-foreground text-xs">
+          Interest to come isn&apos;t included — at this payment the loan is
+          never paid off.
+        </p>
+      )}
+    </div>
   )
 }
 
