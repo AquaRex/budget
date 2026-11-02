@@ -14,10 +14,11 @@ export type Loan = {
   start_month: number
   monthly_payment: number | null // projected payment; null = recent average
   include_history: boolean // work back through payments before the start month
+  in_overview: boolean // counted in the "All debt" overview
   sort_order: number
 }
 
-export type LoanInput = Omit<Loan, "id" | "sort_order">
+export type LoanInput = Omit<Loan, "id" | "sort_order" | "in_overview">
 
 export async function fetchLoans(): Promise<Loan[]> {
   const { data, error } = await getSupabase()
@@ -51,6 +52,19 @@ export async function createLoan(
 
 export async function updateLoan(id: string, input: LoanInput): Promise<void> {
   const { error } = await getSupabase().from("loans").update(input).eq("id", id)
+  if (error) {
+    throw error
+  }
+}
+
+export async function setLoanInOverview(
+  id: string,
+  inOverview: boolean,
+): Promise<void> {
+  const { error } = await getSupabase()
+    .from("loans")
+    .update({ in_overview: inOverview })
+    .eq("id", id)
   if (error) {
     throw error
   }

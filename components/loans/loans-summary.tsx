@@ -17,6 +17,8 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart"
+import { cn } from "@/lib/utils"
+import { Switch } from "@/components/ui/switch"
 import { Figure } from "@/components/stats/figure"
 import { compact, kr } from "@/components/stats/display"
 import { monthLabel } from "@/components/savings/format"
@@ -44,11 +46,17 @@ function owedAt(p: LoanProjection, monthIndex: number) {
 export function LoansSummary({
   items,
   todayIndex,
+  onToggle,
 }: {
   items: Item[]
   todayIndex: number
+  onToggle: (loan: Loan, inOverview: boolean) => void
 }) {
-  const projections = items.map((i) => i.projection)
+  const colorOf = new Map(
+    items.map((i, n) => [i.loan.id, COLORS[n % COLORS.length]]),
+  )
+  const included = items.filter((i) => i.loan.in_overview)
+  const projections = included.map((i) => i.projection)
   const sum = (f: (p: LoanProjection) => number) =>
     projections.reduce((s, p) => s + f(p), 0)
   const owed = sum((p) => Math.max(0, p.balanceNow))
@@ -66,61 +74,109 @@ export function LoansSummary({
 
   return (
     <div className="flex flex-col gap-4 border p-4">
-      <h2 className="text-sm font-semibold">All loans</h2>
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Figure
-          label="Debt-free"
-          value={
-            neverPaid
-              ? "Never"
-              : debtFree === null
-                ? "Now"
-                : monthLabel(debtFree)
-          }
-          hint={
-            neverPaid
-              ? "a loan's payment doesn't cover its interest"
-              : debtFree === null
-                ? "nothing left to pay"
-                : `in ${yearsLeft.toLocaleString("nb-NO", { maximumFractionDigits: 1 })} years`
-          }
-          bad={neverPaid}
-        />
-        <Figure
-          label="Owed in total"
-          value={round(owed)}
-          hint={`across ${items.length} loan${items.length === 1 ? "" : "s"}`}
-        />
-        <Figure
-          label="Paid down"
-          value={percent(first > 0 ? (paidDown / first) * 100 : 0)}
-          hint={`${round(paidDown)} of ${round(first)}`}
-        />
-        <Figure
-          label="Monthly payments"
-          value={round(payment)}
-          hint={
-            neverPaid
-              ? "interest to come can't be told"
-              : `${round(interestLeft)} interest still to come`
-          }
-        />
-      </div>
-      <OwedChart
-        items={items}
-        todayIndex={todayIndex}
-        debtFree={neverPaid ? null : debtFree}
-      />
+      <h2 className="text-sm font-semibold">All debt</h2>
+      {included.length === 0 ? (
+        <p className="text-muted-foreground text-sm">
+          No loans counted. Switch one on below to see it here.
+        </p>
+      ) : (
+        <>
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <Figure
+              label="Debt-free"
+              value={
+                neverPaid
+                  ? "Never"
+                  : debtFree === null
+                    ? "Now"
+                    : monthLabel(debtFree)
+              }
+              hint={
+                neverPaid
+                  ? "a loan's payment doesn't cover its interest"
+                  : debtFree === null
+                    ? "nothing left to pay"
+                    : `in ${yearsLeft.toLocaleString("nb-NO", { maximumFractionDigits: 1 })} years`
+              }
+              bad={neverPaid}
+            />
+            <Figure
+              label="Owed in total"
+              value={round(owed)}
+              hint={`across ${included.length} loan${included.length === 1 ? "" : "s"}`}
+            />
+            <Figure
+              label="Paid down"
+              value={percent(first > 0 ? (paidDown / first) * 100 : 0)}
+              hint={`${round(paidDown)} of ${round(first)}`}
+            />
+            <Figure
+              label="Monthly payments"
+              value={round(payment)}
+              hint={
+                neverPaid
+                  ? "interest to come can't be told"
+                  : `${round(interestLeft)} interest still to come`
+              }
+            />
+          </div>
+          <OwedChart
+            items={included}
+            colorOf={colorOf}
+            todayIndex={todayIndex}
+            debtFree={neverPaid ? null : debtFree}
+          />
+        </>
+      )}
+      <ul className="grid grid-cols-1 gap-x-6 gap-y-1.5 text-xs sm:grid-cols-2">
+        {items.map((i) => {
+          const p = i.projection
+          const on = i.loan.in_overview
+          return (
+            <li
+              key={i.loan.id}
+              className={cn("flex items-center gap-2", !on && "opacity-50")}
+            >
+              <Switch
+                checked={on}
+                onCheckedChange={(v) => onToggle(i.loan, v)}
+                aria-label={`Count ${i.loan.name} in All debt`}
+              />
+              <span
+                className="size-2.5 shrink-0"
+                style={{
+                  background: on ? colorOf.get(i.loan.id) : "var(--viz-other)",
+                }}
+              />
+              <span className="min-w-0 flex-1 truncate">{i.loan.name}</span>
+              <span className="font-medium tabular-nums">
+                {round(Math.max(0, p.balanceNow))}
+              </span>
+              <span className="text-muted-foreground shrink-0 whitespace-nowrap tabular-nums">
+                {!on
+                  ? "not counted"
+                  : p.balanceNow <= 0
+                    ? "paid off"
+                    : p.payoff === null
+                      ? "never paid off"
+                      : `paid off ${monthLabel(p.payoff)}`}
+              </span>
+            </li>
+          )
+        })}
+      </ul>
     </div>
   )
 }
 
 function OwedChart({
   items,
+  colorOf,
   todayIndex,
   debtFree,
 }: {
   items: Item[]
+  colorOf: Map<string, string>
   todayIndex: number
   debtFree: number | null
 }) {
@@ -135,9 +191,9 @@ function OwedChart({
     ...tracked.map((i) => i.projection.months.at(-1)!.monthIndex),
   )
   const config: ChartConfig = Object.fromEntries(
-    tracked.map((i, n) => [
+    tracked.map((i) => [
       i.loan.id,
-      { label: i.loan.name, color: COLORS[n % COLORS.length] },
+      { label: i.loan.name, color: colorOf.get(i.loan.id) },
     ]),
   )
   const data = Array.from({ length: to - from + 1 }, (_, k) => {
@@ -242,30 +298,6 @@ function OwedChart({
           ))}
         </AreaChart>
       </ChartContainer>
-      <ul className="grid grid-cols-1 gap-x-6 gap-y-1 text-xs sm:grid-cols-2">
-        {tracked.map((i) => {
-          const p = i.projection
-          return (
-            <li key={i.loan.id} className="flex items-center gap-2">
-              <span
-                className="size-2.5 shrink-0"
-                style={{ background: config[i.loan.id].color }}
-              />
-              <span className="min-w-0 flex-1 truncate">{i.loan.name}</span>
-              <span className="font-medium tabular-nums">
-                {round(Math.max(0, p.balanceNow))}
-              </span>
-              <span className="text-muted-foreground shrink-0 whitespace-nowrap tabular-nums">
-                {p.balanceNow <= 0
-                  ? "paid off"
-                  : p.payoff === null
-                    ? "never paid off"
-                    : `paid off ${monthLabel(p.payoff)}`}
-              </span>
-            </li>
-          )
-        })}
-      </ul>
     </div>
   )
 }

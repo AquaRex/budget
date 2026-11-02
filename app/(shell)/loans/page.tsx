@@ -5,7 +5,12 @@ import { Plus } from "lucide-react"
 import { toast } from "sonner"
 
 import { errMessage } from "@/lib/errors"
-import { deleteLoan, useLoans, type Loan } from "@/lib/data/loans"
+import {
+  deleteLoan,
+  setLoanInOverview,
+  useLoans,
+  type Loan,
+} from "@/lib/data/loans"
 import { loanPayments, projectLoan } from "@/lib/loans/compute"
 import { monthIndexOf } from "@/lib/savings/compute"
 import { buildTypeMap } from "@/lib/spending"
@@ -63,6 +68,15 @@ export default function LoansPage() {
   const loading =
     isLoading || categoriesLoading || transactionsLoading || typesLoading
 
+  async function toggleOverview(l: Loan, inOverview: boolean) {
+    try {
+      await setLoanInOverview(l.id, inOverview)
+      mutate()
+    } catch (e) {
+      toast.error(errMessage(e, "Could not update the loan."))
+    }
+  }
+
   async function remove(l: Loan) {
     try {
       await deleteLoan(l.id)
@@ -75,7 +89,7 @@ export default function LoansPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-0.5">
-        <h1 className="text-2xl font-semibold tracking-tight">Loans</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Debt</h1>
         <p className="text-muted-foreground text-sm">
           What you owe, when it&apos;s paid off and how much goes to interest —
           from the payments in each loan&apos;s category.
@@ -84,7 +98,7 @@ export default function LoansPage() {
 
       {error ? (
         <Alert variant="destructive">
-          <AlertTitle>Loans needs a database update</AlertTitle>
+          <AlertTitle>Debt needs a database update</AlertTitle>
           <AlertDescription>
             Run <code>supabase/migrations/0022_loans.sql</code> in the Supabase
             SQL Editor, then reload this page. ({errMessage(error, "")})
@@ -94,6 +108,15 @@ export default function LoansPage() {
         <Skeleton className="h-96" />
       ) : (
         <>
+          {loans.some((l) => !("in_overview" in l)) && (
+            <Alert variant="destructive">
+              <AlertTitle>Debt needs a database update</AlertTitle>
+              <AlertDescription>
+                Run <code>supabase/migrations/0024_loan_overview.sql</code> in
+                the Supabase SQL Editor, then reload this page.
+              </AlertDescription>
+            </Alert>
+          )}
           {loans.length > 0 && (
             <LoansSummary
               items={loans.map((l) => ({
@@ -101,6 +124,7 @@ export default function LoansPage() {
                 projection: projections.get(l.id)!,
               }))}
               todayIndex={todayIndex}
+              onToggle={toggleOverview}
             />
           )}
           <div className="flex justify-end">

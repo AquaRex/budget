@@ -30,7 +30,7 @@ const nav = [
   { href: "/transactions", label: "Transactions", icon: ArrowRightLeft },
   { href: "/groups", label: "Groups", icon: Layers },
   { href: "/savings", label: "Savings", icon: PiggyBank },
-  { href: "/loans", label: "Loans", icon: Landmark },
+  { href: "/loans", label: "Debt", icon: Landmark },
   { href: "/settings", label: "Settings", icon: Settings },
 ]
 
