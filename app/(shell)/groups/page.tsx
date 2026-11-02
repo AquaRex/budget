@@ -62,7 +62,7 @@ export default function GroupsPage() {
           </p>
         </div>
         <Button asChild variant="outline" size="sm">
-          <Link href="/settings">
+          <Link href="/settings/categories">
             <SlidersHorizontal className="size-4" />
             Configure
           </Link>

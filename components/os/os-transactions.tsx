@@ -730,7 +730,7 @@ function TxSheet({
                   </>
                 )}
                 <Link
-                  href="/settings"
+                  href="/settings/categories"
                   className="text-muted-foreground flex min-h-11 items-center gap-2 text-sm"
                 >
                   <ArrowUpRight className="size-4" aria-hidden /> Manage

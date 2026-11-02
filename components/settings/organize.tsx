@@ -52,7 +52,6 @@ import {
 import { CategoryTree } from "@/components/settings/category-tree"
 import { BankTypeCleanup } from "@/components/settings/bank-type-cleanup"
 import { TagsManager } from "@/components/settings/tags-manager"
-import { RulesManager } from "@/components/settings/rules-manager"
 
 function fmtDate(iso: string): string {
   const [y, m, d] = iso.split("-")
@@ -79,7 +78,6 @@ export function Organize() {
     <div className="flex flex-col gap-6">
       <CategoryTree />
       <BankTypeCleanup onChanged={refresh} />
-      <RulesManager onChanged={refresh} />
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
         <TriagePanel
           transactions={transactions}

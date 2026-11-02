@@ -25,6 +25,7 @@ import {
   addTextRule,
   deleteMatchRule,
   deleteRule,
+  updateTxRule,
 } from "@/lib/data/transactions"
 import { RuleDialog } from "@/components/spending/rule-dialog"
 import { Button } from "@/components/ui/button"
@@ -64,6 +65,11 @@ export function RulesManager({ onChanged }: { onChanged: () => void }) {
   const [filter, setFilter] = useState("")
   const [showAll, setShowAll] = useState(false)
   const [confirm, setConfirm] = useState<TxRule | null>(null)
+  const [edit, setEdit] = useState<{
+    id: string
+    pattern: string
+    categoryId: string
+  } | null>(null)
 
   const labelOf = useMemo(() => {
     const m = new Map(
@@ -121,6 +127,32 @@ export function RulesManager({ onChanged }: { onChanged: () => void }) {
       onChanged()
     } catch (e) {
       toast.error(errMessage(e, "Could not add the rule."))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const editPattern = (r: TxRule) =>
+    r.match_type === "account"
+      ? (edit?.pattern ?? "").trim()
+      : normalizeText(edit?.pattern)
+
+  async function saveEdit(r: TxRule) {
+    const p = editPattern(r)
+    if (!edit || p.length < 2 || !edit.categoryId) {
+      return
+    }
+    setSaving(true)
+    try {
+      const n = await updateTxRule(r, p, edit.categoryId, typeMap)
+      toast.success(
+        `Rule saved · ${n} transaction${n === 1 ? "" : "s"} now in ${labelOf(edit.categoryId)}`,
+      )
+      setEdit(null)
+      mutate()
+      onChanged()
+    } catch (e) {
+      toast.error(errMessage(e, "Could not save the rule."))
     } finally {
       setSaving(false)
     }
@@ -248,6 +280,49 @@ export function RulesManager({ onChanged }: { onChanged: () => void }) {
           <div className="flex flex-col divide-y">
             {shown.map((r) => {
               const n = matching(r).length
+              if (edit?.id === r.id) {
+                return (
+                  <div
+                    key={r.id}
+                    className="grid gap-2 px-3 py-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_auto]"
+                  >
+                    <Input
+                      value={edit.pattern}
+                      onChange={(e) =>
+                        setEdit({ ...edit, pattern: e.target.value })
+                      }
+                      onKeyDown={(e) => e.key === "Enter" && void saveEdit(r)}
+                      aria-label={
+                        r.match_type === "account"
+                          ? "Account number"
+                          : "Text to match"
+                      }
+                      className="font-mono"
+                    />
+                    <CategorySelect
+                      categories={categories}
+                      value={edit.categoryId}
+                      onChange={(id) =>
+                        setEdit({ ...edit, categoryId: id ?? edit.categoryId })
+                      }
+                    />
+                    <Button
+                      size="sm"
+                      onClick={() => void saveEdit(r)}
+                      disabled={saving || editPattern(r).length < 2}
+                    >
+                      Save
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setEdit(null)}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                )
+              }
               return (
                 <div
                   key={r.id}
@@ -276,6 +351,20 @@ export function RulesManager({ onChanged }: { onChanged: () => void }) {
                       {n} match{n === 1 ? "" : "es"}
                     </span>
                   )}
+                  <button
+                    type="button"
+                    aria-label={`Edit rule ${r.pattern}`}
+                    onClick={() =>
+                      setEdit({
+                        id: r.id,
+                        pattern: r.pattern,
+                        categoryId: r.category_id ?? "",
+                      })
+                    }
+                    className="text-muted-foreground hover:text-foreground p-1"
+                  >
+                    <Pencil className="size-3.5" />
+                  </button>
                   <button
                     type="button"
                     aria-label={`Delete rule ${r.pattern}`}

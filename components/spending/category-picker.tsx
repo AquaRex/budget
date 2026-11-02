@@ -186,7 +186,7 @@ export function CategoryPicker({
         )}
       </div>
       <Link
-        href="/settings#categories"
+        href="/settings/categories"
         className="text-muted-foreground hover:text-foreground flex items-center gap-1.5 border-t px-3 py-2 text-xs"
       >
         <Settings2 className="size-3.5" />

@@ -18,7 +18,10 @@ export function GoalContributions({
       <p className="text-muted-foreground text-xs">
         No savings groups yet. Mark a group as Savings, or a category as “Count
         towards Goals”, in{" "}
-        <Link href="/settings" className="text-primary hover:underline">
+        <Link
+          href="/settings/categories"
+          className="text-primary hover:underline"
+        >
           Settings
         </Link>{" "}
         to see them here.

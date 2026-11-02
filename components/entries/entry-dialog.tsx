@@ -315,7 +315,7 @@ export function EntryDialog({
                 <div className="flex items-baseline justify-between gap-2">
                   <Label htmlFor="category">Group</Label>
                   <Link
-                    href="/settings#categories"
+                    href="/settings/categories"
                     className="text-muted-foreground hover:text-foreground text-xs"
                   >
                     Manage…

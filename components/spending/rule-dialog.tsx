@@ -65,7 +65,11 @@ function draftFrom(tx: Transaction | null, rule: MatchRule | null): Draft {
       tx ? deriveStem(tx.description) || tx.description : null,
       true,
     ),
-    message: text("message", tx?.message ?? null, true),
+    message: text(
+      "message",
+      tx?.message ?? null,
+      (tx?.message?.length ?? 0) <= 40,
+    ),
     type: text("type", tx?.type ?? null, false),
     from_account: text("from_account", tx?.from_account ?? null, false),
     to_account: text("to_account", tx?.to_account ?? null, false),

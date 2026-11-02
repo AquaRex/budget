@@ -16,6 +16,7 @@ import {
   Ban,
   Check,
   Filter,
+  Info,
   MoreHorizontal,
   Plus,
   Search,
@@ -30,6 +31,7 @@ import type { Flow } from "@/lib/stats/types"
 import type { GroupIndex } from "@/lib/stats/flows"
 import { formatNOK } from "@/lib/format"
 import { RuleDialog } from "@/components/spending/rule-dialog"
+import { TxDetailsDialog } from "@/components/spending/tx-details-dialog"
 import { cn } from "@/lib/utils"
 import {
   deriveStem,
@@ -143,7 +145,7 @@ type Picker =
   | { kind: "bulk-category"; anchor: DOMRect }
   | { kind: "bulk-tag"; anchor: DOMRect }
 
-type RowAction = "category" | "category-only" | "tag" | "merchant" | "rule" | "exclude"
+type RowAction = "category" | "category-only" | "tag" | "merchant" | "rule" | "details" | "exclude"
 
 function fmtDate(iso: string): string {
   const [y, m, d] = iso.split("-")
@@ -264,6 +266,7 @@ export function TransactionsTable({
     categoryId: string | null
   } | null>(null)
   const [ruleTx, setRuleTx] = useState<Transaction | null>(null)
+  const [detailsTx, setDetailsTx] = useState<Transaction | null>(null)
   const deferredQuery = useDeferredValue(query)
 
   const setFilter = <K extends keyof Filters>(key: K, value: Filters[K]) =>
@@ -637,6 +640,8 @@ export function TransactionsTable({
         onQueryChange(deriveStem(row.t.description) || row.t.type || "")
       } else if (action === "rule") {
         setRuleTx(row.t)
+      } else if (action === "details") {
+        setDetailsTx(row.t)
       } else {
         setTransactionExcluded(row.id, !row.t.is_excluded)
           .then(onChanged)
@@ -1219,6 +1224,11 @@ export function TransactionsTable({
         }}
       />
 
+      <TxDetailsDialog
+        tx={detailsTx}
+        onClose={() => setDetailsTx(null)}
+        onMakeRule={setRuleTx}
+      />
       <RuleDialog
         open={!!ruleTx}
         tx={ruleTx}
@@ -1342,10 +1352,12 @@ const TxRow = memo(function TxRow({
           {r.text}
         </div>
         <div className="text-muted-foreground flex items-center gap-1.5 truncate text-xs">
-          <span className="truncate">
-            {t.type}
-            {t.message && ` · ${t.message}`}
-          </span>
+          <span className="truncate">{t.type}</span>
+          {(r.amount < 0 ? t.to_account : t.from_account) && (
+            <span className="shrink-0 font-mono text-[11px]">
+              {r.amount < 0 ? "→" : "←"} {r.amount < 0 ? t.to_account : t.from_account}
+            </span>
+          )}
           {r.flow !== "spent" && r.flow !== "income" && (
             <span className="shrink-0 border px-1 text-[10px] tracking-wide uppercase">
               {FLOW_LABEL[r.flow]}
@@ -1456,6 +1468,12 @@ const TxRow = memo(function TxRow({
             >
               <Search className="size-4" />
               Show all from this merchant
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={(e) => onAction(r, "details", e.currentTarget as HTMLElement)}
+            >
+              <Info className="size-4" />
+              Details…
             </DropdownMenuItem>
             <DropdownMenuItem
               onSelect={(e) => onAction(r, "rule", e.currentTarget as HTMLElement)}

@@ -419,6 +419,44 @@ export async function addTextRule(
   return matches.length
 }
 
+/**
+ * Change a text or account rule's pattern and category. Transactions the rule
+ * now matches follow it when they had its old category or none at all (a
+ * detailed rule still wins); others keep theirs. Returns how many moved.
+ */
+export async function updateTxRule(
+  rule: TxRule,
+  pattern: string,
+  categoryId: string,
+  typeMap: TypeMap,
+): Promise<number> {
+  const { error } = await getSupabase()
+    .from("tx_rules")
+    .update({ pattern, category_id: categoryId })
+    .eq("id", rule.id)
+  if (error) {
+    throw error.code === "23505"
+      ? new Error(`A rule for "${pattern}" already exists.`)
+      : error
+  }
+  const [all, matchRules] = await Promise.all([
+    fetchTransactions(),
+    fetchMatchRules(),
+  ])
+  const ids = all
+    .filter(
+      (t) =>
+        txMatchesSource(t, rule.match_type, pattern) &&
+        !matchRuleFor(t, matchRules) &&
+        t.category_id !== categoryId &&
+        (t.category_id === rule.category_id ||
+          effectiveCategoryId(t, typeMap) === null),
+    )
+    .map((t) => t.id)
+  await setCategoryForIds(ids, categoryId)
+  return ids.length
+}
+
 export async function deleteRule(id: string): Promise<void> {
   const supabase = getSupabase()
   const { error } = await supabase.from("tx_rules").delete().eq("id", id)
