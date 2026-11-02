@@ -1,10 +1,17 @@
 import { getSupabase } from "@/lib/supabase/client"
-import type { ImportBatch, Transaction, TxRule } from "@/lib/types"
+import type {
+  ImportBatch,
+  MatchRule,
+  MatchRuleInput,
+  Transaction,
+  TxRule,
+} from "@/lib/types"
 import type { ParsedTx } from "@/lib/csv"
 import {
   classifyImport,
   descMatches,
   effectiveCategoryId,
+  matchRuleFor,
   ruleCategoryFor,
   sourceKeyFor,
   txMatchesSource,
@@ -47,6 +54,55 @@ export async function fetchImports(): Promise<ImportBatch[]> {
   return (data ?? []) as ImportBatch[]
 }
 
+export async function fetchMatchRules(): Promise<MatchRule[]> {
+  const { data, error } = await getSupabase()
+    .from("tx_match_rules")
+    .select("*")
+    .order("created_at", { ascending: true })
+  if (error) throw error
+  return (data ?? []).map((r) => ({
+    ...(r as MatchRule),
+    amount_min: r.amount_min === null ? null : Number(r.amount_min),
+    amount_max: r.amount_max === null ? null : Number(r.amount_max),
+  }))
+}
+
+/**
+ * Save a detailed rule, then give its category to every matching transaction
+ * the rule now decides (a matching rule with more conditions still wins) —
+ * all of them, or with `overwrite` off only those without a category yet.
+ * Returns how many transactions were changed.
+ */
+export async function saveMatchRule(
+  input: MatchRuleInput,
+  overwrite: boolean,
+  typeMap: TypeMap,
+  id?: string,
+): Promise<number> {
+  const supabase = getSupabase()
+  const { data, error } = id
+    ? await supabase.from("tx_match_rules").update(input).eq("id", id).select("*").single()
+    : await supabase.from("tx_match_rules").insert(input).select("*").single()
+  if (error) throw error
+  const saved = data as MatchRule
+  const rules = await fetchMatchRules()
+  const ids = (await fetchTransactions())
+    .filter(
+      (t) =>
+        matchRuleFor(t, rules)?.id === saved.id &&
+        t.category_id !== saved.category_id &&
+        (overwrite || effectiveCategoryId(t, typeMap) === null),
+    )
+    .map((t) => t.id)
+  await setCategoryForIds(ids, saved.category_id)
+  return ids.length
+}
+
+export async function deleteMatchRule(id: string): Promise<void> {
+  const { error } = await getSupabase().from("tx_match_rules").delete().eq("id", id)
+  if (error) throw error
+}
+
 export async function fetchTxRules(): Promise<TxRule[]> {
   const supabase = getSupabase()
   const { data, error } = await supabase
@@ -75,7 +131,10 @@ export async function importTransactions(
 ): Promise<ImportSummary> {
   const supabase = getSupabase()
   // Always reconcile against the latest stored rows, never a stale snapshot.
-  const existing = await fetchTransactions()
+  const [existing, matchRules] = await Promise.all([
+    fetchTransactions(),
+    fetchMatchRules(),
+  ])
   const plan: ImportPlan = classifyImport(parsed, existing)
 
   // Record the import batch first so rows can reference it.
@@ -109,7 +168,8 @@ export async function importTransactions(
       is_internal: r.is_internal,
       dedup_key: r.dedup_key,
       identity_key: r.identity_key,
-      category_id: ruleCategoryFor(r, rules),
+      category_id:
+        matchRuleFor(r, matchRules)?.category_id ?? ruleCategoryFor(r, rules),
     }))
     // Rows already present (same user_id + dedup_key) are ignored; `.select()`
     // returns only the rows that were actually inserted, so the count is true.
@@ -238,11 +298,19 @@ export async function categorizeBySource(
       .eq("pattern", src.pattern)
   }
 
-  // Every matching row across all time (paged: a bare select stops at 1000 rows).
-  const all = await fetchTransactions()
+  // Every matching row across all time (paged: a bare select stops at 1000
+  // rows), except those a detailed rule puts somewhere else.
+  const [all, matchRules] = await Promise.all([
+    fetchTransactions(),
+    fetchMatchRules(),
+  ])
   const ids = new Set(
     all
-      .filter((t) => txMatchesSource(t, src.matchType, src.pattern))
+      .filter(
+        (t) =>
+          txMatchesSource(t, src.matchType, src.pattern) &&
+          !matchRuleFor(t, matchRules),
+      )
       .map((t) => t.id),
   )
   ids.add(tx.id) // always apply to the one the user clicked
@@ -318,42 +386,6 @@ export async function deleteImport(id: string): Promise<void> {
 }
 
 // --- Rules -----------------------------------------------------------------
-
-/**
- * Create/replace a rule, then apply it to every matching uncategorised
- * transaction. Returns how many transactions were updated.
- */
-export async function saveRuleAndApply(
-  rule: { match_type: "description" | "account"; pattern: string },
-  categoryId: string,
-): Promise<number> {
-  const supabase = getSupabase()
-  const { data: saved, error } = await supabase
-    .from("tx_rules")
-    .upsert(
-      {
-        match_type: rule.match_type,
-        pattern: rule.pattern,
-        category_id: categoryId,
-      },
-      { onConflict: "user_id,match_type,pattern" },
-    )
-    .select("*")
-    .single()
-  if (error) throw error
-  const r = saved as TxRule
-
-  // Re-categorise existing matches (only those without a category yet), over
-  // every row (paged: a bare select stops at 1000 rows).
-  const matches = (await fetchTransactions()).filter(
-    (t) => t.category_id === null && ruleCategoryFor(t, [r]) === categoryId,
-  )
-  await setCategoryForIds(
-    matches.map((t) => t.id),
-    categoryId,
-  )
-  return matches.length
-}
 
 /**
  * Add a "text contains" rule typed by hand, then give its category to every

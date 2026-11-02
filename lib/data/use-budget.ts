@@ -18,6 +18,7 @@ import {
   fetchTransactions,
   fetchImports,
   fetchTxRules,
+  fetchMatchRules,
 } from "@/lib/data/transactions"
 import { fetchTypeCategories } from "@/lib/data/type-categories"
 import { fetchTrades } from "@/lib/data/savings"
@@ -30,6 +31,7 @@ import type {
   EntryKind,
   ImportBatch,
   Label,
+  MatchRule,
   PaymentMethod,
   Transaction,
   TxRule,
@@ -170,6 +172,14 @@ export function useTxRules() {
     fetchTxRules,
   )
   return { rules: data ?? [], error, isLoading, mutate }
+}
+
+export function useMatchRules() {
+  const { data, error, isLoading, mutate } = useSWR<MatchRule[]>(
+    "tx_match_rules",
+    fetchMatchRules,
+  )
+  return { matchRules: data ?? [], error, isLoading, mutate }
 }
 
 export function useTypeCategories() {

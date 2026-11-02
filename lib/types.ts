@@ -117,6 +117,22 @@ export type TxRule = {
   created_at: string
 }
 
+/** A detailed rule: every condition that's set must match (text contains, accounts exact, amount ignoring sign). */
+export type MatchRule = {
+  id: string
+  description: string | null
+  message: string | null
+  type: string | null
+  from_account: string | null
+  to_account: string | null
+  amount_min: number | null
+  amount_max: number | null
+  category_id: string
+  created_at: string
+}
+
+export type MatchRuleInput = Omit<MatchRule, "id" | "created_at">
+
 // Payload when creating/editing an entry's settings (no amounts/order here).
 export type EntryInput = {
   kind: EntryKind

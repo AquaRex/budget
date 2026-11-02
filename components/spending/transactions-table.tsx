@@ -29,6 +29,7 @@ import type { Category, Label as TxLabel, Transaction } from "@/lib/types"
 import type { Flow } from "@/lib/stats/types"
 import type { GroupIndex } from "@/lib/stats/flows"
 import { formatNOK } from "@/lib/format"
+import { RuleDialog } from "@/components/spending/rule-dialog"
 import { cn } from "@/lib/utils"
 import {
   deriveStem,
@@ -45,7 +46,6 @@ import {
 import {
   categorizeBySource,
   resolveConflict,
-  saveRuleAndApply,
   setCategoryForIds,
   setTransactionCategory,
   setTransactionExcluded,
@@ -67,7 +67,6 @@ import {
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import {
   Select,
   SelectContent,
@@ -82,14 +81,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
 
 const NONE = "__none__"
 const ANY = "__any__"
@@ -144,13 +135,6 @@ type Row = {
   conflict: boolean
   needsSorting: boolean
   sourceKey: string | null
-}
-
-type RuleDraft = {
-  tx: Transaction
-  matchType: "description" | "account"
-  pattern: string
-  categoryId: string
 }
 
 type Picker =
@@ -279,8 +263,7 @@ export function TransactionsTable({
     row: Row
     categoryId: string | null
   } | null>(null)
-  const [rule, setRule] = useState<RuleDraft | null>(null)
-  const [savingRule, setSavingRule] = useState(false)
+  const [ruleTx, setRuleTx] = useState<Transaction | null>(null)
   const deferredQuery = useDeferredValue(query)
 
   const setFilter = <K extends keyof Filters>(key: K, value: Filters[K]) =>
@@ -407,6 +390,8 @@ export function TransactionsTable({
         descMatches(r.t.description, q) ||
         (r.t.type ?? "").toLowerCase().includes(q) ||
         (r.t.message ?? "").toLowerCase().includes(q) ||
+        (r.t.to_account ?? "").includes(q) ||
+        (r.t.from_account ?? "").includes(q) ||
         (r.tagName ?? "").toLowerCase().includes(q) ||
         (r.catName ?? "").toLowerCase().includes(q) ||
         (r.groupId ? r.groupName : "").toLowerCase().includes(q)
@@ -651,19 +636,14 @@ export function TransactionsTable({
       } else if (action === "merchant") {
         onQueryChange(deriveStem(row.t.description) || row.t.type || "")
       } else if (action === "rule") {
-        setRule({
-          tx: row.t,
-          matchType: "description",
-          pattern: deriveStem(row.t.description) || (row.t.description ?? ""),
-          categoryId: row.t.category_id ?? categories[0]?.id ?? "",
-        })
+        setRuleTx(row.t)
       } else {
         setTransactionExcluded(row.id, !row.t.is_excluded)
           .then(onChanged)
           .catch((e) => toast.error(e instanceof Error ? e.message : "Could not update."))
       }
     },
-    [categories, onChanged, onQueryChange],
+    [onChanged, onQueryChange],
   )
 
   const onResolve = useCallback(
@@ -674,26 +654,6 @@ export function TransactionsTable({
     },
     [onChanged],
   )
-
-  async function saveRule() {
-    if (!rule || !rule.categoryId || !rule.pattern.trim()) {
-      return
-    }
-    setSavingRule(true)
-    try {
-      const n = await saveRuleAndApply(
-        { match_type: rule.matchType, pattern: rule.pattern.trim().toLowerCase() },
-        rule.categoryId,
-      )
-      toast.success(`Rule saved · categorised ${n} matching transaction(s).`)
-      setRule(null)
-      onChanged()
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not save rule.")
-    } finally {
-      setSavingRule(false)
-    }
-  }
 
   /* --------------------------------------------------------- virtual list */
 
@@ -1259,89 +1219,13 @@ export function TransactionsTable({
         }}
       />
 
-      <Dialog open={!!rule} onOpenChange={(o) => !o && setRule(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Always categorise this</DialogTitle>
-            <DialogDescription>
-              Future imports matching this pattern get the chosen category
-              automatically.
-            </DialogDescription>
-          </DialogHeader>
-          {rule && (
-            <div className="grid gap-4 py-2">
-              <div className="grid gap-2">
-                <Label>Match by</Label>
-                <Select
-                  value={rule.matchType}
-                  onValueChange={(v) =>
-                    setRule({
-                      ...rule,
-                      matchType: v as "description" | "account",
-                      pattern:
-                        v === "account"
-                          ? rule.tx.to_account ?? rule.tx.from_account ?? ""
-                          : deriveStem(rule.tx.description) ||
-                            (rule.tx.description ?? ""),
-                    })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="description">
-                      Merchant / description
-                    </SelectItem>
-                    <SelectItem value="account">Account number</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="rule-pattern">
-                  {rule.matchType === "description"
-                    ? "Text to match (contains)"
-                    : "Account number"}
-                </Label>
-                <Input
-                  id="rule-pattern"
-                  value={rule.pattern}
-                  onChange={(e) => setRule({ ...rule, pattern: e.target.value })}
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label>Category</Label>
-                <Select
-                  value={rule.categoryId}
-                  onValueChange={(v) => setRule({ ...rule, categoryId: v })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Choose a category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {options.map((o) => (
-                      <SelectItem key={o.id} value={o.id}>
-                        {o.group && o.group !== "No group" ? `${o.group} › ${o.name}` : o.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          )}
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setRule(null)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={saveRule}
-              disabled={savingRule || !rule?.categoryId || !rule?.pattern.trim()}
-            >
-              {savingRule ? "Saving…" : "Save rule"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <RuleDialog
+        open={!!ruleTx}
+        tx={ruleTx}
+        rule={null}
+        onClose={() => setRuleTx(null)}
+        onSaved={onChanged}
+      />
     </div>
   )
 }
@@ -1458,7 +1342,10 @@ const TxRow = memo(function TxRow({
           {r.text}
         </div>
         <div className="text-muted-foreground flex items-center gap-1.5 truncate text-xs">
-          <span className="truncate">{t.type}</span>
+          <span className="truncate">
+            {t.type}
+            {t.message && ` · ${t.message}`}
+          </span>
           {r.flow !== "spent" && r.flow !== "income" && (
             <span className="shrink-0 border px-1 text-[10px] tracking-wide uppercase">
               {FLOW_LABEL[r.flow]}

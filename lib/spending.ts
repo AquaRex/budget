@@ -1,4 +1,11 @@
-import type { Category, Transaction, TxRule, TypeCategory } from "@/lib/types"
+import type {
+  Category,
+  MatchRule,
+  MatchRuleInput,
+  Transaction,
+  TxRule,
+  TypeCategory,
+} from "@/lib/types"
 import type { ParsedTx } from "@/lib/csv"
 import { getDateMode } from "@/lib/date-mode"
 import { getCountTransfers } from "@/lib/count-transfers"
@@ -131,6 +138,49 @@ export function ruleCategoryFor(tx: TxLike, rules: TxRule[]): string | null {
     }
   }
   return null
+}
+
+type MatchableTx = TxLike & {
+  message: string | null
+  type: string | null
+  amount: number | string
+}
+
+/** Whether every condition set on a detailed rule matches the transaction. */
+export function matchRuleMatches(rule: MatchRuleInput, tx: MatchableTx): boolean {
+  const amount = Math.abs(Number(tx.amount))
+  return (
+    (!rule.description || descMatches(tx.description, normalizeText(rule.description))) &&
+    (!rule.message || normalizeText(tx.message).includes(normalizeText(rule.message))) &&
+    (!rule.type || normalizeText(tx.type).includes(normalizeText(rule.type))) &&
+    (!rule.from_account || tx.from_account === rule.from_account) &&
+    (!rule.to_account || tx.to_account === rule.to_account) &&
+    (rule.amount_min === null || amount >= rule.amount_min) &&
+    (rule.amount_max === null || amount <= rule.amount_max)
+  )
+}
+
+const conditionCount = (r: MatchRule) =>
+  [r.description, r.message, r.type, r.from_account, r.to_account, r.amount_min, r.amount_max].filter(
+    (v) => v !== null,
+  ).length
+
+/** The detailed rule a transaction falls under: the one with most conditions, then the newest. */
+export function matchRuleFor(tx: MatchableTx, rules: MatchRule[]): MatchRule | null {
+  let best: MatchRule | null = null
+  for (const r of rules) {
+    if (!matchRuleMatches(r, tx)) {
+      continue
+    }
+    if (
+      !best ||
+      conditionCount(r) > conditionCount(best) ||
+      (conditionCount(r) === conditionCount(best) && r.created_at > best.created_at)
+    ) {
+      best = r
+    }
+  }
+  return best
 }
 
 /**
