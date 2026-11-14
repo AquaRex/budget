@@ -8,7 +8,7 @@ import useSWR, { mutate } from "swr"
 
 import { getSupabase } from "@/lib/supabase/client"
 
-export const BANK_DAILY_LIMIT = 2
+export const BANK_DAILY_LIMIT = 4
 
 export type BankAccount = {
   uid?: string
@@ -65,6 +65,7 @@ export type RawTransaction = {
   raw: Record<string, unknown>
   raw_hash: string
   copies: number
+  last_fetch_id: string | null
   first_seen_at: string
   last_seen_at: string
   seen_count: number
@@ -203,7 +204,7 @@ async function fetchRaw(): Promise<RawTransaction[]> {
     const { data, error } = await getSupabase()
       .from("bank_raw_transactions")
       .select(
-        "id, account_key, session_id, raw, raw_hash, copies, first_seen_at, last_seen_at, seen_count",
+        "id, account_key, session_id, raw, raw_hash, copies, last_fetch_id, first_seen_at, last_seen_at, seen_count",
       )
       .order("first_seen_at", { ascending: true })
       .order("id", { ascending: true })

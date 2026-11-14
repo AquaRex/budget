@@ -221,7 +221,7 @@ function ConnectForm({
           variant={reconnect ? "outline" : "default"}
         >
           {busy && <Loader2 className="size-4 animate-spin" />}
-          {reconnect ? "Reconnect / renew consent…" : "Connect bank…"}
+          {reconnect ? "Renew consent or add another bank…" : "Connect bank…"}
         </Button>
       </div>
     )

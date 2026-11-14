@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { Loader2, RefreshCw } from "lucide-react"
+import { Landmark, Loader2, RefreshCw } from "lucide-react"
 import { toast } from "sonner"
 
 import { runBankFetch, useBankUsage } from "@/lib/bank"
@@ -11,7 +11,7 @@ import { errMessage } from "@/lib/errors"
 import { Button } from "@/components/ui/button"
 
 /**
- * Header button: pulls new bank data on demand (never automatically), at most
+ * Pulls new bank data on demand (never automatically), at most
  * BANK_DAILY_LIMIT times per day. Stage 1: data goes to the staging tables only.
  */
 export function BankUpdateButton() {
@@ -23,15 +23,10 @@ export function BankUpdateButton() {
 
   if (!connected) {
     return (
-      <Button
-        variant="ghost"
-        size="sm"
-        className="hidden sm:inline-flex"
-        asChild
-      >
+      <Button variant="outline" asChild>
         <Link href="/settings/bank" title="Connect your bank">
-          <RefreshCw className="size-4" />
-          <span className="hidden xl:inline">Connect bank</span>
+          <Landmark className="size-4" />
+          Connect bank
         </Link>
       </Button>
     )
@@ -62,10 +57,9 @@ export function BankUpdateButton() {
   }
 
   return (
-    <div className="hidden items-center gap-1.5 sm:flex">
+    <div className="flex items-center gap-2">
       <Button
         variant="outline"
-        size="sm"
         onClick={onClick}
         disabled={disabled}
         title={
@@ -81,16 +75,14 @@ export function BankUpdateButton() {
         ) : (
           <RefreshCw className="size-4" />
         )}
-        <span className="hidden md:inline">Update</span>
+        Update from bank
       </Button>
-      <Link
-        href="/settings/bank"
-        className="text-muted-foreground hover:text-foreground text-[11px] leading-tight whitespace-nowrap tabular-nums"
-        title="Max 2 bank updates per day. Details in Settings → Bank."
+      <span
+        className="text-muted-foreground text-xs leading-tight whitespace-nowrap tabular-nums"
+        title={`Max ${limit} bank updates per day (the bank's own limit).`}
       >
         {used}/{limit} today
-        <span className="hidden xl:inline"> · max {limit}/day</span>
-      </Link>
+      </span>
     </div>
   )
 }

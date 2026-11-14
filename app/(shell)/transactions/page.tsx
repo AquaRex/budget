@@ -27,6 +27,7 @@ import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CsvDropzone } from "@/components/spending/csv-dropzone"
+import { BankUpdateButton } from "@/components/bank/bank-update-button"
 import { SpendingSummary } from "@/components/spending/spending-summary"
 import { TransactionsTable } from "@/components/spending/transactions-table"
 import { ActualsGrid, type DrillMode } from "@/components/spending/actuals-grid"
@@ -303,9 +304,12 @@ export default function TransactionsPage() {
             Your imported bank transactions and where each one is categorised.
           </p>
         </div>
-        {(lt || transactions.length > 0) && (
-          <CsvDropzone rules={rules} onImported={refresh} />
-        )}
+        <div className="flex flex-wrap items-center gap-3">
+          <BankUpdateButton />
+          {(lt || transactions.length > 0) && (
+            <CsvDropzone rules={rules} onImported={refresh} />
+          )}
+        </div>
       </div>
 
       {lt ? (

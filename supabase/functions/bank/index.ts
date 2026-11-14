@@ -7,7 +7,7 @@
 //   { "action": "aspsps" }                                   → banks in Norway
 //   { "action": "start", aspsp_name, aspsp_country, redirect_url } → { url } to the bank's BankID login
 //   { "action": "callback", code, state }                    → stores the session (consent)
-//   { "action": "fetch" }                                    → pulls raw data (max 2/day)
+//   { "action": "fetch" }                                    → pulls raw data (max 4/day)
 //   { "action": "disconnect", session_id }                   → ends a session
 //
 // Secrets (supabase secrets set …):
@@ -19,7 +19,7 @@
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2"
 
 const EB = "https://api.enablebanking.com"
-const DAILY_LIMIT = 2
+const DAILY_LIMIT = 4 // the PSD2 limit for unattended access; keep in sync with BANK_DAILY_LIMIT in lib/bank.ts
 const DEMO_EMAIL = "demo@demo.com"
 const MAX_PAGES = 200
 
