@@ -1,0 +1,15 @@
+/*
+ * Our cards put a ReflectiveCard on each face of a FlipCard. FlipCard clips its
+ * faces (overflow: hidden), which cuts off the reflective card as it tilts and
+ * hides its shadow — let the faces overflow and stay transparent instead.
+ * (Plain CSS, two classes: beats FlipCard.css without editing it.)
+ */
+.payment-card .flip-card__face {
+  overflow: visible;
+  background: transparent;
+}
+
+/* Room between the chip and the card name (ReflectiveCard.css sets margin: 0). */
+.payment-card .payment-card__name {
+  margin-top: 28px;
+}

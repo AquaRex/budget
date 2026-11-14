@@ -41,6 +41,7 @@ import {
 import { Panel } from "@/components/stats/panel"
 import FlipCard from "@/components/FlipCard"
 import ReflectiveCard from "@/components/ReflectiveCard"
+import "./payment-cards.css"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
   CheckmarkBadge01Icon,
@@ -195,8 +196,8 @@ function CardTile({
   const groups = (n: string) => n.replace(/(\d{4})(?=\d)/g, "$1 ")
 
   // Your React Bits settings ("Studio" = no video: it reflects a soft studio).
-  // Radius 40 at full width, scaled down with the card on narrow screens.
-  const radius = Math.round((40 * width) / 420)
+  // Radius 20 at full width (half of the React Bits 40), scaled with the card.
+  const radius = Math.round((20 * width) / 420)
   const surface = {
     width,
     height,
@@ -212,6 +213,8 @@ function CardTile({
     bevel: 4.5,
     enableTilt: true, // the reflective card does the tilting
     tiltStrength: 16,
+    // Padding normally follows the radius; keep it as it was with radius 40.
+    style: { "--rc-pad": "22px" } as React.CSSProperties,
   }
 
   const header = (
@@ -236,7 +239,7 @@ function CardTile({
       {header}
       <div className="reflective-card__identity">
         <GoldChip />
-        <h3 className="reflective-card__name mt-6 truncate">{card.name}</h3>
+        <h3 className="reflective-card__name payment-card__name truncate">{card.name}</h3>
         {accountName && (
           <p className="reflective-card__role truncate">{accountName}</p>
         )}
@@ -319,7 +322,7 @@ function CardTile({
   )
 
   return (
-    <div ref={ref} className="w-full max-w-[420px]">
+    <div ref={ref} className="payment-card w-full max-w-[420px]">
       <FlipCard
         front={front}
         back={back}
