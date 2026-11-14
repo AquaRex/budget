@@ -10,7 +10,6 @@
 // subtracts reservations, but may also include a credit limit, so it isn't
 // used as the real number.
 
-import { getDemoMode } from "@/lib/demo-mode"
 import { accountFromKey, rawCents } from "@/lib/reconcile"
 import { getSupabase } from "@/lib/supabase/client"
 
@@ -70,7 +69,6 @@ function pick(list: RawBalance[], order: string[]) {
 }
 
 export async function fetchBankBalances(): Promise<BankBalances | null> {
-  if (getDemoMode() !== "off") return null
   const supabase = getSupabase()
   const { data: fetches, error } = await supabase
     .from("bank_fetches")

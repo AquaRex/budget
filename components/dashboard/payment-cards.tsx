@@ -17,7 +17,7 @@ import {
   useAccountLabel,
   useCards,
 } from "@/lib/data/accounts"
-import { getDemoMode } from "@/lib/demo-mode"
+import { MASK, getDemoMode, useDemoMode } from "@/lib/demo-mode"
 import { errMessage } from "@/lib/errors"
 import { formatNOK } from "@/lib/format"
 import { accountFromKey } from "@/lib/reconcile"
@@ -41,6 +41,11 @@ import {
 import { Panel } from "@/components/stats/panel"
 import FlipCard from "@/components/FlipCard"
 import ReflectiveCard from "@/components/ReflectiveCard"
+import { HugeiconsIcon } from "@hugeicons/react"
+import {
+  CheckmarkBadge01Icon,
+  FingerPrintIcon,
+} from "@hugeicons/core-free-icons"
 
 const NETWORKS: { value: CardNetwork; label: string }[] = [
   { value: "visa", label: "Visa" },
@@ -53,29 +58,36 @@ const NETWORKS: { value: CardNetwork; label: string }[] = [
 export function PaymentCards({ accounts }: { accounts: AccountBalance[] }) {
   const { data: cards } = useCards()
   const [editing, setEditing] = useState<PaymentCard | "new" | null>(null)
+  const demo = useDemoMode() !== "off"
 
   return (
     <Panel
       title="Cards"
       action={
-        <Button
-          size="icon-sm"
-          variant="ghost"
-          aria-label="Add card"
-          onClick={() => setEditing("new")}
-        >
-          <Plus className="size-4" />
-        </Button>
+        demo ? undefined : (
+          <Button
+            size="icon-sm"
+            variant="ghost"
+            aria-label="Add card"
+            onClick={() => setEditing("new")}
+          >
+            <Plus className="size-4" />
+          </Button>
+        )
       }
     >
       {!cards?.length ? (
-        <button
-          type="button"
-          onClick={() => setEditing("new")}
-          className="text-muted-foreground hover:text-foreground w-full border border-dashed p-6 text-center text-sm"
-        >
-          Add a card to see its balance here
-        </button>
+        demo ? (
+          <p className="text-muted-foreground text-sm">No cards added.</p>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setEditing("new")}
+            className="text-muted-foreground hover:text-foreground w-full border border-dashed p-6 text-center text-sm"
+          >
+            Add a card to see its balance here
+          </button>
+        )
       ) : (
         <div className="flex flex-col gap-3">
           {cards.map((c) => (
@@ -141,13 +153,14 @@ function CardTile({
   account: AccountBalance | undefined
   onEdit: () => void
 }) {
+  const demo = useDemoMode() !== "off"
   const [secret, setSecret] = useState<CardSecret | null>(null)
   const [loading, setLoading] = useState(false)
-  const shown = secret !== null
+  const shown = secret !== null && !demo
   const label = useAccountLabel()
   const network = NETWORKS.find((n) => n.value === card.network)?.label
   const { ref, width } = useFitWidth(420)
-  const height = Math.round(width / 1.586) // real card proportions
+  const height = Math.round(width / 1.51) // the reference card, turned sideways
 
   // Hide again automatically after a minute.
   useEffect(() => {
@@ -184,65 +197,70 @@ function CardTile({
   const surface = {
     width,
     height,
-    radius: 18,
+    radius: 22,
     webcam: false, // never use the camera
     enableTilt: false, // FlipCard does the tilting
-    intro: false,
   }
+
+  const header = (
+    <div className="reflective-card__header">
+      <span className="reflective-card__badge">
+        <HugeiconsIcon
+          icon={CheckmarkBadge01Icon}
+          size={16}
+          strokeWidth={1.8}
+        />
+        Verified
+      </span>
+      <span className="reflective-card__status">
+        <span className="reflective-card__dot" />
+        Active
+      </span>
+    </div>
+  )
 
   const front = (
     <ReflectiveCard {...surface}>
-      <div className="flex h-full flex-col justify-between text-white">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <div className="truncate text-sm font-semibold">{card.name}</div>
-            {accountName && (
-              <div className="truncate text-[11px] text-white/70">
-                {accountName}
-              </div>
-            )}
-          </div>
-          <NoFlip>
-            <Button
-              size="icon-sm"
-              variant="ghost"
-              className={iconBtn}
-              aria-label="Edit card"
-              onClick={onEdit}
-            >
-              <Pencil className="size-3.5" />
-            </Button>
-          </NoFlip>
-        </div>
-        <div className="h-7 w-9 rounded-md bg-gradient-to-br from-amber-200 to-amber-500 shadow-inner" />
-        <div className="flex items-end justify-between gap-3">
-          <div className="font-mono text-sm tracking-widest">
+      {header}
+      <div className="reflective-card__identity">
+        <GoldChip />
+        <h3 className="reflective-card__name mt-3 truncate">{card.name}</h3>
+        {accountName && (
+          <p className="reflective-card__role truncate">{accountName}</p>
+        )}
+      </div>
+      <div className="reflective-card__footer !mt-4">
+        <div className="reflective-card__id">
+          <span className="reflective-card__label">Card number</span>
+          <span className="reflective-card__value">
             •••• •••• •••• {card.last4 ?? "••••"}
-            <div className="mt-1 text-[10px] tracking-normal text-white/60">
-              Tap to flip
-            </div>
-          </div>
-          <div className="text-right">
-            <div className="text-[10px] tracking-wider text-white/70 uppercase">
-              {network ?? ""}
-            </div>
-            <div className="text-xl font-semibold tabular-nums">
-              {account?.real != null ? formatNOK(account.real, true) : "—"}
-            </div>
-          </div>
+          </span>
         </div>
+        <div className="reflective-card__id ml-auto text-right">
+          <span className="reflective-card__label">
+            {network ? `${network} · ` : ""}Available
+          </span>
+          <span className="reflective-card__value">
+            {demo
+              ? `${MASK} kr`
+              : account?.real != null
+                ? formatNOK(account.real, true)
+                : "—"}
+          </span>
+        </div>
+        <span className="reflective-card__tile">
+          <HugeiconsIcon icon={FingerPrintIcon} size={22} strokeWidth={1.6} />
+        </span>
       </div>
     </ReflectiveCard>
   )
 
   const back = (
     <ReflectiveCard {...surface}>
-      <div className="flex h-full flex-col justify-between text-white">
-        <div className="-mx-(--rc-pad) h-9 bg-black/70" aria-hidden />
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-[11px] tracking-wider text-white/70 uppercase">
-            Card details
-          </span>
+      <div className="-mx-(--rc-pad) h-10 bg-black/75" aria-hidden />
+      <div className="mt-3 flex items-center justify-between gap-2">
+        <span className="reflective-card__label">Card details</span>
+        {!demo && (
           <NoFlip>
             <Button
               size="icon-sm"
@@ -258,19 +276,31 @@ function CardTile({
                 <Eye className="size-4" />
               )}
             </Button>
+            <Button
+              size="icon-sm"
+              variant="ghost"
+              className={iconBtn}
+              aria-label="Edit card"
+              onClick={onEdit}
+            >
+              <Pencil className="size-3.5" />
+            </Button>
           </NoFlip>
-        </div>
-        <div className="flex flex-col gap-2 font-mono tabular-nums">
-          <div className="text-base tracking-widest">
+        )}
+      </div>
+      <div className="mt-auto flex flex-col gap-3">
+        <div className="reflective-card__id">
+          <span className="reflective-card__label">Card number</span>
+          <span className="reflective-card__value !text-lg">
             {shown && secret?.number
               ? groups(secret.number)
               : `•••• •••• •••• ${shown ? (card.last4 ?? "••••") : "••••"}`}
-          </div>
-          <div className="flex gap-5 text-xs">
-            <Field k="Expires" v={shown ? (card.expiry ?? "—") : "••/••"} />
-            <Field k="CVC" v={shown ? (secret?.cvc ?? "—") : "•••"} />
-            <Field k="PIN" v={shown ? (secret?.pin ?? "—") : "••••"} />
-          </div>
+          </span>
+        </div>
+        <div className="flex gap-6">
+          <Field k="Expires" v={shown ? (card.expiry ?? "—") : "••/••"} />
+          <Field k="CVC" v={shown ? (secret?.cvc ?? "—") : "•••"} />
+          <Field k="PIN" v={shown ? (secret?.pin ?? "—") : "••••"} />
         </div>
       </div>
     </ReflectiveCard>
@@ -298,11 +328,48 @@ function CardTile({
 
 function Field({ k, v }: { k: string; v: string }) {
   return (
-    <div className="flex flex-col">
-      <span className="text-[9px] tracking-wider text-white/60 uppercase">
-        {k}
-      </span>
-      <span>{v}</span>
+    <div className="reflective-card__id">
+      <span className="reflective-card__label">{k}</span>
+      <span className="reflective-card__value">{v}</span>
+    </div>
+  )
+}
+
+/**
+ * EMV chip in shiny gold, after the classic contact pattern. The highlight
+ * follows FlipCard's glare position (--fc-gx/--fc-gy), so it shines as the
+ * card tilts.
+ */
+function GoldChip() {
+  return (
+    <div
+      className="relative h-[34px] w-[46px] overflow-hidden rounded-[8px] shadow-[inset_0_0_0_1px_rgba(90,60,10,0.55),0_1px_2px_rgba(0,0,0,0.5)]"
+      style={{
+        backgroundImage: [
+          "radial-gradient(circle at var(--fc-gx, 30%) var(--fc-gy, 25%), rgba(255,250,220,0.95) 0%, rgba(255,236,170,0.55) 18%, rgba(255,220,130,0) 45%)",
+          "linear-gradient(135deg, #f7dd8b 0%, #d9aa45 35%, #f3d27a 55%, #b8862c 80%, #e7c06a 100%)",
+        ].join(", "),
+      }}
+      aria-hidden
+    >
+      <svg
+        viewBox="0 0 100 76"
+        className="absolute inset-0 size-full"
+        fill="none"
+        stroke="rgba(92,62,12,0.65)"
+        strokeWidth="2.4"
+        strokeLinejoin="round"
+      >
+        {/* top V into the centre stem */}
+        <path d="M32 0 L48 16 Q50 18 50 21 L50 25 Q50 28 47 28 L0 28" />
+        <path d="M68 0 L52 16" />
+        <path d="M100 28 L56 28 Q53 28 53 31 L53 52" />
+        <path d="M37 28 L37 52" />
+        {/* middle band */}
+        <path d="M0 52 L100 52" />
+        {/* bottom V */}
+        <path d="M50 52 L50 58 M50 58 L32 76 M50 58 L68 76" />
+      </svg>
     </div>
   )
 }

@@ -8,6 +8,7 @@ import useSWR from "swr"
 import { type AccountBalance, fetchBankBalances } from "@/lib/bank-balances"
 import { saveAccountName, useAccountLabel } from "@/lib/data/accounts"
 import { errMessage } from "@/lib/errors"
+import { MASK, useDemoMode } from "@/lib/demo-mode"
 import { formatNOK } from "@/lib/format"
 import { accountFromKey } from "@/lib/reconcile"
 import { cn } from "@/lib/utils"
@@ -45,6 +46,7 @@ function AccountsPanel({
   accounts: AccountBalance[]
   asOf: string | null
 }) {
+  const demo = useDemoMode() !== "off"
   const nok = accounts.filter((a) => a.currency === "NOK" && a.real !== null)
   const total = nok.reduce((s, a) => s + (a.real ?? 0), 0)
   const pendingTotal = nok.reduce((s, a) => s + a.pending, 0)
@@ -66,11 +68,12 @@ function AccountsPanel({
       <div className="flex flex-col gap-3">
         <div className="flex flex-wrap items-baseline gap-x-3">
           <span className="text-3xl font-semibold tabular-nums">
-            {formatNOK(total, true)}
+            {demo ? `${MASK} kr` : formatNOK(total, true)}
           </span>
           {pendingTotal !== 0 && (
             <span className="text-muted-foreground text-xs tabular-nums">
-              incl. {formatNOK(pendingTotal, true)} pending
+              incl. {demo ? `${MASK} kr` : formatNOK(pendingTotal, true)}{" "}
+              pending
             </span>
           )}
         </div>
@@ -91,8 +94,14 @@ function AccountRow({ a }: { a: AccountBalance }) {
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState("")
+  // Demo mode: names stay, amounts never show (bank balances aren't scrambled).
+  const demo = useDemoMode() !== "off"
   const money = (n: number) =>
-    a.currency === "NOK" ? formatNOK(n, true) : `${n.toFixed(2)} ${a.currency}`
+    demo
+      ? `${MASK} ${a.currency === "NOK" ? "kr" : a.currency}`
+      : a.currency === "NOK"
+        ? formatNOK(n, true)
+        : `${n.toFixed(2)} ${a.currency}`
 
   async function save() {
     try {
@@ -154,17 +163,19 @@ function AccountRow({ a }: { a: AccountBalance }) {
                 {acct.replace(/^(\d{4})(\d{2})(\d{5})$/, "$1.$2.$3")}
               </div>
             </button>
-            <Button
-              size="icon-sm"
-              variant="ghost"
-              aria-label="Rename account"
-              onClick={() => {
-                setDraft(name ?? "")
-                setEditing(true)
-              }}
-            >
-              <Pencil className="size-3.5" />
-            </Button>
+            {!demo && (
+              <Button
+                size="icon-sm"
+                variant="ghost"
+                aria-label="Rename account"
+                onClick={() => {
+                  setDraft(name ?? "")
+                  setEditing(true)
+                }}
+              >
+                <Pencil className="size-3.5" />
+              </Button>
+            )}
             <span
               className={cn(
                 "shrink-0 font-semibold tabular-nums",
