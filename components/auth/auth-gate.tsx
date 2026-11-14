@@ -1,11 +1,13 @@
 "use client"
 
+import { useState } from "react"
 import { Loader2 } from "lucide-react"
 
 import { useAuth } from "@/components/auth/auth-provider"
 import { PasswordForm } from "@/components/auth/password-form"
 import { MfaEnroll } from "@/components/auth/mfa-enroll"
 import { MfaChallenge } from "@/components/auth/mfa-challenge"
+import { PinLock } from "@/components/pin/pin-lock"
 import { DesktopSiteNotice } from "@/components/os/desktop-site-notice"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
@@ -16,8 +18,17 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
  */
 export function AuthGate({ children }: { children: React.ReactNode }) {
   const { status } = useAuth()
+  // A full password / 2FA sign-in on this load counts as unlocking, so a
+  // forgotten PIN can be recovered by signing out and back in.
+  const [signedInNow, setSignedInNow] = useState(false)
+  if (
+    !signedInNow &&
+    (status === "password" || status === "enroll" || status === "challenge")
+  ) {
+    setSignedInNow(true)
+  }
 
-  if (status === "ready") return <>{children}</>
+  if (status === "ready") return <PinLock skip={signedInNow}>{children}</PinLock>
 
   return (
     <div className="bg-muted/40 flex min-h-svh flex-col">

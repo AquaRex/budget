@@ -26,7 +26,22 @@ function stored(): string | null {
   return cached
 }
 
+// A temporary mode that wins over the stored one without being saved: the PIN
+// lock shows the page as "mask" behind its blur until it's unlocked.
+let override: DemoMode | null = null
+
+/** Force a mode until cleared with null; the stored choice is untouched. */
+export function setDemoOverride(mode: DemoMode | null, notify = true): void {
+  override = mode
+  if (notify) {
+    listeners.forEach((l) => l())
+  }
+}
+
 export function getDemoMode(): DemoMode {
+  if (override) {
+    return override
+  }
   const s = stored()
   return !s ? "off" : s.startsWith("scramble:") ? "scramble" : "mask"
 }

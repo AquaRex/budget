@@ -1,6 +1,7 @@
 "use client"
 
 import { DemoModeToggle } from "@/components/settings/demo-mode-toggle"
+import { PinLockSettings } from "@/components/settings/pin-lock-settings"
 import { DateModeToggle } from "@/components/settings/date-mode-toggle"
 import { TransfersToggle } from "@/components/settings/transfers-toggle"
 import { ThemeToggle } from "@/components/settings/theme-toggle"
@@ -21,6 +22,7 @@ export default function SettingsPage() {
             <DateModeToggle />
             <TransfersToggle />
             <DemoModeToggle />
+            <PinLockSettings />
           </div>
         </Section>
 
