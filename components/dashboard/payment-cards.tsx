@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Eye, EyeOff, Pencil, Plus } from "lucide-react"
 import { toast } from "sonner"
 
@@ -21,7 +21,6 @@ import { getDemoMode } from "@/lib/demo-mode"
 import { errMessage } from "@/lib/errors"
 import { formatNOK } from "@/lib/format"
 import { accountFromKey } from "@/lib/reconcile"
-import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -40,6 +39,8 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Panel } from "@/components/stats/panel"
+import FlipCard from "@/components/FlipCard"
+import ReflectiveCard from "@/components/ReflectiveCard"
 
 const NETWORKS: { value: CardNetwork; label: string }[] = [
   { value: "visa", label: "Visa" },
@@ -100,6 +101,37 @@ export function PaymentCards({ accounts }: { accounts: AccountBalance[] }) {
   )
 }
 
+/** Keeps a press on a button inside the card from flipping or dragging it. */
+function NoFlip({ children }: { children: React.ReactNode }) {
+  return (
+    <span
+      className="flex shrink-0 gap-0.5"
+      onPointerDown={(e) => e.stopPropagation()}
+      onKeyDown={(e) => e.stopPropagation()}
+    >
+      {children}
+    </span>
+  )
+}
+
+/** Width that fits the panel (cards are fixed-size components), max 420px. */
+function useFitWidth(max: number) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [width, setWidth] = useState(max)
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const ro = new ResizeObserver(([e]) =>
+      setWidth(Math.max(240, Math.min(max, Math.floor(e.contentRect.width)))),
+    )
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [max])
+  return { ref, width }
+}
+
+const iconBtn = "text-white/80 hover:bg-white/15 hover:text-white"
+
 function CardTile({
   card,
   account,
@@ -114,6 +146,8 @@ function CardTile({
   const shown = secret !== null
   const label = useAccountLabel()
   const network = NETWORKS.find((n) => n.value === card.network)?.label
+  const { ref, width } = useFitWidth(420)
+  const height = Math.round(width / 1.586) // real card proportions
 
   // Hide again automatically after a minute.
   useEffect(() => {
@@ -141,75 +175,134 @@ function CardTile({
     }
   }
 
-  const number = secret?.number
-    ? secret.number.replace(/(\d{4})(?=\d)/g, "$1 ")
-    : `•••• •••• •••• ${shown ? (card.last4 ?? "????") : "••••"}`
+  const accountName = card.account_number
+    ? (label(card.account_number) ??
+      `Account …${card.account_number.slice(-4)}`)
+    : null
+  const groups = (n: string) => n.replace(/(\d{4})(?=\d)/g, "$1 ")
+
+  const surface = {
+    width,
+    height,
+    radius: 18,
+    webcam: false, // never use the camera
+    enableTilt: false, // FlipCard does the tilting
+    intro: false,
+  }
+
+  const front = (
+    <ReflectiveCard {...surface}>
+      <div className="flex h-full flex-col justify-between text-white">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <div className="truncate text-sm font-semibold">{card.name}</div>
+            {accountName && (
+              <div className="truncate text-[11px] text-white/70">
+                {accountName}
+              </div>
+            )}
+          </div>
+          <NoFlip>
+            <Button
+              size="icon-sm"
+              variant="ghost"
+              className={iconBtn}
+              aria-label="Edit card"
+              onClick={onEdit}
+            >
+              <Pencil className="size-3.5" />
+            </Button>
+          </NoFlip>
+        </div>
+        <div className="h-7 w-9 rounded-md bg-gradient-to-br from-amber-200 to-amber-500 shadow-inner" />
+        <div className="flex items-end justify-between gap-3">
+          <div className="font-mono text-sm tracking-widest">
+            •••• •••• •••• {card.last4 ?? "••••"}
+            <div className="mt-1 text-[10px] tracking-normal text-white/60">
+              Tap to flip
+            </div>
+          </div>
+          <div className="text-right">
+            <div className="text-[10px] tracking-wider text-white/70 uppercase">
+              {network ?? ""}
+            </div>
+            <div className="text-xl font-semibold tabular-nums">
+              {account?.real != null ? formatNOK(account.real, true) : "—"}
+            </div>
+          </div>
+        </div>
+      </div>
+    </ReflectiveCard>
+  )
+
+  const back = (
+    <ReflectiveCard {...surface}>
+      <div className="flex h-full flex-col justify-between text-white">
+        <div className="-mx-(--rc-pad) h-9 bg-black/70" aria-hidden />
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-[11px] tracking-wider text-white/70 uppercase">
+            Card details
+          </span>
+          <NoFlip>
+            <Button
+              size="icon-sm"
+              variant="ghost"
+              className={iconBtn}
+              aria-label={shown ? "Hide card details" : "Show card details"}
+              disabled={loading}
+              onClick={toggle}
+            >
+              {shown ? (
+                <EyeOff className="size-4" />
+              ) : (
+                <Eye className="size-4" />
+              )}
+            </Button>
+          </NoFlip>
+        </div>
+        <div className="flex flex-col gap-2 font-mono tabular-nums">
+          <div className="text-base tracking-widest">
+            {shown && secret?.number
+              ? groups(secret.number)
+              : `•••• •••• •••• ${shown ? (card.last4 ?? "••••") : "••••"}`}
+          </div>
+          <div className="flex gap-5 text-xs">
+            <Field k="Expires" v={shown ? (card.expiry ?? "—") : "••/••"} />
+            <Field k="CVC" v={shown ? (secret?.cvc ?? "—") : "•••"} />
+            <Field k="PIN" v={shown ? (secret?.pin ?? "—") : "••••"} />
+          </div>
+        </div>
+      </div>
+    </ReflectiveCard>
+  )
 
   return (
-    <div
-      className={cn(
-        "relative flex aspect-[1.586] max-w-sm flex-col justify-between overflow-hidden p-4 text-white shadow-sm",
-        card.network === "mastercard"
-          ? "bg-gradient-to-br from-zinc-800 to-zinc-950"
-          : card.network === "amex"
-            ? "bg-gradient-to-br from-sky-700 to-sky-950"
-            : "bg-gradient-to-br from-indigo-700 to-indigo-950",
-      )}
-    >
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <div className="truncate text-sm font-semibold">{card.name}</div>
-          {card.account_number && (
-            <div className="truncate text-[11px] text-white/70">
-              {label(card.account_number) ??
-                `Account …${card.account_number.slice(-4)}`}
-            </div>
-          )}
-        </div>
-        <div className="flex shrink-0 gap-0.5">
-          <Button
-            size="icon-sm"
-            variant="ghost"
-            className="text-white hover:bg-white/15 hover:text-white"
-            aria-label={shown ? "Hide card details" : "Show card details"}
-            disabled={loading}
-            onClick={toggle}
-          >
-            {shown ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-          </Button>
-          <Button
-            size="icon-sm"
-            variant="ghost"
-            className="text-white hover:bg-white/15 hover:text-white"
-            aria-label="Edit card"
-            onClick={onEdit}
-          >
-            <Pencil className="size-3.5" />
-          </Button>
-        </div>
-      </div>
+    <div ref={ref} className="w-full max-w-[420px]">
+      <FlipCard
+        front={front}
+        back={back}
+        width={width}
+        height={height}
+        radius={18}
+        background="transparent"
+        hoverScale={1.01}
+        tiltMax={8}
+        ariaLabel={`Flip card ${card.name}`}
+        onFlipChange={(b: boolean) => {
+          if (!b) setSecret(null) // hide details when turned back over
+        }}
+      />
+    </div>
+  )
+}
 
-      {/* Chip */}
-      <div className="h-6 w-8 rounded-sm bg-gradient-to-br from-amber-200 to-amber-500" />
-
-      <div className="flex items-end justify-between gap-3">
-        <div className="font-mono text-sm tracking-widest tabular-nums">
-          {number}
-          <div className="mt-1 flex gap-3 text-[11px] tracking-normal text-white/70">
-            <span>{shown ? (card.expiry ?? "--/--") : "••/••"}</span>
-            {shown && secret?.cvc && <span>CVC {secret.cvc}</span>}
-            {shown && secret?.pin && <span>PIN {secret.pin}</span>}
-          </div>
-        </div>
-        <div className="text-right">
-          <div className="text-[10px] tracking-wider text-white/70 uppercase">
-            {network ?? ""}
-          </div>
-          <div className="text-lg font-semibold tabular-nums">
-            {account?.real != null ? formatNOK(account.real, true) : "—"}
-          </div>
-        </div>
-      </div>
+function Field({ k, v }: { k: string; v: string }) {
+  return (
+    <div className="flex flex-col">
+      <span className="text-[9px] tracking-wider text-white/60 uppercase">
+        {k}
+      </span>
+      <span>{v}</span>
     </div>
   )
 }

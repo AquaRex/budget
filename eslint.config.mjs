@@ -15,6 +15,9 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // Supabase Edge Functions run on Deno, not in the Next app.
     "supabase/functions/**",
+    // Third-party React Bits components (added via shadcn), kept as shipped.
+    "components/FlipCard.jsx",
+    "components/ReflectiveCard.jsx",
   ]),
 ]);
 
