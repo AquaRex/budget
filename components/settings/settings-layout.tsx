@@ -4,6 +4,7 @@ const TABS = [
   { href: "/settings", label: "General" },
   { href: "/settings/categories", label: "Categories" },
   { href: "/settings/rules", label: "Rules" },
+  { href: "/settings/bank", label: "Bank" },
 ]
 
 /** The Settings heading and its sub-tabs, above one tab's content. */

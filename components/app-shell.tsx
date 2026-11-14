@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils"
 import { useAuth } from "@/components/auth/auth-provider"
 import { Button } from "@/components/ui/button"
 import { YearSelector } from "@/components/year-selector"
+import { BankUpdateButton } from "@/components/bank/bank-update-button"
 
 const nav = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -81,6 +82,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             })}
           </nav>
           <div className="ml-auto flex min-w-0 items-center gap-1">
+            <BankUpdateButton />
             {/* Many years scroll inside the header instead of widening the page. */}
             <div className="min-w-0 [scrollbar-width:none] overflow-x-auto">
               <YearSelector />
