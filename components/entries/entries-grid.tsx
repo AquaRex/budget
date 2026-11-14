@@ -68,9 +68,9 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 
-// Freeze the first (name) column only on ≥sm screens. On phones it would eat
-// the viewport and hide the months behind it, so let the row scroll as one.
-const sticky = "sm:sticky sm:left-0 sm:z-10"
+// Freeze the first (name) column. On phones it is kept narrow (long names are
+// cut with "…", full name on long-press) so the months sit right next to it.
+const sticky = "sticky left-0 z-10 max-w-[9rem] sm:max-w-none"
 const COLS = 18
 
 type Confirm = { id: string; name: string }
@@ -313,16 +313,21 @@ export function EntriesGrid({
             if (id) commitEntryMove(id, entry.category_id, entry.id)
           }}
         >
-          <div className="flex items-center gap-1.5">
+          <div className="flex min-w-0 items-center gap-1.5">
             <span
               draggable
               onDragStart={(e) => setDragId(e, REORDER_ENTRY, entry.id)}
-              className="text-muted-foreground/50 hover:text-foreground cursor-grab active:cursor-grabbing"
+              className="text-muted-foreground/50 hover:text-foreground hidden cursor-grab active:cursor-grabbing sm:inline"
               aria-label="Drag to reorder"
             >
               <GripVertical className="size-4" />
             </span>
-            <span className="font-medium whitespace-nowrap">{entry.name}</span>
+            <span
+              className="truncate font-medium whitespace-nowrap sm:overflow-visible"
+              title={entry.name}
+            >
+              {entry.name}
+            </span>
             {entry.is_salary ? (
               <Badge variant="secondary" className="text-[10px]">
                 salary

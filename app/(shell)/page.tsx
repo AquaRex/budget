@@ -166,7 +166,7 @@ export default function DashboardPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="bg-background/95 supports-backdrop-filter:backdrop-blur sticky top-14 z-10 -mx-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b px-4 py-3 sm:-mx-6 sm:px-6">
+      <div className="bg-background/95 supports-backdrop-filter:backdrop-blur z-10 -mx-4 sm:sticky sm:top-14 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b px-4 py-3 sm:-mx-6 sm:px-6">
         <div className="flex flex-col">
           <h1 className="text-2xl font-semibold tracking-tight">
             {scope === "month" ? monthLabel : year}
@@ -237,7 +237,7 @@ export default function DashboardPage() {
           <Button
             variant="ghost"
             size="icon-sm"
-            className="size-11 sm:size-9"
+            className="hidden size-11 sm:inline-flex sm:size-9"
             asChild
           >
             <Link href="/os" aria-label="Open phone view">

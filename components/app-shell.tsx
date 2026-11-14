@@ -1,5 +1,6 @@
 "use client"
 
+import { useSyncExternalStore } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useTheme } from "next-themes"
@@ -16,6 +17,7 @@ import {
   Landmark,
   ArrowRightLeft,
   LogOut,
+  X,
 } from "lucide-react"
 
 import { useDemoMode } from "@/lib/demo-mode"
@@ -28,18 +30,54 @@ import { useBankAutoImport } from "@/components/bank/use-bank-auto-import"
 const nav = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/budget", label: "Budget", icon: Receipt },
-  { href: "/transactions", label: "Transactions", icon: ArrowRightLeft },
+  {
+    href: "/transactions",
+    label: "Transactions",
+    short: "Activity", // fits the phone tab bar
+    icon: ArrowRightLeft,
+  },
   { href: "/groups", label: "Groups", icon: Layers },
   { href: "/savings", label: "Savings", icon: PiggyBank },
   { href: "/loans", label: "Debt", icon: Landmark },
   { href: "/settings", label: "Settings", icon: Settings },
 ]
 
+const BANNER_KEY = "budget.hideAppBanner"
+const bannerListeners = new Set<() => void>()
+
+/** Whether the "Open app" banner was dismissed on this device. */
+function useAppBannerHidden(): [boolean, () => void] {
+  const hidden = useSyncExternalStore(
+    (l) => {
+      bannerListeners.add(l)
+      return () => bannerListeners.delete(l)
+    },
+    () => {
+      try {
+        return localStorage.getItem(BANNER_KEY) === "1"
+      } catch {
+        return false
+      }
+    },
+    () => true, // prerender: hidden, so it never flashes in
+  )
+  const hide = () => {
+    try {
+      localStorage.setItem(BANNER_KEY, "1")
+    } catch {
+      // storage blocked — it just comes back next visit
+    }
+    bannerListeners.forEach((l) => l())
+  }
+  return [hidden, hide]
+}
+
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const { signOut } = useAuth()
   const { resolvedTheme, setTheme } = useTheme()
   const demo = useDemoMode()
+  const [appBannerHidden, hideAppBanner] = useAppBannerHidden()
   useBankAutoImport()
 
   // Normalize trailing slashes (trailingSlash: true) for active matching.
@@ -55,11 +93,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             aria-label="Budget"
           >
             <span className="bg-primary size-3" />
-            <span className="hidden text-xs font-semibold tracking-widest uppercase md:inline">
+            <span className="text-xs font-semibold tracking-widest uppercase sm:hidden md:inline">
               Budget
             </span>
           </Link>
-          <nav className="flex h-full shrink-0 items-center">
+          {/* Phones get the bottom tab bar instead (below). */}
+          <nav className="hidden h-full shrink-0 items-center sm:flex">
             {nav.map(({ href, label, icon: Icon }) => {
               const active =
                 path === href || (href !== "/" && path.startsWith(`${href}/`))
@@ -123,19 +162,31 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </header>
       {/* Phones get the dedicated app; the full site stays one tap away. */}
-      <Link
-        href="/os"
-        className="bg-primary/10 hover:bg-primary/15 flex items-center justify-between gap-3 border-b px-4 py-2.5 text-xs font-semibold tracking-wider uppercase transition-colors sm:hidden"
-      >
-        <span className="flex items-center gap-2">
-          <Smartphone className="size-4" />
-          Open app
-        </span>
-        <span className="text-muted-foreground flex items-center gap-1 font-normal tracking-normal normal-case">
-          Made for your phone
-          <ArrowRight className="size-3.5" />
-        </span>
-      </Link>
+      {!appBannerHidden && (
+        <div className="bg-primary/10 flex items-center border-b sm:hidden">
+          <Link
+            href="/os"
+            className="hover:bg-primary/15 flex min-w-0 flex-1 items-center justify-between gap-3 py-2.5 pl-4 text-xs font-semibold tracking-wider uppercase transition-colors"
+          >
+            <span className="flex items-center gap-2">
+              <Smartphone className="size-4" />
+              Open app
+            </span>
+            <span className="text-muted-foreground flex items-center gap-1 font-normal tracking-normal normal-case">
+              Made for your phone
+              <ArrowRight className="size-3.5" />
+            </span>
+          </Link>
+          <button
+            type="button"
+            onClick={hideAppBanner}
+            aria-label="Hide this banner"
+            className="text-muted-foreground hover:text-foreground flex size-11 shrink-0 items-center justify-center"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+      )}
       {demo !== "off" && (
         <Link
           href="/settings"
@@ -146,9 +197,43 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           is off — turn off in Settings
         </Link>
       )}
-      <main className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 2xl:max-w-[1600px]">
+      {/* Bottom padding on phones keeps content clear of the tab bar. */}
+      <main className="mx-auto w-full max-w-7xl px-4 pt-6 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:px-6 sm:pb-6 2xl:max-w-[1600px]">
         {children}
       </main>
+
+      {/* Phones: thumb-reachable tab bar. */}
+      <nav
+        aria-label="Main"
+        className="bg-background/95 supports-backdrop-filter:backdrop-blur fixed inset-x-0 bottom-0 z-30 border-t pb-[env(safe-area-inset-bottom)] sm:hidden"
+      >
+        <div className="grid grid-cols-7">
+          {nav.map(({ href, label, short, icon: Icon }) => {
+            const active =
+              path === href || (href !== "/" && path.startsWith(`${href}/`))
+            return (
+              <Link
+                key={href}
+                href={href}
+                aria-label={label}
+                aria-current={active ? "page" : undefined}
+                className={cn(
+                  "relative flex h-14 flex-col items-center justify-center gap-1 text-[10px] font-medium transition-colors active:bg-muted",
+                  active ? "text-foreground" : "text-muted-foreground",
+                )}
+              >
+                {active && (
+                  <span className="bg-primary absolute inset-x-3 top-0 h-0.5" />
+                )}
+                <Icon className="size-5" />
+                <span className="max-w-full truncate px-0.5">
+                  {short ?? label}
+                </span>
+              </Link>
+            )
+          })}
+        </div>
+      </nav>
     </div>
   )
 }

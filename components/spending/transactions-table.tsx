@@ -1101,7 +1101,7 @@ export function TransactionsTable({
 
       {/* Bulk actions */}
       {selectedRows.length > 0 && (
-        <div className="bg-background/95 supports-backdrop-filter:backdrop-blur sticky bottom-3 z-20 flex flex-wrap items-center gap-2 border border-primary/40 px-3 py-2 text-sm shadow-lg">
+        <div className="bg-background/95 supports-backdrop-filter:backdrop-blur sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-20 flex sm:bottom-3 flex-wrap items-center gap-2 border border-primary/40 px-3 py-2 text-sm shadow-lg">
           <span className="font-medium tabular-nums">
             {selectedRows.length} selected
           </span>
