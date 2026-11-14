@@ -1,4 +1,4 @@
-import type { Metadata } from "next"
+import type { Metadata, Viewport } from "next"
 import { Geist_Mono, Oxanium } from "next/font/google"
 
 import "./globals.css"
@@ -20,6 +20,23 @@ const fontMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Budget",
   description: "Personal monthly bills and income tracker",
+  // Installed on the home screen: full screen, content under the status bar
+  // (the header pads itself with the safe-area inset).
+  appleWebApp: {
+    capable: true,
+    title: "Budget",
+    statusBarStyle: "black-translucent",
+  },
+}
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ebebee" },
+    { media: "(prefers-color-scheme: dark)", color: "#09090b" },
+  ],
 }
 
 export default function RootLayout({

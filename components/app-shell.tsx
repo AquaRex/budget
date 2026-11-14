@@ -1,11 +1,9 @@
 "use client"
 
-import { useSyncExternalStore } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useTheme } from "next-themes"
 import {
-  ArrowRight,
   LayoutDashboard,
   Layers,
   Moon,
@@ -17,7 +15,6 @@ import {
   Landmark,
   ArrowRightLeft,
   LogOut,
-  X,
 } from "lucide-react"
 
 import { useDemoMode } from "@/lib/demo-mode"
@@ -42,42 +39,11 @@ const nav = [
   { href: "/settings", label: "Settings", icon: Settings },
 ]
 
-const BANNER_KEY = "budget.hideAppBanner"
-const bannerListeners = new Set<() => void>()
-
-/** Whether the "Open app" banner was dismissed on this device. */
-function useAppBannerHidden(): [boolean, () => void] {
-  const hidden = useSyncExternalStore(
-    (l) => {
-      bannerListeners.add(l)
-      return () => bannerListeners.delete(l)
-    },
-    () => {
-      try {
-        return localStorage.getItem(BANNER_KEY) === "1"
-      } catch {
-        return false
-      }
-    },
-    () => true, // prerender: hidden, so it never flashes in
-  )
-  const hide = () => {
-    try {
-      localStorage.setItem(BANNER_KEY, "1")
-    } catch {
-      // storage blocked — it just comes back next visit
-    }
-    bannerListeners.forEach((l) => l())
-  }
-  return [hidden, hide]
-}
-
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const { signOut } = useAuth()
   const { resolvedTheme, setTheme } = useTheme()
   const demo = useDemoMode()
-  const [appBannerHidden, hideAppBanner] = useAppBannerHidden()
   useBankAutoImport()
 
   // Normalize trailing slashes (trailingSlash: true) for active matching.
@@ -85,7 +51,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-svh">
-      <header className="bg-background/80 sticky top-0 z-20 border-b backdrop-blur">
+      {/* Top padding = the phone's status bar when installed on the home screen. */}
+      <header className="bg-background/80 sticky top-0 z-20 border-b pt-[env(safe-area-inset-top)] backdrop-blur">
         <div className="mx-auto flex h-14 w-full max-w-7xl items-center gap-2 px-4 sm:gap-4 sm:px-6 2xl:max-w-[1600px]">
           <Link
             href="/"
@@ -162,31 +129,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </header>
       {/* Phones get the dedicated app; the full site stays one tap away. */}
-      {!appBannerHidden && (
-        <div className="bg-primary/10 flex items-center border-b sm:hidden">
-          <Link
-            href="/os"
-            className="hover:bg-primary/15 flex min-w-0 flex-1 items-center justify-between gap-3 py-2.5 pl-4 text-xs font-semibold tracking-wider uppercase transition-colors"
-          >
-            <span className="flex items-center gap-2">
-              <Smartphone className="size-4" />
-              Open app
-            </span>
-            <span className="text-muted-foreground flex items-center gap-1 font-normal tracking-normal normal-case">
-              Made for your phone
-              <ArrowRight className="size-3.5" />
-            </span>
-          </Link>
-          <button
-            type="button"
-            onClick={hideAppBanner}
-            aria-label="Hide this banner"
-            className="text-muted-foreground hover:text-foreground flex size-11 shrink-0 items-center justify-center"
-          >
-            <X className="size-4" />
-          </button>
-        </div>
-      )}
       {demo !== "off" && (
         <Link
           href="/settings"

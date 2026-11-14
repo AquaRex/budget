@@ -318,7 +318,7 @@ export default function TransactionsPage() {
         <CsvDropzone rules={rules} onImported={refresh} large />
       ) : (
         <Tabs value={tab} onValueChange={setTab} className="gap-6">
-          <div className="bg-background/95 supports-backdrop-filter:backdrop-blur z-10 -mx-4 sm:sticky sm:top-14 flex flex-wrap items-center justify-between gap-3 border-b px-4 py-2 sm:-mx-6 sm:px-6">
+          <div className="bg-background/95 supports-backdrop-filter:backdrop-blur z-10 -mx-4 sm:sticky sm:top-[calc(3.5rem+env(safe-area-inset-top))] flex flex-wrap items-center justify-between gap-3 border-b px-4 py-2 sm:-mx-6 sm:px-6">
             <TabsList>
               <TabsTrigger value="transactions">List</TabsTrigger>
               <TabsTrigger value="bills">Bills</TabsTrigger>

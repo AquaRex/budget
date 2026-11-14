@@ -11,13 +11,15 @@ const shortcutIcon = [
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
+    // Same id as before, so an installed app updates instead of duplicating.
     id: `${base}/os/`,
-    name: "Budget OS",
+    name: "Budget",
     short_name: "Budget",
-    description:
-      "Quick-glance view of your monthly spending, pace and savings rate",
-    start_url: `${base}/os/`,
-    scope: `${base}/os/`,
+    description: "Your budget, transactions, savings and debt",
+    // The installed app opens the full website (built for phones too), so
+    // every page and setting is there. The reduced /os view stays reachable.
+    start_url: `${base}/`,
+    scope: `${base}/`,
     display: "standalone",
     display_override: ["standalone", "minimal-ui"],
     // The Fold turns between a tall cover screen and a near-square inner one.
@@ -28,11 +30,11 @@ export default function manifest(): MetadataRoute.Manifest {
     shortcuts: [
       {
         name: "Transactions",
-        url: `${base}/os/transactions/`,
+        url: `${base}/transactions/`,
         icons: shortcutIcon,
       },
-      { name: "Budget", url: `${base}/os/budget/`, icons: shortcutIcon },
-      { name: "Groups", url: `${base}/os/groups/`, icons: shortcutIcon },
+      { name: "Budget", url: `${base}/budget/`, icons: shortcutIcon },
+      { name: "Groups", url: `${base}/groups/`, icons: shortcutIcon },
     ],
     icons: [
       {

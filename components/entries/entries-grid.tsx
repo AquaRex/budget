@@ -127,10 +127,12 @@ export function EntriesGrid({
   const [headOffset, setHeadOffset] = useState(0)
 
   useEffect(() => {
-    const APP_HEADER = 56 // sticky app header height (h-14)
     let raf = 0
     const update = () => {
       raf = 0
+      // The sticky app header: h-14, plus the status bar when installed.
+      const APP_HEADER =
+        document.querySelector("header")?.getBoundingClientRect().bottom ?? 56
       const wrap = wrapperRef.current
       const thead = theadRef.current
       if (!wrap || !thead) return

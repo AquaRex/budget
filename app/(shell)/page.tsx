@@ -166,7 +166,7 @@ export default function DashboardPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="bg-background/95 supports-backdrop-filter:backdrop-blur z-10 -mx-4 sm:sticky sm:top-14 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b px-4 py-3 sm:-mx-6 sm:px-6">
+      <div className="bg-background/95 supports-backdrop-filter:backdrop-blur z-10 -mx-4 sm:sticky sm:top-[calc(3.5rem+env(safe-area-inset-top))] flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b px-4 py-3 sm:-mx-6 sm:px-6">
         <div className="flex flex-col">
           <h1 className="text-2xl font-semibold tracking-tight">
             {scope === "month" ? monthLabel : year}
