@@ -12,7 +12,7 @@ import {
   planBankImport,
 } from "@/lib/bank-import"
 import { bankText } from "@/lib/reconcile"
-import { useTransactions } from "@/lib/data/use-budget"
+import { useStoredTransactions as useTransactions } from "@/lib/data/use-budget"
 import { errMessage } from "@/lib/errors"
 import type { Transaction } from "@/lib/types"
 import { Button } from "@/components/ui/button"

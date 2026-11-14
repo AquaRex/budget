@@ -21,6 +21,7 @@ import {
   fetchMatchRules,
 } from "@/lib/data/transactions"
 import { fetchTypeCategories } from "@/lib/data/type-categories"
+import { fetchCurrentPending, pendingAsTransactions } from "@/lib/bank-pending"
 import { fetchTrades } from "@/lib/data/savings"
 import { buildAmountMap, type BudgetContext } from "@/lib/budget"
 import type { SalaryProfile } from "@/lib/salary"
@@ -150,12 +151,39 @@ export function useSalaryProfile(year?: number) {
   return { profile: data ?? null, error, isLoading, mutate }
 }
 
-export function useTransactions() {
+/** Only the rows stored in the database (imports and the bank import use this). */
+export function useStoredTransactions() {
   const { data, error, isLoading, mutate } = useSWR<Transaction[]>(
     "transactions",
     fetchTransactions,
   )
   return { transactions: data ?? [], error, isLoading, mutate }
+}
+
+/**
+ * The transaction list: stored rows plus the bank's current pending purchases
+ * (money already gone, not booked yet — shown and counted, never stored; see
+ * lib/bank-pending.ts). `mutate` refreshes the stored rows.
+ */
+export function useTransactions() {
+  const stored = useStoredTransactions()
+  const { data: pendingRaw } = useSWR("bank_pending", fetchCurrentPending, {
+    revalidateOnFocus: false,
+  })
+  const { rules } = useTxRules()
+  const { matchRules } = useMatchRules()
+  const pending = useMemo(
+    () =>
+      pendingRaw?.length && !stored.isLoading
+        ? pendingAsTransactions(pendingRaw, stored.transactions, rules, matchRules)
+        : [],
+    [pendingRaw, stored.transactions, stored.isLoading, rules, matchRules],
+  )
+  const transactions = useMemo(
+    () => (pending.length ? [...pending, ...stored.transactions] : stored.transactions),
+    [pending, stored.transactions],
+  )
+  return { ...stored, transactions }
 }
 
 export function useImports() {

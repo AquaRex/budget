@@ -17,12 +17,10 @@ import { mutate } from "swr"
 import {
   type BankTx,
   type ReconcileResult,
-  accountFromKey,
   bankText,
   bankTransactions,
   counterpartAccount,
   dayNum,
-  rawCents,
   reconcile,
   txLeg,
 } from "@/lib/reconcile"
@@ -241,57 +239,4 @@ export function historyIssues(
         .map((c) => c.tx),
     }))
     .sort((a, b) => b.tx.booked_date.localeCompare(a.tx.booked_date))
-}
-
-// ---------------------------------------------------------------- pending
-
-export type PendingBankTx = {
-  key: string
-  account: string
-  date: string
-  cents: number
-  currency: string
-  text: string
-}
-
-/**
- * The bank's CURRENT pending (reserved, not yet booked) transactions — shown,
- * never stored. "Current" = in the most recent pull of that account. Ones that
- * already have a look-alike in the list (e.g. a pending row from a CSV import)
- * are left out so nothing shows twice. When the bank books one, it drops out
- * of here and the booked version is added by the normal import.
- */
-export function pendingBankTransactions(
-  staged: StagedRaw[],
-  txs: Transaction[],
-): PendingBankTx[] {
-  const latest = new Map<string, string>()
-  for (const s of staged) {
-    const cur = latest.get(s.account_key)
-    if (!cur || s.last_seen_at > cur) latest.set(s.account_key, s.last_seen_at)
-  }
-  const pending: PendingBankTx[] = []
-  for (const s of staged) {
-    if (s.raw.status !== "PDNG") continue
-    if (s.last_seen_at !== latest.get(s.account_key)) continue // gone from the bank
-    const cents = rawCents(s.raw)
-    const date = String(s.raw.booking_date ?? s.raw.value_date ?? "")
-    if (!cents || !date) continue
-    const currency =
-      (s.raw.transaction_amount as { currency?: string } | undefined)
-        ?.currency ?? "NOK"
-    for (let c = 0; c < s.copies; c++) {
-      pending.push({
-        key: `${s.id}:${c}`,
-        account: accountFromKey(s.account_key),
-        date,
-        cents,
-        currency,
-        text: bankText(s.raw),
-      })
-    }
-  }
-  const existing = txs.map((t) => txLeg(t))
-  const r = reconcile(pending, existing)
-  return r.fresh.sort((a, b) => b.date.localeCompare(a.date))
 }

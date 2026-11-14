@@ -236,3 +236,8 @@ export function counterpartAccount(
     : (side?.other?.identification ?? "")
   return id ? digits(id) : null
 }
+
+/** Id prefix of pending bank purchases shown in the list but never stored. */
+export const PENDING_ID_PREFIX = "bank-pending:"
+
+export const isPendingBankId = (id: string) => id.startsWith(PENDING_ID_PREFIX)

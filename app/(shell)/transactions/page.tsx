@@ -28,7 +28,6 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CsvDropzone } from "@/components/spending/csv-dropzone"
 import { BankUpdateButton } from "@/components/bank/bank-update-button"
-import { BankPending } from "@/components/bank/bank-pending"
 import { SpendingSummary } from "@/components/spending/spending-summary"
 import { TransactionsTable } from "@/components/spending/transactions-table"
 import { ActualsGrid, type DrillMode } from "@/components/spending/actuals-grid"
@@ -312,8 +311,6 @@ export default function TransactionsPage() {
           )}
         </div>
       </div>
-
-      <BankPending />
 
       {lt ? (
         <Skeleton className="h-40 w-full" />

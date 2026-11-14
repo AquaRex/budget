@@ -1,4 +1,5 @@
 import { getSupabase } from "@/lib/supabase/client"
+import { isPendingBankId } from "@/lib/reconcile"
 import type {
   ImportBatch,
   MatchRule,
@@ -247,6 +248,7 @@ export async function resolveConflict(
   tx: Transaction,
   keep: "new" | "old",
 ): Promise<void> {
+  assertStored(tx.id)
   const supabase = getSupabase()
   const patch =
     keep === "new"
@@ -264,11 +266,23 @@ export async function resolveConflict(
   if (error) throw error
 }
 
+/** Pending bank purchases are shown but not stored, so they can't be edited yet. */
+function assertStored(id: string): void {
+  if (isPendingBankId(id)) {
+    throw new Error(
+      "This purchase is still pending at the bank. It can be changed once it's booked (usually within a few days).",
+    )
+  }
+}
+
+const storedIds = (ids: string[]) => ids.filter((id) => !isPendingBankId(id))
+
 /** One-off exception: re-categorise a single transaction, leaving its merchant's rule alone. */
 export async function setTransactionCategory(
   id: string,
   categoryId: string | null,
 ): Promise<void> {
+  assertStored(id)
   const supabase = getSupabase()
   const { error } = await supabase
     .from("transactions")
@@ -340,6 +354,7 @@ export async function setCategoryForIds(
   ids: string[],
   categoryId: string | null,
 ): Promise<void> {
+  ids = storedIds(ids)
   const supabase = getSupabase()
   for (let i = 0; i < ids.length; i += UPDATE_CHUNK) {
     const { error } = await supabase
@@ -357,6 +372,7 @@ export async function setTransactionLabel(
   id: string,
   labelId: string | null,
 ): Promise<void> {
+  assertStored(id)
   const supabase = getSupabase()
   const { error } = await supabase
     .from("transactions")
@@ -370,6 +386,7 @@ export async function setTransactionsLabel(
   ids: string[],
   labelId: string | null,
 ): Promise<void> {
+  ids = storedIds(ids)
   if (ids.length === 0) return
   const supabase = getSupabase()
   const { error } = await supabase
@@ -383,6 +400,7 @@ export async function setTransactionExcluded(
   id: string,
   excluded: boolean,
 ): Promise<void> {
+  assertStored(id)
   const supabase = getSupabase()
   const { error } = await supabase
     .from("transactions")

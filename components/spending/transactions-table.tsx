@@ -33,6 +33,7 @@ import { formatNOK } from "@/lib/format"
 import { RuleDialog } from "@/components/spending/rule-dialog"
 import { TxDetailsDialog } from "@/components/spending/tx-details-dialog"
 import { cn } from "@/lib/utils"
+import { isPendingBankId } from "@/lib/reconcile"
 import {
   deriveStem,
   descMatches,
@@ -1352,6 +1353,14 @@ const TxRow = memo(function TxRow({
           {r.text}
         </div>
         <div className="text-muted-foreground flex items-center gap-1.5 truncate text-xs">
+          {isPendingBankId(t.id) && (
+            <span
+              className="shrink-0 border border-amber-500/60 px-1 text-[10px] tracking-wide text-amber-600 uppercase"
+              title="Reserved by the bank, not booked yet. Counted as spent; can be edited once booked."
+            >
+              Pending
+            </span>
+          )}
           <span className="truncate">{t.type}</span>
           {(r.amount < 0 ? t.to_account : t.from_account) && (
             <span className="shrink-0 font-mono text-[11px]">
