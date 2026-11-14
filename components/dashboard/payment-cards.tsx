@@ -194,12 +194,24 @@ function CardTile({
     : null
   const groups = (n: string) => n.replace(/(\d{4})(?=\d)/g, "$1 ")
 
+  // Your React Bits settings ("Studio" = no video: it reflects a soft studio).
+  // Radius 40 at full width, scaled down with the card on narrow screens.
+  const radius = Math.round((40 * width) / 420)
   const surface = {
     width,
     height,
-    radius: 22,
+    radius,
     webcam: false, // never use the camera
-    enableTilt: false, // FlipCard does the tilting
+    tint: "#ffffff",
+    metalness: 1,
+    roughness: 0.4,
+    blurStrength: 10.5,
+    shine: 1.35,
+    glare: 0.3,
+    warpScale: 3,
+    bevel: 4.5,
+    enableTilt: true, // the reflective card does the tilting
+    tiltStrength: 16,
   }
 
   const header = (
@@ -224,7 +236,7 @@ function CardTile({
       {header}
       <div className="reflective-card__identity">
         <GoldChip />
-        <h3 className="reflective-card__name mt-3 truncate">{card.name}</h3>
+        <h3 className="reflective-card__name mt-6 truncate">{card.name}</h3>
         {accountName && (
           <p className="reflective-card__role truncate">{accountName}</p>
         )}
@@ -313,10 +325,13 @@ function CardTile({
         back={back}
         width={width}
         height={height}
-        radius={18}
+        radius={radius}
         background="transparent"
-        hoverScale={1.01}
-        tiltMax={8}
+        // FlipCard only flips; tilt, glare and shadow come from ReflectiveCard.
+        tilt={false}
+        glare={false}
+        shadow={false}
+        hoverScale={1}
         ariaLabel={`Flip card ${card.name}`}
         onFlipChange={(b: boolean) => {
           if (!b) setSecret(null) // hide details when turned back over
@@ -336,22 +351,31 @@ function Field({ k, v }: { k: string; v: string }) {
 }
 
 /**
- * EMV chip in shiny gold, after the classic contact pattern. The highlight
- * follows FlipCard's glare position (--fc-gx/--fc-gy), so it shines as the
- * card tilts.
+ * EMV chip in shiny gold, after the classic contact pattern. A highlight band
+ * sweeps across it with ReflectiveCard's own tilt (--rc-rotate-x/-y, which it
+ * sets on the card), so the gold catches the light as the card moves.
  */
 function GoldChip() {
   return (
     <div
       className="relative h-[34px] w-[46px] overflow-hidden rounded-[8px] shadow-[inset_0_0_0_1px_rgba(90,60,10,0.55),0_1px_2px_rgba(0,0,0,0.5)]"
       style={{
-        backgroundImage: [
-          "radial-gradient(circle at var(--fc-gx, 30%) var(--fc-gy, 25%), rgba(255,250,220,0.95) 0%, rgba(255,236,170,0.55) 18%, rgba(255,220,130,0) 45%)",
+        backgroundImage:
           "linear-gradient(135deg, #f7dd8b 0%, #d9aa45 35%, #f3d27a 55%, #b8862c 80%, #e7c06a 100%)",
-        ].join(", "),
       }}
       aria-hidden
     >
+      {/* Sweeping highlight: swings around a point below the chip as the card tilts. */}
+      <div
+        className="absolute -inset-x-[150%] -top-[60%] h-[220%] mix-blend-screen"
+        style={{
+          transformOrigin: "50% 260%",
+          transform:
+            "rotate(calc(var(--rc-rotate-y, 0deg) * -3 + var(--rc-rotate-x, 0deg) * 1.5 - 8deg))",
+          backgroundImage:
+            "linear-gradient(100deg, transparent 42%, rgba(255,248,215,0.15) 46%, rgba(255,252,235,0.9) 50%, rgba(255,248,215,0.15) 54%, transparent 58%)",
+        }}
+      />
       <svg
         viewBox="0 0 100 76"
         className="absolute inset-0 size-full"
