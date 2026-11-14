@@ -119,7 +119,7 @@ export function PinLockSettings() {
         )}
       </div>
       <Dialog open={setting} onOpenChange={setSetting}>
-        <DialogContent className="w-auto max-w-none rounded-[2rem] p-0 sm:max-w-none">
+        <DialogContent className="w-auto max-w-none p-0 sm:max-w-none">
           <DialogTitle className="sr-only">Set PIN</DialogTitle>
           {setting && <SetPin onDone={() => setSetting(false)} />}
         </DialogContent>
@@ -207,9 +207,9 @@ function SetPin({ onDone }: { onDone: () => void }) {
             aria-label="Next"
             disabled={pin.length < PIN_MIN}
             onClick={confirmFirst}
-            className="bg-primary text-primary-foreground hover:bg-primary/90"
+            variant="default"
           >
-            <Check className="size-6" strokeWidth={2.75} />
+            <Check />
           </Key>
         ) : undefined
       }

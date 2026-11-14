@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "motion/react"
 import { Check, Delete, Fingerprint, Shield } from "lucide-react"
 
 import { cn } from "@/lib/utils"
+import { Button } from "@/components/ui/button"
 
 const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9"]
 
@@ -48,7 +49,7 @@ export function PinPad({
   const inner = (
     <span className="relative grid size-20 place-items-center">
       <Shield
-        className="text-primary fill-primary/15 absolute inset-0 size-20"
+        className="text-primary absolute inset-0 size-20"
         strokeWidth={1.5}
       />
       <AnimatePresence mode="popLayout" initial={false}>
@@ -80,7 +81,7 @@ export function PinPad({
           type="button"
           onClick={onShield}
           aria-label="Unlock with fingerprint"
-          className="focus-visible:ring-ring/40 rounded-full transition-transform outline-none focus-visible:ring-2 active:scale-95"
+          className="focus-visible:ring-ring/30 outline-none focus-visible:ring-2 active:translate-y-px"
         >
           {inner}
         </button>
@@ -89,7 +90,7 @@ export function PinPad({
       )}
 
       <div className="flex flex-col items-center gap-1 text-center">
-        <h2 className="text-sm font-semibold tracking-widest uppercase">
+        <h2 className="text-muted-foreground text-[11px] font-semibold tracking-widest uppercase">
           {title}
         </h2>
         <p
@@ -120,8 +121,8 @@ export function PinPad({
                 className={cn(
                   "block transition-all duration-200",
                   dot
-                    ? "bg-primary size-3.5 rounded-full"
-                    : "bg-muted-foreground/50 h-0.5 w-6 rounded-full",
+                    ? "bg-primary size-3"
+                    : "bg-muted-foreground/50 h-0.5 w-6",
                 )}
               />
             </span>
@@ -143,24 +144,26 @@ export function PinPad({
           disabled={disabled || digits === 0}
           onClick={onBack}
           aria-label="Delete last digit"
-          className="bg-transparent hover:bg-muted/60"
+          variant="ghost"
         >
-          <Delete className="size-6" />
+          <Delete />
         </Key>
       </div>
     </div>
   )
 }
 
+/** A numpad key: the site's own Button, just square and big. */
 export function Key({
   className,
+  variant = "outline",
   ...props
-}: React.ComponentProps<"button">) {
+}: React.ComponentProps<typeof Button>) {
   return (
-    <button
-      type="button"
+    <Button
+      variant={variant}
       className={cn(
-        "bg-muted/70 hover:bg-muted focus-visible:ring-ring/40 grid size-[4.25rem] place-items-center max-[359px]:size-16 rounded-full text-2xl font-medium tabular-nums transition-[background-color,transform,opacity] outline-none select-none focus-visible:ring-2 active:scale-90 disabled:opacity-40",
+        "size-[4.25rem] text-xl tabular-nums max-[359px]:size-16 [&_svg:not([class*='size-'])]:size-5",
         className,
       )}
       {...props}

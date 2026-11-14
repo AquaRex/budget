@@ -12,6 +12,8 @@ import type { User } from "@supabase/supabase-js"
 
 import { useAuth } from "@/components/auth/auth-provider"
 import { PinPad } from "@/components/pin/pin-pad"
+import { Button } from "@/components/ui/button"
+import { Card } from "@/components/ui/card"
 import { getDemoMode, setDemoOverride } from "@/lib/demo-mode"
 import {
   PIN_MAX,
@@ -280,13 +282,7 @@ function LockScreen({
       transition={{ duration: 0.3 }}
       className="bg-background/30 pointer-events-auto fixed inset-0 z-[100] flex flex-col items-center justify-center gap-4 overflow-y-auto px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur-xl"
     >
-      <motion.div
-        initial={{ scale: 0.96, y: 8 }}
-        animate={{ scale: 1, y: 0 }}
-        exit={{ scale: 1.04 }}
-        transition={{ duration: 0.3, ease: "easeOut" }}
-        className="bg-card/90 rounded-[2rem] border shadow-2xl"
-      >
+      <Card className="gap-0 py-0">
         <PinPad
           title="Budget locked"
           hint={hint}
@@ -301,14 +297,10 @@ function LockScreen({
           onDigit={(d) => void press(d)}
           onBack={back}
         />
-      </motion.div>
-      <button
-        type="button"
-        onClick={() => void signOut()}
-        className="text-muted-foreground hover:text-foreground text-xs underline-offset-4 hover:underline"
-      >
+      </Card>
+      <Button variant="ghost" size="xs" onClick={() => void signOut()}>
         Forgot PIN? Sign out
-      </button>
+      </Button>
     </motion.div>
   )
 }
