@@ -240,19 +240,6 @@ export async function importTransactions(
   }
 }
 
-/** Delete ALL imported transactions and import batches (irreversible). */
-export async function deleteAllTransactions(): Promise<void> {
-  const supabase = getSupabase()
-  const all = "00000000-0000-0000-0000-000000000000"
-  const { error: e1 } = await supabase
-    .from("transactions")
-    .delete()
-    .neq("id", all)
-  if (e1) throw e1
-  const { error: e2 } = await supabase.from("imports").delete().neq("id", all)
-  if (e2) throw e2
-}
-
 /** Resolve a conflict: keep the newer (pending) value, or discard it. */
 export async function resolveConflict(
   tx: Transaction,
@@ -424,15 +411,6 @@ export async function setTransactionExcluded(
     .from("transactions")
     .update({ is_excluded: excluded })
     .eq("id", id)
-  if (error) throw error
-}
-
-export async function deleteImport(id: string): Promise<void> {
-  const supabase = getSupabase()
-  // Remove the batch's rows, then the batch.
-  const del = await supabase.from("transactions").delete().eq("import_id", id)
-  if (del.error) throw del.error
-  const { error } = await supabase.from("imports").delete().eq("id", id)
   if (error) throw error
 }
 

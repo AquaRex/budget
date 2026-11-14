@@ -16,6 +16,7 @@ The database is a permanent, long-term record (10–20+ years). Banks and CSV ex
 - A duplicate is only a fully identical row, and even then (e.g. two equal transfers on one day) it may be real. Never remove one automatically.
 - Never delete, archive, hide or overwrite existing transactions unless the user explicitly asks for that specific change.
 - Discrepancy checks are read-only information.
+- The website never bulk-deletes transactions (no "clear all", no "delete import"). Wiping data, if ever needed, is done by the user directly in the database. Settings → General offers a full read-only backup download instead.
 
 ## Importing transactions (CSV and bank)
 

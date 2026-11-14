@@ -5,7 +5,7 @@ import { DateModeToggle } from "@/components/settings/date-mode-toggle"
 import { TransfersToggle } from "@/components/settings/transfers-toggle"
 import { ThemeToggle } from "@/components/settings/theme-toggle"
 import { YearManager } from "@/components/settings/year-manager"
-import { DangerZone } from "@/components/settings/danger-zone"
+import { BackupDownload } from "@/components/settings/backup-download"
 import { Section, SettingsLayout } from "@/components/settings/settings-layout"
 
 export default function SettingsPage() {
@@ -31,7 +31,7 @@ export default function SettingsPage() {
           <YearManager />
         </Section>
 
-        <DangerZone />
+        <BackupDownload />
       </div>
     </SettingsLayout>
   )
