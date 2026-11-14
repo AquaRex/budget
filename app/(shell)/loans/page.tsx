@@ -5,6 +5,7 @@ import { Plus } from "lucide-react"
 import { toast } from "sonner"
 
 import { errMessage } from "@/lib/errors"
+import { useDemoMode } from "@/lib/demo-mode"
 import {
   deleteLoan,
   setLoanInOverview,
@@ -49,6 +50,15 @@ export default function LoansPage() {
   const [editing, setEditing] = useState<Loan | null>(null)
   const [adding, setAdding] = useState(false)
   const [removing, setRemoving] = useState<Loan | null>(null)
+  // Demo mode can't save, so "count in All debt" switches only change the
+  // view; leaving demo mode remounts the page and drops these.
+  const demo = useDemoMode() !== "off"
+  const [demoOverview, setDemoOverview] = useState<Record<string, boolean>>({})
+  const shownLoans = demo
+    ? loans.map((l) =>
+        l.id in demoOverview ? { ...l, in_overview: demoOverview[l.id] } : l,
+      )
+    : loans
 
   const typeMap = useMemo(() => buildTypeMap(typeCategories), [typeCategories])
   const projections = useMemo(
@@ -69,6 +79,10 @@ export default function LoansPage() {
     isLoading || categoriesLoading || transactionsLoading || typesLoading
 
   async function toggleOverview(l: Loan, inOverview: boolean) {
+    if (demo) {
+      setDemoOverview((m) => ({ ...m, [l.id]: inOverview }))
+      return
+    }
     try {
       await setLoanInOverview(l.id, inOverview)
       mutate()
@@ -119,7 +133,7 @@ export default function LoansPage() {
           )}
           {loans.length > 0 && (
             <LoansSummary
-              items={loans.map((l) => ({
+              items={shownLoans.map((l) => ({
                 loan: l,
                 projection: projections.get(l.id)!,
               }))}
