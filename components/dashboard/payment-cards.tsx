@@ -1,19 +1,23 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Eye, EyeOff, Pencil, Plus } from "lucide-react"
 import { toast } from "sonner"
 
 import type { AccountBalance } from "@/lib/bank-balances"
 import {
   type CardNetwork,
+  type CardSecret,
   type PaymentCard,
   type PaymentCardInput,
   deleteCard,
+  getCardSecret,
   saveCard,
+  setCardSecret,
   useAccountLabel,
   useCards,
 } from "@/lib/data/accounts"
+import { getDemoMode } from "@/lib/demo-mode"
 import { errMessage } from "@/lib/errors"
 import { formatNOK } from "@/lib/format"
 import { accountFromKey } from "@/lib/reconcile"
@@ -105,9 +109,42 @@ function CardTile({
   account: AccountBalance | undefined
   onEdit: () => void
 }) {
-  const [shown, setShown] = useState(false)
+  const [secret, setSecret] = useState<CardSecret | null>(null)
+  const [loading, setLoading] = useState(false)
+  const shown = secret !== null
   const label = useAccountLabel()
   const network = NETWORKS.find((n) => n.value === card.network)?.label
+
+  // Hide again automatically after a minute.
+  useEffect(() => {
+    if (!secret) return
+    const t = setTimeout(() => setSecret(null), 60_000)
+    return () => clearTimeout(t)
+  }, [secret])
+
+  async function toggle() {
+    if (shown) {
+      setSecret(null)
+      return
+    }
+    if (getDemoMode() !== "off") {
+      toast.info("Card details stay hidden while demo mode is on.")
+      return
+    }
+    setLoading(true)
+    try {
+      setSecret(await getCardSecret(card.id))
+    } catch (e) {
+      toast.error(errMessage(e, "Could not show the card details."))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const number = secret?.number
+    ? secret.number.replace(/(\d{4})(?=\d)/g, "$1 ")
+    : `•••• •••• •••• ${shown ? (card.last4 ?? "????") : "••••"}`
+
   return (
     <div
       className={cn(
@@ -135,7 +172,8 @@ function CardTile({
             variant="ghost"
             className="text-white hover:bg-white/15 hover:text-white"
             aria-label={shown ? "Hide card details" : "Show card details"}
-            onClick={() => setShown(!shown)}
+            disabled={loading}
+            onClick={toggle}
           >
             {shown ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
           </Button>
@@ -156,9 +194,11 @@ function CardTile({
 
       <div className="flex items-end justify-between gap-3">
         <div className="font-mono text-sm tracking-widest tabular-nums">
-          •••• •••• •••• {shown ? (card.last4 ?? "????") : "••••"}
-          <div className="mt-1 text-[11px] tracking-normal text-white/70">
-            {shown ? (card.expiry ?? "--/--") : "••/••"}
+          {number}
+          <div className="mt-1 flex gap-3 text-[11px] tracking-normal text-white/70">
+            <span>{shown ? (card.expiry ?? "--/--") : "••/••"}</span>
+            {shown && secret?.cvc && <span>CVC {secret.cvc}</span>}
+            {shown && secret?.pin && <span>PIN {secret.pin}</span>}
           </div>
         </div>
         <div className="text-right">
@@ -191,18 +231,33 @@ function CardDialog({
     expiry: card?.expiry ?? "",
     account_number: card?.account_number ?? "",
   })
+  const [secret, setSecretForm] = useState<CardSecret>({
+    number: "",
+    cvc: "",
+    pin: "",
+  })
   const [busy, setBusy] = useState(false)
   const set = (patch: Partial<PaymentCardInput>) =>
     setForm((f) => ({ ...f, ...patch }))
+  const onlyDigits = (v: string, max: number) =>
+    v.replace(/\D/g, "").slice(0, max)
+
+  const numberOk = !secret.number || /^\d{12,19}$/.test(secret.number)
+  const cvcOk = !secret.cvc || /^\d{3,4}$/.test(secret.cvc)
+  const pinOk = !secret.pin || /^\d{4,6}$/.test(secret.pin)
 
   const last4Ok = !form.last4 || /^\d{4}$/.test(form.last4)
   const expiryOk = !form.expiry || /^(0[1-9]|1[0-2])\/\d{2}$/.test(form.expiry)
-  const valid = form.name.trim() && last4Ok && expiryOk
+  const valid =
+    form.name.trim() && last4Ok && expiryOk && numberOk && cvcOk && pinOk
 
   async function save() {
     setBusy(true)
     try {
-      await saveCard(form, card?.id)
+      const id = await saveCard(form, card?.id)
+      if (secret.number || secret.cvc || secret.pin) {
+        await setCardSecret(id, secret)
+      }
       onClose()
     } catch (e) {
       toast.error(errMessage(e, "Could not save the card."))
@@ -318,9 +373,65 @@ function CardDialog({
               />
             </div>
           </div>
+          <div className="grid gap-1.5">
+            <Label htmlFor="card-number">Full card number</Label>
+            <Input
+              id="card-number"
+              type="password"
+              autoComplete="off"
+              inputMode="numeric"
+              placeholder={card?.secret_id ? "Saved — leave empty to keep" : ""}
+              value={secret.number}
+              aria-invalid={!numberOk}
+              onChange={(e) =>
+                setSecretForm((s) => ({
+                  ...s,
+                  number: onlyDigits(e.target.value, 19),
+                }))
+              }
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-1.5">
+              <Label htmlFor="card-cvc">CVC</Label>
+              <Input
+                id="card-cvc"
+                type="password"
+                autoComplete="off"
+                inputMode="numeric"
+                placeholder={card?.secret_id ? "Leave empty to keep" : ""}
+                value={secret.cvc}
+                aria-invalid={!cvcOk}
+                onChange={(e) =>
+                  setSecretForm((s) => ({
+                    ...s,
+                    cvc: onlyDigits(e.target.value, 4),
+                  }))
+                }
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="card-pin">PIN</Label>
+              <Input
+                id="card-pin"
+                type="password"
+                autoComplete="off"
+                inputMode="numeric"
+                placeholder={card?.secret_id ? "Leave empty to keep" : ""}
+                value={secret.pin}
+                aria-invalid={!pinOk}
+                onChange={(e) =>
+                  setSecretForm((s) => ({
+                    ...s,
+                    pin: onlyDigits(e.target.value, 6),
+                  }))
+                }
+              />
+            </div>
+          </div>
           <p className="text-muted-foreground text-xs">
-            Only the last 4 digits are stored — never the full card number, CVC
-            or PIN.
+            Card number, CVC and PIN are stored encrypted in Supabase Vault and
+            only decrypted when you click the eye icon (signed in with 2FA).
           </p>
         </div>
         <DialogFooter className="gap-2">

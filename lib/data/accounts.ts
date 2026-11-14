@@ -84,14 +84,21 @@ export type PaymentCard = {
   expiry: string | null // "MM/YY"
   account_number: string | null
   sort_order: number
+  /** Set when full number/CVC/PIN are saved (encrypted in Vault). */
+  secret_id: string | null
 }
 
-export type PaymentCardInput = Omit<PaymentCard, "id" | "sort_order">
+export type PaymentCardInput = Omit<
+  PaymentCard,
+  "id" | "sort_order" | "secret_id"
+>
 
 async function fetchCards(): Promise<PaymentCard[]> {
   const { data, error } = await getSupabase()
     .from("payment_cards")
-    .select("id, name, network, last4, expiry, account_number, sort_order")
+    .select(
+      "id, name, network, last4, expiry, account_number, sort_order, secret_id",
+    )
     .order("sort_order")
     .order("created_at")
   if (error) throw error
@@ -102,7 +109,11 @@ export function useCards() {
   return useSWR("payment_cards", fetchCards)
 }
 
-export async function saveCard(input: PaymentCardInput, id?: string) {
+/** Save a card's display details. Returns its id. */
+export async function saveCard(
+  input: PaymentCardInput,
+  id?: string,
+): Promise<string> {
   const supabase = getSupabase()
   const row = {
     name: input.name.trim(),
@@ -111,11 +122,46 @@ export async function saveCard(input: PaymentCardInput, id?: string) {
     expiry: input.expiry || null,
     account_number: input.account_number || null,
   }
-  const { error } = id
-    ? await supabase.from("payment_cards").update(row).eq("id", id)
-    : await supabase.from("payment_cards").insert(row)
+  if (id) {
+    const { error } = await supabase
+      .from("payment_cards")
+      .update(row)
+      .eq("id", id)
+    if (error) throw error
+  } else {
+    const { data, error } = await supabase
+      .from("payment_cards")
+      .insert(row)
+      .select("id")
+      .single()
+    if (error) throw error
+    id = data.id as string
+  }
+  await mutate("payment_cards")
+  return id!
+}
+
+export type CardSecret = { number?: string; cvc?: string; pin?: string }
+
+/** Store full number / CVC / PIN encrypted in Supabase Vault (blank = keep). */
+export async function setCardSecret(cardId: string, s: CardSecret) {
+  const { error } = await getSupabase().rpc("set_card_secret", {
+    p_card_id: cardId,
+    p_number: s.number || null,
+    p_cvc: s.cvc || null,
+    p_pin: s.pin || null,
+  })
   if (error) throw error
   await mutate("payment_cards")
+}
+
+/** Decrypt a card's secret details — only called when you click the eye. */
+export async function getCardSecret(cardId: string): Promise<CardSecret> {
+  const { data, error } = await getSupabase().rpc("get_card_secret", {
+    p_card_id: cardId,
+  })
+  if (error) throw error
+  return (data ?? {}) as CardSecret
 }
 
 export async function deleteCard(id: string) {
