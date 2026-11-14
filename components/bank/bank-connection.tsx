@@ -5,6 +5,7 @@ import { Loader2, Unplug } from "lucide-react"
 import { toast } from "sonner"
 
 import {
+  accountLabel,
   type Aspsp,
   type BankSession,
   completeBankAuth,
@@ -157,9 +158,7 @@ function SessionCard({ session }: { session: BankSession }) {
             key={a.uid ?? i}
             className="flex flex-wrap gap-x-3 border-t py-1.5"
           >
-            <span className="font-medium">
-              {a.name || a.product || "Unnamed account"}
-            </span>
+            <span className="font-medium">{accountLabel(a)}</span>
             <span className="text-muted-foreground tabular-nums">
               {a.account_id?.iban ?? "no IBAN"}
             </span>
@@ -221,7 +220,7 @@ function ConnectForm({
           variant={reconnect ? "outline" : "default"}
         >
           {busy && <Loader2 className="size-4 animate-spin" />}
-          {reconnect ? "Renew consent or add another bank…" : "Connect bank…"}
+          {reconnect ? "Renew consent…" : "Connect bank…"}
         </Button>
       </div>
     )

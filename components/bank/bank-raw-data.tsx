@@ -4,6 +4,7 @@ import { Fragment, useMemo, useState } from "react"
 import { Download, Loader2 } from "lucide-react"
 
 import {
+  accountLabel,
   type BankFetch,
   type RawTransaction,
   rawAmount,
@@ -144,7 +145,7 @@ export function BankRawData() {
     for (const s of sessions ?? []) {
       for (const a of s.accounts) {
         const key = a.account_id?.iban || a.identification_hash || a.uid
-        if (key) m.set(key, a.name || a.product || key)
+        if (key) m.set(key, accountLabel(a))
       }
     }
     return m

@@ -1,9 +1,9 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { Loader2 } from "lucide-react"
+import { Download, Loader2 } from "lucide-react"
 
-import { useBankSessions, useRawTransactions } from "@/lib/bank"
+import { accountLabel, useBankSessions, useRawTransactions } from "@/lib/bank"
 import {
   type AccountCompare,
   type CompareRow,
@@ -22,6 +22,19 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+
+/** Saves rows as a JSON file (all rows, every column, as stored). */
+function downloadJson(rows: unknown, name: string) {
+  const blob = new Blob([JSON.stringify(rows, null, 2)], {
+    type: "application/json",
+  })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement("a")
+  a.href = url
+  a.download = `${name}-${new Date().toISOString().slice(0, 10)}.json`
+  a.click()
+  URL.revokeObjectURL(url)
+}
 
 const nok = (n: number) =>
   n.toLocaleString("nb-NO", {
@@ -53,7 +66,7 @@ export function BankCompare() {
     for (const s of sessions ?? []) {
       for (const a of s.accounts) {
         const key = a.account_id?.iban || a.identification_hash || a.uid
-        if (key) m.set(key, a.name || a.product || key)
+        if (key) m.set(key, accountLabel(a))
       }
     }
     return m
@@ -86,6 +99,16 @@ export function BankCompare() {
         . A bank row &quot;matches&quot; a CSV row when the amount is identical
         and a date is within 4 days. Each CSV row can only match once.
       </p>
+      <div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => downloadJson(transactions, "transactions")}
+        >
+          <Download className="size-4" />
+          Download my transactions (JSON)
+        </Button>
+      </div>
       {result.accounts.map((a) => (
         <AccountBlock
           key={a.accountKey}

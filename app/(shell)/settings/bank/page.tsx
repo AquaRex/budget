@@ -13,7 +13,7 @@ export default function BankSettingsPage() {
       <div className="flex flex-col gap-10">
         <Section
           title="Bank connection"
-          description="Read-only access to your bank accounts through Enable Banking (PSD2). You approve it with BankID; consent lasts up to 180 days. You can connect more than one bank."
+          description="Read-only access to your bank accounts through Enable Banking (PSD2). You approve it with BankID; consent lasts up to 180 days."
         >
           <BankConnection />
         </Section>

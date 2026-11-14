@@ -278,3 +278,14 @@ export function rawDate(raw: Record<string, unknown>): string {
     raw.booking_date ?? raw.transaction_date ?? raw.value_date ?? "",
   )
 }
+
+/**
+ * A readable account label. The bank's `name` is the account HOLDER's name
+ * (the same on every account), so prefer the product, plus the last digits.
+ */
+export function accountLabel(a: BankAccount): string {
+  const iban = a.account_id?.iban
+  const tail = iban ? `…${iban.slice(-4)}` : ""
+  const base = a.product || a.cash_account_type || a.name || "Account"
+  return tail ? `${base} ${tail}` : base
+}
