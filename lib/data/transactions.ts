@@ -1,5 +1,12 @@
 import { getSupabase } from "@/lib/supabase/client"
+import { mutate } from "swr"
+
 import { isPendingBankId } from "@/lib/reconcile"
+import {
+  applyPendingLabels,
+  markPendingLabelsUsed,
+  savePendingLabel,
+} from "@/lib/pending-labels"
 import type {
   ImportBatch,
   MatchRule,
@@ -185,13 +192,16 @@ export async function importTransactions(
       category_id:
         matchRuleFor(r, matchRules)?.category_id ?? ruleCategoryFor(r, rules),
     }))
+    // A tag put on the purchase while it was pending at the bank comes along.
+    const tagged = await applyPendingLabels(rows)
     // Rows already present (same user_id + dedup_key) are ignored; `.select()`
     // returns only the rows that were actually inserted, so the count is true.
     const { data: insertedRows, error } = await supabase
       .from("transactions")
-      .upsert(rows, { onConflict: "user_id,dedup_key", ignoreDuplicates: true })
+      .upsert(tagged.rows, { onConflict: "user_id,dedup_key", ignoreDuplicates: true })
       .select("id")
     if (error) throw error
+    await markPendingLabelsUsed(tagged.usedIds)
     inserted = insertedRows?.length ?? 0
   }
 
@@ -371,7 +381,15 @@ export async function setCategoryForIds(
 export async function setTransactionLabel(
   id: string,
   labelId: string | null,
+  tx?: Transaction,
 ): Promise<void> {
+  // A pending bank purchase isn't stored yet: keep the tag as a note that is
+  // given to the booked row when it arrives.
+  if (isPendingBankId(id) && tx) {
+    await savePendingLabel(tx, labelId)
+    await mutate("pending_labels")
+    return
+  }
   assertStored(id)
   const supabase = getSupabase()
   const { error } = await supabase

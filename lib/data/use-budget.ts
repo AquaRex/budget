@@ -22,6 +22,7 @@ import {
 } from "@/lib/data/transactions"
 import { fetchTypeCategories } from "@/lib/data/type-categories"
 import { fetchCurrentPending, pendingAsTransactions } from "@/lib/bank-pending"
+import { fetchPendingLabels } from "@/lib/pending-labels"
 import { fetchTrades } from "@/lib/data/savings"
 import { buildAmountMap, type BudgetContext } from "@/lib/budget"
 import type { SalaryProfile } from "@/lib/salary"
@@ -170,15 +171,18 @@ export function useTransactions() {
   const { data: pendingRaw } = useSWR("bank_pending", fetchCurrentPending, {
     revalidateOnFocus: false,
   })
+  const { data: notes } = useSWR("pending_labels", fetchPendingLabels, {
+    revalidateOnFocus: false,
+  })
   const { rules } = useTxRules()
   const { matchRules } = useMatchRules()
-  const pending = useMemo(
-    () =>
-      pendingRaw?.length && !stored.isLoading
-        ? pendingAsTransactions(pendingRaw, stored.transactions, rules, matchRules)
-        : [],
-    [pendingRaw, stored.transactions, stored.isLoading, rules, matchRules],
-  )
+  const pending = useMemo(() => {
+    if (!pendingRaw?.length || stored.isLoading) return []
+    const tags = new Map((notes ?? []).map((n) => [n.pending_key, n.label_id]))
+    return pendingAsTransactions(pendingRaw, stored.transactions, rules, matchRules).map(
+      (t) => (tags.has(t.id) ? { ...t, label_id: tags.get(t.id)! } : t),
+    )
+  }, [pendingRaw, notes, stored.transactions, stored.isLoading, rules, matchRules])
   const transactions = useMemo(
     () => (pending.length ? [...pending, ...stored.transactions] : stored.transactions),
     [pending, stored.transactions],

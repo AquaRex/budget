@@ -599,7 +599,7 @@ export function TransactionsTable({
   async function pickTag(labelId: string | null) {
     const p = picker
     if (p?.kind === "tag") {
-      await run(() => setTransactionLabel(p.row.id, labelId), "Could not set tag.")
+      await run(() => setTransactionLabel(p.row.id, labelId, p.row.t), "Could not set tag.")
     } else if (p?.kind === "bulk-tag") {
       const ids = selectedRows.map((r) => r.id)
       await run(async () => {

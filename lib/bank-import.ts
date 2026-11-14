@@ -31,6 +31,7 @@ import {
   fetchTxRules,
 } from "@/lib/data/transactions"
 import { isInternalTx, matchRuleFor, ruleCategoryFor } from "@/lib/spending"
+import { applyPendingLabels, markPendingLabelsUsed } from "@/lib/pending-labels"
 import { getSupabase } from "@/lib/supabase/client"
 import type { Transaction } from "@/lib/types"
 
@@ -149,11 +150,16 @@ async function doImport(): Promise<BankImportResult> {
         matchRuleFor(r, matchRules)?.category_id ?? ruleCategoryFor(r, rules),
     }
   })
+  const tagged = await applyPendingLabels(rows)
   const { data, error } = await supabase
     .from("transactions")
-    .upsert(rows, { onConflict: "user_id,dedup_key", ignoreDuplicates: true })
+    .upsert(tagged.rows, {
+      onConflict: "user_id,dedup_key",
+      ignoreDuplicates: true,
+    })
     .select("id")
   if (error) throw error
+  await markPendingLabelsUsed(tagged.usedIds)
   await mutate("transactions")
   await mutate("imports")
   return { added: data?.length ?? 0, held: plan.held.length, tooMany: false }
@@ -185,11 +191,16 @@ export async function addHeld(items: BankTx[]): Promise<number> {
         matchRuleFor(r, matchRules)?.category_id ?? ruleCategoryFor(r, rules),
     }
   })
+  const tagged = await applyPendingLabels(rows)
   const { data, error } = await supabase
     .from("transactions")
-    .upsert(rows, { onConflict: "user_id,dedup_key", ignoreDuplicates: true })
+    .upsert(tagged.rows, {
+      onConflict: "user_id,dedup_key",
+      ignoreDuplicates: true,
+    })
     .select("id")
   if (error) throw error
+  await markPendingLabelsUsed(tagged.usedIds)
   await mutate("transactions")
   return data?.length ?? 0
 }
