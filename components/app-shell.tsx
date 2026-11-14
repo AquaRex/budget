@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils"
 import { useAuth } from "@/components/auth/auth-provider"
 import { Button } from "@/components/ui/button"
 import { YearSelector } from "@/components/year-selector"
+import { useBankAutoImport } from "@/components/bank/use-bank-auto-import"
 
 const nav = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -39,6 +40,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { signOut } = useAuth()
   const { resolvedTheme, setTheme } = useTheme()
   const demo = useDemoMode()
+  useBankAutoImport()
 
   // Normalize trailing slashes (trailingSlash: true) for active matching.
   const path = pathname?.replace(/\/+$/, "") || "/"

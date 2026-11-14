@@ -1,8 +1,8 @@
 "use client"
 
-import { BankCompare } from "@/components/bank/bank-compare"
 import { BankConnection } from "@/components/bank/bank-connection"
-import { BankFetchHistory, BankRawData } from "@/components/bank/bank-raw-data"
+import { BankFetchHistory } from "@/components/bank/bank-history"
+import { BankHeld, BankHistoryCheck } from "@/components/bank/bank-review"
 import { BankUpdateButton } from "@/components/bank/bank-update-button"
 import { BANK_DAILY_LIMIT } from "@/lib/bank"
 import { Section, SettingsLayout } from "@/components/settings/settings-layout"
@@ -20,24 +20,24 @@ export default function BankSettingsPage() {
 
         <Section
           title="Updates"
-          description={`Pull new data from the bank — only when you click, max ${BANK_DAILY_LIMIT} per day. Click a row for the full details.`}
+          description={`New transactions are fetched automatically every morning. The button gets them right away — up to ${BANK_DAILY_LIMIT} times a day. Only transactions not already in your list are added.`}
         >
           <BankUpdateButton />
           <BankFetchHistory />
         </Section>
 
         <Section
-          title="Compare with your transactions"
-          description="Read-only check of how the bank data lines up with what you've imported from CSV. Nothing is imported or changed."
+          title="Waiting for review"
+          description="Bank transactions that weren't added automatically because a very similar one is already in your list nearby."
         >
-          <BankCompare />
+          <BankHeld />
         </Section>
 
         <Section
-          title="Raw data (staging)"
-          description="Exactly what the bank sent, stored separately. Nothing here is added to your Transactions yet — this is for inspecting the data first. Click a row to see the raw JSON."
+          title="History check"
+          description="Compares your list with the bank's own records, for information. Read-only — it never changes or removes anything."
         >
-          <BankRawData />
+          <BankHistoryCheck />
         </Section>
       </div>
     </SettingsLayout>

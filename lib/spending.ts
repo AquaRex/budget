@@ -9,6 +9,7 @@ import type {
 import type { ParsedTx } from "@/lib/csv"
 import { getDateMode } from "@/lib/date-mode"
 import { getCountTransfers } from "@/lib/count-transfers"
+import { reconcile, txLeg } from "@/lib/reconcile"
 
 /** bank-type string -> budget category id. */
 export type TypeMap = Map<string, string>
@@ -346,6 +347,23 @@ export function classifyImport(
       }
     }
     toInsert.push(row)
+  }
+
+  // Last check before anything is added: the same transaction may already be in
+  // the list under a different look — re-dated by the bank (a preliminary
+  // transfer/eFaktura that settled days later with new text), or added from the
+  // bank API (no purchase time, other text). Same own account + amount, date
+  // within a few days, counted one-to-one → SKIP it (not added, existing row
+  // left exactly as it is). Only rows that are definitely new get added.
+  if (toInsert.length) {
+    const unused = existing
+      .filter((t) => !used.has(t.id))
+      .map((t) => ({ ...txLeg(t), t }))
+    const incoming = toInsert.map((row) => ({ ...txLeg(row), row }))
+    const r = reconcile(incoming, unused)
+    unchangedCount += r.exact.length + r.shifted.length
+    toInsert.length = 0
+    toInsert.push(...r.fresh.map((f) => f.row), ...r.held.map((h) => h.incoming.row))
   }
 
   return { toInsert, toUpdate, unchangedCount }

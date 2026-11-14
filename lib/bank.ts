@@ -1,14 +1,16 @@
 "use client"
 
-// Bank connection (Enable Banking / PSD2) — stage 1: raw data in staging tables
-// only. Nothing here touches public.transactions. All writes go through the
-// `bank` Edge Function; the site only reads the bank_* tables.
+// Bank connection (Enable Banking / PSD2). Pulling from the bank goes through
+// the `bank` Edge Function into the bank_* tables (kept forever, never changed);
+// lib/bank-import.ts then adds what's new to the transaction list.
 
 import useSWR, { mutate } from "swr"
 
+import { type BankImportResult, runBankImport } from "@/lib/bank-import"
 import { getSupabase } from "@/lib/supabase/client"
 
-export const BANK_DAILY_LIMIT = 4
+/** Pulls by the button per day. A daily automatic pull is on top (1/day); 3 + 1 = the bank's 4. */
+export const BANK_DAILY_LIMIT = 3
 
 export type BankAccount = {
   uid?: string
@@ -54,21 +56,9 @@ export type BankFetch = {
   started_at: string
   finished_at: string | null
   status: "running" | "ok" | "partial" | "error"
+  trigger: "manual" | "auto"
   error: string | null
   summary: { accounts?: FetchAccountSummary[] }
-}
-
-export type RawTransaction = {
-  id: string
-  account_key: string
-  session_id: string
-  raw: Record<string, unknown>
-  raw_hash: string
-  copies: number
-  last_fetch_id: string | null
-  first_seen_at: string
-  last_seen_at: string
-  seen_count: number
 }
 
 /** Today's date in Norway, yyyy-mm-dd (the daily limit resets at Oslo midnight). */
@@ -90,8 +80,9 @@ export function isActiveSession(s: BankSession): boolean {
   )
 }
 
-/** A fetch that counts towards the daily limit (mirrors bank_begin_fetch). */
+/** A button pull that counts towards the daily limit (mirrors bank_begin_fetch_v2). */
 export function countsTowardsLimit(f: BankFetch): boolean {
+  if (f.trigger !== "manual") return false
   if (f.status === "ok" || f.status === "partial") return true
   return (
     f.status === "running" &&
@@ -151,11 +142,14 @@ export const disconnectBank = (sessionId: string) =>
 export type FetchResult = {
   status: BankFetch["status"]
   accounts: FetchAccountSummary[]
+  imported: BankImportResult
 }
 
+/** Pull from the bank, then add whatever is new to the transaction list. */
 export async function runBankFetch(): Promise<FetchResult> {
   try {
-    return await callBank<FetchResult>({ action: "fetch" })
+    const r = await callBank<Omit<FetchResult, "imported">>({ action: "fetch" })
+    return { ...r, imported: await runBankImport() }
   } finally {
     await refreshBankData()
   }
@@ -165,13 +159,12 @@ export async function runBankFetch(): Promise<FetchResult> {
 
 const SESSIONS_KEY = "bank_sessions"
 const FETCHES_KEY = "bank_fetches"
-const RAW_KEY = "bank_raw_transactions"
 
 export function refreshBankData() {
   return Promise.all([
     mutate(SESSIONS_KEY),
     mutate(FETCHES_KEY),
-    mutate(RAW_KEY),
+    mutate("bank_staged"),
   ])
 }
 
@@ -196,26 +189,6 @@ async function fetchFetches(): Promise<BankFetch[]> {
   return (data ?? []) as BankFetch[]
 }
 
-async function fetchRaw(): Promise<RawTransaction[]> {
-  // PostgREST caps a response at 1000 rows, so page through everything.
-  const out: RawTransaction[] = []
-  const page = 1000
-  for (let from = 0; ; from += page) {
-    const { data, error } = await getSupabase()
-      .from("bank_raw_transactions")
-      .select(
-        "id, account_key, session_id, raw, raw_hash, copies, last_fetch_id, first_seen_at, last_seen_at, seen_count",
-      )
-      .order("first_seen_at", { ascending: true })
-      .order("id", { ascending: true })
-      .range(from, from + page - 1)
-    if (error) throw error
-    out.push(...((data ?? []) as RawTransaction[]))
-    if (!data || data.length < page) break
-  }
-  return out
-}
-
 export function useBankSessions() {
   return useSWR(SESSIONS_KEY, fetchSessions)
 }
@@ -224,11 +197,7 @@ export function useBankFetches() {
   return useSWR(FETCHES_KEY, fetchFetches)
 }
 
-export function useRawTransactions() {
-  return useSWR(RAW_KEY, fetchRaw, { revalidateOnFocus: false })
-}
-
-/** How many of today's updates are used, for the header button. */
+/** Today's button pulls used, and when the last automatic pull ran. */
 export function useBankUsage() {
   const { data: fetches } = useBankFetches()
   const { data: sessions } = useBankSessions()
@@ -236,47 +205,17 @@ export function useBankUsage() {
   const used = (fetches ?? []).filter(
     (f) => f.fetch_date === today && countsTowardsLimit(f),
   ).length
+  const lastAuto = (fetches ?? []).find(
+    (f) =>
+      f.trigger === "auto" && (f.status === "ok" || f.status === "partial"),
+  )
   return {
     used,
     limit: BANK_DAILY_LIMIT,
+    lastAuto: lastAuto?.finished_at ?? null,
     connected: (sessions ?? []).some(isActiveSession),
     loaded: fetches !== undefined && sessions !== undefined,
   }
-}
-
-// ------------------------------------------------------------------ raw helpers
-
-type Amount = { amount?: string; currency?: string }
-
-/** Signed amount from a raw PSD2 transaction (DBIT = money out). */
-export function rawAmount(raw: Record<string, unknown>): {
-  value: number | null
-  currency: string
-} {
-  const a = (raw.transaction_amount ?? {}) as Amount
-  const n = a.amount != null ? Number(a.amount) : NaN
-  if (Number.isNaN(n)) return { value: null, currency: a.currency ?? "" }
-  const sign = raw.credit_debit_indicator === "DBIT" ? -1 : 1
-  return { value: sign * Math.abs(n), currency: a.currency ?? "" }
-}
-
-/** A readable one-line text for a raw transaction. */
-export function rawText(raw: Record<string, unknown>): string {
-  const parts: string[] = []
-  const party =
-    raw.credit_debit_indicator === "DBIT" ? raw.creditor : raw.debtor
-  const name = (party as { name?: string } | null)?.name
-  if (name) parts.push(name)
-  const rem = raw.remittance_information
-  if (Array.isArray(rem)) parts.push(...rem.map(String))
-  else if (typeof rem === "string") parts.push(rem)
-  return parts.join(" · ")
-}
-
-export function rawDate(raw: Record<string, unknown>): string {
-  return String(
-    raw.booking_date ?? raw.transaction_date ?? raw.value_date ?? "",
-  )
 }
 
 /**

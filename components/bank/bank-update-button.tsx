@@ -6,16 +6,39 @@ import { Landmark, Loader2, RefreshCw } from "lucide-react"
 import { toast } from "sonner"
 
 import { runBankFetch, useBankUsage } from "@/lib/bank"
+import type { BankImportResult } from "@/lib/bank-import"
 import { useDemoMode } from "@/lib/demo-mode"
 import { errMessage } from "@/lib/errors"
 import { Button } from "@/components/ui/button"
 
+/** Toast for an import run (shared by the button and the automatic import). */
+export function announceImport(r: BankImportResult, quietWhenNothing = false) {
+  if (r.tooMany) {
+    toast.warning(
+      "The bank has an unusually large number of new transactions, so none were added automatically. Check Settings → Bank.",
+    )
+    return
+  }
+  const held = r.held
+    ? ` ${r.held} need a quick review in Settings → Bank.`
+    : ""
+  if (r.added) {
+    toast.success(
+      `${r.added} new transaction${r.added === 1 ? "" : "s"} from the bank.${held}`,
+    )
+  } else if (held) {
+    toast.info(held.trim())
+  } else if (!quietWhenNothing) {
+    toast.success("Up to date — no new transactions.")
+  }
+}
+
 /**
- * Pulls new bank data on demand (never automatically), at most
- * BANK_DAILY_LIMIT times per day. Stage 1: data goes to the staging tables only.
+ * Pulls from the bank now and adds what's new to the list. Max
+ * BANK_DAILY_LIMIT per day; the daily automatic pull comes on top.
  */
 export function BankUpdateButton() {
-  const { used, limit, connected, loaded } = useBankUsage()
+  const { used, limit, connected, loaded, lastAuto } = useBankUsage()
   const demo = useDemoMode()
   const [busy, setBusy] = useState(false)
 
@@ -39,16 +62,13 @@ export function BankUpdateButton() {
     setBusy(true)
     try {
       const r = await runBankFetch()
-      const fresh = r.accounts.reduce((n, a) => n + (a.new ?? 0), 0)
       const failed = r.accounts.filter((a) => a.error).length
-      const msg = `Bank update: ${fresh} new raw transaction${fresh === 1 ? "" : "s"} in staging`
       if (failed) {
         toast.warning(
-          `${msg} — ${failed} account(s) failed, see Settings → Bank`,
+          `${failed} account(s) could not be read — see Settings → Bank.`,
         )
-      } else {
-        toast.success(msg)
       }
+      announceImport(r.imported)
     } catch (e) {
       toast.error(errMessage(e, "Bank update failed."))
     } finally {
@@ -67,7 +87,7 @@ export function BankUpdateButton() {
             ? "Turn off demo mode to update"
             : left <= 0
               ? "Daily limit reached — try again tomorrow"
-              : "Pull new transactions from your bank (into staging)"
+              : "Get the latest transactions from your bank now"
         }
       >
         {busy ? (
@@ -78,10 +98,21 @@ export function BankUpdateButton() {
         Update from bank
       </Button>
       <span
-        className="text-muted-foreground text-xs leading-tight whitespace-nowrap tabular-nums"
-        title={`Max ${limit} bank updates per day (the bank's own limit).`}
+        className="text-muted-foreground text-xs leading-tight tabular-nums"
+        title={`${limit} updates per day by the button, plus one automatic update every morning.`}
       >
         {used}/{limit} today
+        {lastAuto && (
+          <span className="block">
+            auto{" "}
+            {new Date(lastAuto).toLocaleString("nb-NO", {
+              day: "2-digit",
+              month: "2-digit",
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+          </span>
+        )}
       </span>
     </div>
   )

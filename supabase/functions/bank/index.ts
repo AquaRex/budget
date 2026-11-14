@@ -7,19 +7,24 @@
 //   { "action": "aspsps" }                                   → banks in Norway
 //   { "action": "start", aspsp_name, aspsp_country, redirect_url } → { url } to the bank's BankID login
 //   { "action": "callback", code, state }                    → stores the session (consent)
-//   { "action": "fetch" }                                    → pulls raw data (max 4/day)
+//   { "action": "fetch" }                                    → pulls raw data (max 3/day by button)
+//   { "action": "cron" } + header x-cron-secret              → daily automatic pull (1/day), for every user with a connection
 //   { "action": "disconnect", session_id }                   → ends a session
 //
 // Secrets (supabase secrets set …):
 //   ENABLEBANKING_APP_ID       the application id (JWT "kid")
 //   ENABLEBANKING_PRIVATE_KEY  the .pem downloaded when the app was registered
 //   BANK_REDIRECT_URLS         comma-separated allowed redirect URLs (must match Enable Banking's list)
+//   CRON_SECRET                shared secret the daily scheduled job sends in x-cron-secret
 // SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are provided by Supabase.
 
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2"
 
 const EB = "https://api.enablebanking.com"
-const DAILY_LIMIT = 4 // the PSD2 limit for unattended access; keep in sync with BANK_DAILY_LIMIT in lib/bank.ts
+// The bank allows 4 unattended pulls a day: 1 automatic (daily job) + 3 by the
+// button. Enforced in the database by bank_begin_fetch_v2.
+const LIMITS = { manual: 3, auto: 1 } as const
+type Trigger = keyof typeof LIMITS
 const DEMO_EMAIL = "demo@demo.com"
 const MAX_PAGES = 200
 
@@ -315,7 +320,7 @@ async function fetchAllTransactions(
   return { rows, pages }
 }
 
-async function actionFetch(admin: SupabaseClient, userId: string, req: Request) {
+async function actionFetch(admin: SupabaseClient, userId: string, req: Request | null, trigger: Trigger) {
   const { data: sessions, error: sErr } = await admin
     .from("bank_sessions")
     .select("session_id, aspsp_name, aspsp_country, accounts, valid_until")
@@ -329,15 +334,20 @@ async function actionFetch(admin: SupabaseClient, userId: string, req: Request) 
     throw new HttpError(400, "No active bank connection. Connect (or reconnect) your bank first.")
   }
 
-  const { data: fetchId, error: bErr } = await admin.rpc("bank_begin_fetch", {
+  const { data: fetchId, error: bErr } = await admin.rpc("bank_begin_fetch_v2", {
     p_user_id: userId,
-    p_limit: DAILY_LIMIT,
+    p_trigger: trigger,
   })
   if (bErr) {
     throw new HttpError(500, bErr.message)
   }
   if (!fetchId) {
-    throw new HttpError(429, `Daily limit reached (${DAILY_LIMIT} updates per day). Try again tomorrow.`)
+    throw new HttpError(
+      429,
+      trigger === "auto"
+        ? "The automatic update already ran today."
+        : `Daily limit reached (${LIMITS.manual} updates per day by the button). Try again tomorrow.`,
+    )
   }
 
   const accountsSummary: Record<string, unknown>[] = []
@@ -350,7 +360,8 @@ async function actionFetch(admin: SupabaseClient, userId: string, req: Request) 
         aspspCache.set(s.aspsp_country, await listAspsps(s.aspsp_country).catch(() => []))
       }
       const aspsp = aspspCache.get(s.aspsp_country)!.find((a) => a.name === s.aspsp_name)
-      const headers = psuHeaders(req, aspsp)
+      // Only a click means the user is present; the daily job is unattended.
+      const headers = req ? psuHeaders(req, aspsp) : {}
 
       for (const acc of (s.accounts ?? []) as SessionAccount[]) {
         total++
@@ -453,6 +464,40 @@ async function actionFetch(admin: SupabaseClient, userId: string, req: Request) 
   return { status, accounts: accountsSummary, date: osloDate() }
 }
 
+/** Constant-time string compare, for the cron secret. */
+function safeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false
+  let x = 0
+  for (let i = 0; i < a.length; i++) x |= a.charCodeAt(i) ^ b.charCodeAt(i)
+  return x === 0
+}
+
+/** Daily job: one automatic pull for every user with an active connection. */
+async function actionCron(admin: SupabaseClient) {
+  const { data, error } = await admin
+    .from("bank_sessions")
+    .select("user_id, valid_until")
+    .is("revoked_at", null)
+  if (error) throw new HttpError(500, error.message)
+  const users = [
+    ...new Set(
+      (data ?? [])
+        .filter((s) => !s.valid_until || new Date(s.valid_until) > new Date())
+        .map((s) => s.user_id as string),
+    ),
+  ]
+  const results: Record<string, unknown>[] = []
+  for (const userId of users) {
+    try {
+      const r = await actionFetch(admin, userId, null, "auto")
+      results.push({ status: r.status })
+    } catch (e) {
+      results.push({ error: String((e as Error).message ?? e) })
+    }
+  }
+  return { users: users.length, results }
+}
+
 // ---------------------------------------------------------------- entry
 
 Deno.serve(async (req) => {
@@ -466,6 +511,16 @@ Deno.serve(async (req) => {
     const admin = createClient(env("SUPABASE_URL"), env("SUPABASE_SERVICE_ROLE_KEY"), {
       auth: { persistSession: false, autoRefreshToken: false },
     })
+    const body = (await req.json().catch(() => ({}))) as Record<string, unknown>
+
+    // The daily scheduled job: authenticated by a shared secret, not a user.
+    if (body.action === "cron") {
+      const given = req.headers.get("x-cron-secret") ?? ""
+      if (!given || !safeEqual(given, env("CRON_SECRET"))) {
+        throw new HttpError(401, "Bad cron secret.")
+      }
+      return json(await actionCron(admin))
+    }
 
     // Who is calling? getUser validates the token with Supabase Auth.
     const jwt = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "")
@@ -483,7 +538,6 @@ Deno.serve(async (req) => {
       throw new HttpError(403, "Bank connections are not available for the demo account.")
     }
 
-    const body = (await req.json().catch(() => ({}))) as Record<string, unknown>
     switch (body.action) {
       case "aspsps":
         return json({
@@ -499,7 +553,7 @@ Deno.serve(async (req) => {
       case "callback":
         return json(await actionCallback(admin, user.id, body))
       case "fetch":
-        return json(await actionFetch(admin, user.id, req))
+        return json(await actionFetch(admin, user.id, req, "manual"))
       case "disconnect":
         return json(await actionDisconnect(admin, user.id, body))
       default:

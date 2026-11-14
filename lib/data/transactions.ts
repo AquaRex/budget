@@ -150,6 +150,19 @@ export async function importTransactions(
   if (impErr) throw impErr
   const importId = (imp as ImportBatch).id
 
+  // Keep every CSV line as parsed, separately and unchanged, as the CSV
+  // counterpart of the bank's raw data (backup + later discrepancy checks).
+  for (let i = 0; i < parsed.length; i += 500) {
+    const { error } = await supabase.from("csv_raw_rows").insert(
+      parsed.slice(i, i + 500).map((row, j) => ({
+        import_id: importId,
+        line_no: i + j + 1,
+        row,
+      })),
+    )
+    if (error) throw error
+  }
+
   let inserted = 0
   if (plan.toInsert.length > 0) {
     const rows = plan.toInsert.map((r) => ({
@@ -200,6 +213,8 @@ export async function importTransactions(
           is_internal: u.incoming.is_internal,
           dedup_key: u.incoming.dedup_key,
           identity_key: u.incoming.identity_key,
+          // The row now holds the CSV's version (the bank's stays in staging).
+          source: "csv",
           pending_amount: null,
           pending_booked_date: null,
         })

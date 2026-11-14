@@ -86,6 +86,8 @@ export type Transaction = {
   pending_amount: number | null
   pending_booked_date: string | null
   created_at: string
+  /** Where the row came from: a CSV import or the bank API. */
+  source?: "csv" | "bank"
 }
 
 // A manual, per-transaction tag below the category (e.g. a specific game under

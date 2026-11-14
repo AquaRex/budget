@@ -32,6 +32,7 @@ import { useCountTransfers } from "@/lib/count-transfers"
 import { formatShortDate } from "@/components/stats/display"
 import { DesktopSiteNotice } from "@/components/os/desktop-site-notice"
 import { useInstall, useInstallListener } from "@/components/os/platform"
+import { useBankAutoImport } from "@/components/bank/use-bank-auto-import"
 
 const TABS = [
   { href: "/os", label: "Home", icon: Gauge },
@@ -76,6 +77,7 @@ export function useOs(): OsContextValue {
 /** App chrome for /os: one month shared by every tab, tabs below or beside. */
 export function OsShell({ children }: { children: ReactNode }) {
   useInstallListener()
+  useBankAutoImport()
   const pathname = usePathname()
   const path = pathname?.replace(/\/+$/, "") || "/os"
   const year = useYear()
