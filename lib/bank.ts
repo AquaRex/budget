@@ -166,6 +166,7 @@ export function refreshBankData() {
     mutate(FETCHES_KEY),
     mutate("bank_staged"),
     mutate("bank_pending"),
+    mutate("bank_balances"),
   ])
 }
 

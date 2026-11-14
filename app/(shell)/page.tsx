@@ -21,6 +21,7 @@ import { Card } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Switch } from "@/components/ui/switch"
 import { UpcomingList } from "@/components/dashboard/upcoming-list"
+import { BankBalances } from "@/components/dashboard/bank-balances"
 import {
   BudgetKpi,
   CashKpi,
@@ -245,6 +246,8 @@ export default function DashboardPage() {
           </Button>
         </div>
       </div>
+
+      <BankBalances />
 
       {stats.loading ? (
         <DashboardSkeleton />
