@@ -70,7 +70,7 @@ function seed(p: SalaryProfile): State {
 export function SalaryCalculator({ onChanged }: { onChanged: () => void }) {
   const year = useYear()
   const demo = useDemoMode()
-  const { profile, mutate } = useSalaryProfile()
+  const { profile, isLoading, mutate } = useSalaryProfile()
 
   const [state, setState] = useState<State>(() =>
     seed(profile ?? defaultSalaryProfile()),
@@ -79,12 +79,14 @@ export function SalaryCalculator({ onChanged }: { onChanged: () => void }) {
   const [advanced, setAdvanced] = useState(false)
   const [saving, setSaving] = useState(false)
 
-  // Re-seed when the saved profile first loads.
-  const sig = profile ? "has" : "none"
+  // Salary is per year: re-seed the form whenever the selected year or that
+  // year's saved profile changes, so it never shows (or saves) another year's
+  // numbers. A year without a saved salary starts from the defaults.
+  const sig = isLoading ? null : `${year}|${profile ? JSON.stringify(profile) : "none"}`
   const [activeSig, setActiveSig] = useState(sig)
-  if (sig !== activeSig) {
+  if (sig !== null && sig !== activeSig) {
     setActiveSig(sig)
-    if (profile) setState(seed(profile))
+    setState(seed(profile ?? defaultSalaryProfile()))
   }
 
   function set<K extends keyof State>(key: K, value: State[K]) {
@@ -117,7 +119,7 @@ export function SalaryCalculator({ onChanged }: { onChanged: () => void }) {
       await ensureSalaryEntry(year)
       await mutate()
       onChanged()
-      toast.success("Salary saved. The Salary row now auto-fills every month.")
+      toast.success(`Salary for ${year} saved. ${year}'s Salary row now auto-fills every month.`)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not save salary.")
     } finally {
@@ -148,7 +150,7 @@ export function SalaryCalculator({ onChanged }: { onChanged: () => void }) {
           <div>
             <CardTitle className="text-muted-foreground flex items-center gap-2 text-[11px] tracking-widest">
               <Settings2 className="size-4" />
-              Salary calculator
+              Salary {year}
               {profile && profile.yearlySalary > 0 && (
                 <Badge variant="secondary" className="font-normal">
                   {formatNOK(profile.yearlySalary)}/yr
@@ -156,7 +158,9 @@ export function SalaryCalculator({ onChanged }: { onChanged: () => void }) {
               )}
             </CardTitle>
             <CardDescription>
-              Auto-fills the Salary row. Drag a result onto any month.
+              {profile
+                ? `The agreed salary for ${year}. Auto-fills ${year}'s Salary row; drag a result onto any month.`
+                : `No salary saved for ${year} yet. Set it here, or copy another year's budget (salary included) above.`}
             </CardDescription>
           </div>
           <span className="text-muted-foreground flex shrink-0 items-center gap-1 text-xs font-medium">
