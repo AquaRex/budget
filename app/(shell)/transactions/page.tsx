@@ -11,7 +11,8 @@ import {
   classifyTransactions,
   isSavingsTx,
 } from "@/lib/stats/flows"
-import { useYear, setYear } from "@/lib/year"
+import { setYear } from "@/lib/year"
+import { useYearNav } from "@/lib/data/use-year-nav"
 import {
   useEntries,
   useAmounts,
@@ -82,41 +83,61 @@ export default function TransactionsPage() {
     return Array.from(set).sort((a, b) => b.localeCompare(a))
   }, [transactions])
 
-  const dataYears = useMemo(
-    () => Array.from(new Set(periods.map((p) => p.slice(0, 4)))),
-    [periods],
-  )
-
+  // The year is the app-wide one (nav selector, Bills, Income, dashboard all
+  // share it). This page only adds a scope and, in month scope, a month within
+  // that year; stepping months across New Year moves the global year along.
+  const yearNav = useYearNav()
+  const globalYear = yearNav.year
+  const activeYear = String(globalYear)
+  const [scope, setScope] = useState<Scope>("month")
+  const [monthSel, setMonthSel] = useState<number | null>(null)
+  const monthsInYear = periods.filter((p) => p.startsWith(activeYear)) // newest first
+  const chosenMonth =
+    monthSel != null ? `${activeYear}-${String(monthSel).padStart(2, "0")}` : null
+  // The chosen month if it has data this year, else the year's latest month
+  // with data, else (an empty year) the chosen/current month number.
+  const activeMonth =
+    (chosenMonth && periods.includes(chosenMonth) ? chosenMonth : null) ??
+    monthsInYear[0] ??
+    chosenMonth ??
+    `${activeYear}-${monthKey(new Date()).slice(5, 7)}`
   // "all" = every transaction; "YYYY" = a year; otherwise a "YYYY-MM" key.
-  const [period, setPeriod] = useState<string | null>(null)
-  const active = period ?? periods[0] ?? monthKey(new Date())
-  const isAll = active === "all"
-  const isYear = active.length === 4
-  const scope: Scope = isAll ? "all" : isYear ? "year" : "month"
-  const steps = isYear ? dataYears : periods
-  const idx = steps.indexOf(active)
+  const active = scope === "all" ? "all" : scope === "year" ? activeYear : activeMonth
+  const isAll = scope === "all"
+  const isYear = scope === "year"
 
-  const stepPeriod = (deltaTime: number) => {
-    if (steps.length === 0 || isAll) {
+  // Jump to a period key ("all", "YYYY" or "YYYY-MM"), syncing the global year.
+  const goPeriod = (p: string) => {
+    if (p === "all") {
+      setScope("all")
+    } else if (p.length === 4) {
+      setScope("year")
+      setYear(Number(p))
+    } else {
+      setScope("month")
+      setYear(Number(p.slice(0, 4)))
+      setMonthSel(Number(p.slice(5, 7)))
+    }
+  }
+
+  // Neighbouring months with data (periods is newest first).
+  const olderMonth = periods.find((p) => p < activeMonth) ?? null
+  const newerMonth = [...periods].reverse().find((p) => p > activeMonth) ?? null
+  const canBack = isAll ? false : isYear ? yearNav.prevYear != null : olderMonth != null
+  const canForward = isAll ? false : isYear ? yearNav.nextYear != null : newerMonth != null
+
+  const stepPeriod = (delta: number) => {
+    if (isAll) return
+    if (isYear) {
+      yearNav.step(delta)
       return
     }
-    const next = Math.min(Math.max(idx - deltaTime, 0), steps.length - 1)
-    setPeriod(steps[next])
+    const target = delta < 0 ? olderMonth : newerMonth
+    if (target) goPeriod(target)
   }
 
   const changeScope = (next: Scope) => {
-    if (next === scope) {
-      return
-    }
-    if (next === "all") {
-      setPeriod("all")
-    } else if (next === "year") {
-      setPeriod(isAll ? (dataYears[0] ?? active) : active.slice(0, 4))
-    } else if (isYear) {
-      setPeriod(periods.find((p) => p.startsWith(active)) ?? periods[0])
-    } else {
-      setPeriod(periods[0])
-    }
+    if (next !== scope) setScope(next)
   }
 
   const monthNum = isAll || isYear ? 0 : Number(active.slice(5, 7))
@@ -150,10 +171,6 @@ export default function TransactionsPage() {
           .map((p) => Number(p.slice(5, 7)))
       : [monthNum]
 
-  // Bills/Income grids follow the global year selector.
-  const globalYear = useYear()
-  const activeYear = String(globalYear)
-
   // Active sub-tab and the transaction-list search (controlled so the Bills/
   // Income grids can drill into a specific merchant + month).
   const [tab, setTab] = useState("transactions")
@@ -171,11 +188,11 @@ export default function TransactionsPage() {
   // list and scrolls to / highlights that item.
   const drillTo = (period: string, merchant: string, mode: DrillMode) => {
     if (mode === "full") {
-      setPeriod("all")
+      goPeriod("all")
       setTxQuery("")
       setHighlight({ merchant, period })
     } else {
-      setPeriod(period)
+      goPeriod(period)
       setTxQuery(merchant)
       setHighlight(null)
     }
@@ -207,7 +224,7 @@ export default function TransactionsPage() {
     queueMicrotask(() => {
       if (tb) setTab(tb)
       if (p && /^(all|\d{4}|\d{4}-(0[1-9]|1[0-2]))$/.test(p)) {
-        setPeriod(p)
+        goPeriod(p)
       }
       if (cat) setCatFilter(cat)
       if (label) setLabelFilter(label)
@@ -238,19 +255,14 @@ export default function TransactionsPage() {
         return
       }
       if (tab === "transactions") {
-        if (isAll || steps.length === 0) {
-          return
-        }
-        setPeriod(
-          steps[Math.min(Math.max(idx + (back ? 1 : -1), 0), steps.length - 1)],
-        )
+        stepPeriod(back ? -1 : 1)
       } else {
-        setYear(globalYear + (back ? -1 : 1))
+        yearNav.step(back ? -1 : 1)
       }
     }
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
-  }, [tab, steps, idx, isAll, globalYear])
+  })
 
   const refresh = () => {
     mutateTx()
@@ -350,12 +362,17 @@ export default function TransactionsPage() {
                       ? active
                       : `${MONTHS_LONG[monthNum - 1].slice(0, 3)} ${yearNum}`,
                     stepPeriod,
-                    idx < steps.length - 1,
-                    idx > 0,
+                    canBack,
+                    canForward,
                   )}
               </div>
             ) : (
-              stepper(activeYear, (d) => setYear(globalYear + d), true, true)
+              stepper(
+                activeYear,
+                (d) => yearNav.step(d),
+                yearNav.prevYear != null,
+                yearNav.nextYear != null,
+              )
             )}
           </div>
 

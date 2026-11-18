@@ -28,6 +28,7 @@ import { useDashboardStats } from "@/lib/stats/use-dashboard-stats"
 import { MONTHS_LONG } from "@/lib/budget"
 import { cn } from "@/lib/utils"
 import { getYear, setYear, useYear } from "@/lib/year"
+import { useYearNav } from "@/lib/data/use-year-nav"
 import { useCountTransfers } from "@/lib/count-transfers"
 import { formatShortDate } from "@/components/stats/display"
 import { DesktopSiteNotice } from "@/components/os/desktop-site-notice"
@@ -146,20 +147,26 @@ export function OsShell({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  // Years step only between years with data (shared with the website's selector).
+  const yearNav = useYearNav()
   const step = (delta: 1 | -1) => {
-    setDirection(delta)
     if (period === "year") {
-      setYear(year + delta)
+      if (yearNav.step(delta)) setDirection(delta)
       return
     }
     const next = month + delta
     if (next < 1) {
-      setYear(year - 1)
-      setMonth(12)
+      if (yearNav.step(-1)) {
+        setDirection(delta)
+        setMonth(12)
+      }
     } else if (next > 12) {
-      setYear(year + 1)
-      setMonth(1)
+      if (yearNav.step(1)) {
+        setDirection(delta)
+        setMonth(1)
+      }
     } else {
+      setDirection(delta)
       setMonth(next)
     }
   }

@@ -8,7 +8,8 @@ import type { Scope } from "@/lib/stats/types"
 import { useDashboardStats } from "@/lib/stats/use-dashboard-stats"
 import { MONTHS_LONG } from "@/lib/budget"
 import { cn } from "@/lib/utils"
-import { useYear, setYear } from "@/lib/year"
+import { useYear } from "@/lib/year"
+import { useYearNav } from "@/lib/data/use-year-nav"
 import { useCountTransfers } from "@/lib/count-transfers"
 import {
   useAmounts,
@@ -70,18 +71,20 @@ export default function DashboardPage() {
   const ctx = useBudgetContext(amounts, profile)
 
   // Month scope steps months (rolling into adjacent years); year scope steps years.
+  // Years step only between years with data (shared with the nav selector).
+  const yearNav = useYearNav()
+  const canBack = scope === "year" ? yearNav.prevYear != null : month > 1 || yearNav.prevYear != null
+  const canForward = scope === "year" ? yearNav.nextYear != null : month < 12 || yearNav.nextYear != null
   const step = (delta: number) => {
     if (scope === "year") {
-      setYear(year + delta)
+      yearNav.step(delta)
       return
     }
     const next = month + delta
     if (next < 1) {
-      setYear(year - 1)
-      setMonth(12)
+      if (yearNav.step(-1)) setMonth(12)
     } else if (next > 12) {
-      setYear(year + 1)
-      setMonth(1)
+      if (yearNav.step(1)) setMonth(1)
     } else {
       setMonth(next)
     }
@@ -108,7 +111,7 @@ export default function DashboardPage() {
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [month, year, scope])
+  }, [month, year, scope, yearNav.prevYear, yearNav.nextYear])
 
   const openMonth = (m: number) => {
     setMonth(m)
@@ -218,6 +221,7 @@ export default function DashboardPage() {
               className="size-11 sm:size-9"
               aria-label={`Previous ${scope}`}
               onClick={() => step(-1)}
+              disabled={!canBack}
             >
               <ChevronLeft className="size-4" />
             </Button>
@@ -230,6 +234,7 @@ export default function DashboardPage() {
               className="size-11 sm:size-9"
               aria-label={`Next ${scope}`}
               onClick={() => step(1)}
+              disabled={!canForward}
             >
               <ChevronRight className="size-4" />
             </Button>

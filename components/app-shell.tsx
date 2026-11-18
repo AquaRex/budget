@@ -89,10 +89,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             })}
           </nav>
           <div className="ml-auto flex min-w-0 items-center gap-1">
-            {/* Many years scroll inside the header instead of widening the page. */}
-            <div className="min-w-0 [scrollbar-width:none] overflow-x-auto">
-              <YearSelector />
-            </div>
+            <YearSelector />
             <div className="bg-border mx-1 hidden h-5 w-px sm:block" />
             <Button
               variant="ghost"
