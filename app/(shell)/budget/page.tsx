@@ -3,7 +3,7 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { EntriesGrid } from "@/components/entries/entries-grid"
 import { BudgetSummary } from "@/components/entries/budget-summary"
-import { EmptyYear } from "@/components/entries/empty-year"
+import { YearBudgetBar } from "@/components/entries/year-budget-bar"
 
 export default function BudgetPage() {
   return (
@@ -15,7 +15,7 @@ export default function BudgetPage() {
         </p>
       </div>
 
-      <EmptyYear />
+      <YearBudgetBar />
 
       <BudgetSummary />
 

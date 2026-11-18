@@ -111,7 +111,7 @@ export function EmptyBudget({ year }: { year: number }) {
       <h2 className="text-base font-semibold">{year} has no budget yet.</h2>
       <p className="text-muted-foreground text-sm">
         {source
-          ? `Open the Budget page on the website and tap “Copy ${source} into ${year}” to start from last year’s bills, income and salary.`
+          ? `Open the Budget page on the website, pick a year under “Copy from” (e.g. ${source}) and tap “Copy into ${year}” to start from its bills, income and salary.`
           : "Build it on the Budget page on the website."}
       </p>
       <Button asChild size="lg" variant="outline">

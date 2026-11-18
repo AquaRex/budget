@@ -62,6 +62,8 @@ export function useAmounts(year?: number) {
 }
 
 /** Distinct years that have budget entries (newest first), incl. current. */
+const NO_YEARS: number[] = []
+
 export function useBudgetYears() {
   const { data, error, isLoading, mutate } = useSWR<number[]>(
     "entry_years",
@@ -71,6 +73,9 @@ export function useBudgetYears() {
   years.add(new Date().getFullYear())
   return {
     years: Array.from(years).sort((a, b) => a - b),
+    /** Years that actually have budget entries, newest first (no implicit
+     *  current year). Stable reference between renders (SWR data). */
+    stored: data ?? NO_YEARS,
     error,
     isLoading,
     mutate,

@@ -30,7 +30,7 @@ export function adjacentYear(years: number[], year: number, delta: number): numb
 
 export function useYearNav() {
   const year = useYear()
-  const { years: budgetYears } = useBudgetYears()
+  const { stored: budgetYears } = useBudgetYears()
   const { transactions } = useTransactions()
   const { data: trades } = useSWR("holding_trades", fetchTrades)
 
