@@ -9,6 +9,7 @@ import { parseBankCsvFile, type ParsedTx } from "@/lib/csv"
 import { classifyImport } from "@/lib/spending"
 import { fetchTransactions, importTransactions } from "@/lib/data/transactions"
 import { cn } from "@/lib/utils"
+import { errMessage } from "@/lib/errors"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -80,7 +81,7 @@ export function CsvDropzone({
       if (skipped > 0)
         toast.message(`${skipped} row(s) couldn't be read and were skipped.`)
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not read the file.")
+      toast.error(errMessage(e, "Could not read the file."))
     } finally {
       setBusy(false)
     }
@@ -100,7 +101,7 @@ export function CsvDropzone({
       setPreview(null)
       onImported()
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Import failed.")
+      toast.error(errMessage(e, "Import failed."))
     } finally {
       setBusy(false)
     }

@@ -196,13 +196,27 @@ export async function importTransactions(
     const tagged = await applyPendingLabels(rows)
     // Rows already present (same user_id + dedup_key) are ignored; `.select()`
     // returns only the rows that were actually inserted, so the count is true.
-    const { data: insertedRows, error } = await supabase
-      .from("transactions")
-      .upsert(tagged.rows, { onConflict: "user_id,dedup_key", ignoreDuplicates: true })
-      .select("id")
-    if (error) throw error
+    // Sent in chunks: one request with thousands of rows (a multi-year history
+    // import) exceeds the API's request size / statement time limits. A chunk
+    // that fails leaves earlier chunks stored; re-importing the same file skips
+    // those (insert-only, matched as already present) and adds the rest.
+    const CHUNK = 500
+    for (let i = 0; i < tagged.rows.length; i += CHUNK) {
+      const { data: insertedRows, error } = await supabase
+        .from("transactions")
+        .upsert(tagged.rows.slice(i, i + CHUNK), {
+          onConflict: "user_id,dedup_key",
+          ignoreDuplicates: true,
+        })
+        .select("id")
+      if (error) {
+        throw new Error(
+          `Stopped after ${inserted} new rows (batch ${i / CHUNK + 1}): ${error.message}`,
+        )
+      }
+      inserted += insertedRows?.length ?? 0
+    }
     await markPendingLabelsUsed(tagged.usedIds)
-    inserted = insertedRows?.length ?? 0
   }
 
   // A pending row that settled (or otherwise changed) is updated in place so it
