@@ -274,7 +274,7 @@ function monthOutlook(
   }
 }
 
-function summarize(totalMonths: MonthStat[], avgMonths: MonthStat[]): PeriodSummary {
+export function summarize(totalMonths: MonthStat[], avgMonths: MonthStat[]): PeriodSummary {
   const income = sumBy(totalMonths, (m) => m.income)
   const spent = sumBy(totalMonths, (m) => m.spent)
   const avgIncome = sumBy(avgMonths, (m) => m.income)
@@ -374,7 +374,7 @@ function spendingPace(
   }
 }
 
-function categorySlices(
+export function categorySlices(
   scopeFlows: ClassifiedTx[],
   avgFlows: ClassifiedTx[],
   avgMonthCount: number,

@@ -1,134 +1,160 @@
-"use client"
+"use client";
 
-import { useEffect, useState } from "react"
-import Link from "next/link"
-import { ChevronLeft, ChevronRight, Smartphone, Upload } from "lucide-react"
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { ChevronLeft, ChevronRight, Smartphone, Upload } from "lucide-react";
 
-import type { Scope } from "@/lib/stats/types"
-import { useDashboardStats } from "@/lib/stats/use-dashboard-stats"
-import { MONTHS_LONG } from "@/lib/budget"
-import { cn } from "@/lib/utils"
-import { useYear } from "@/lib/year"
-import { useYearNav } from "@/lib/data/use-year-nav"
-import { useCountTransfers } from "@/lib/count-transfers"
+import type { Scope } from "@/lib/stats/types";
+import {
+  useAllTimeStats,
+  useDashboardStats,
+} from "@/lib/stats/use-dashboard-stats";
+import { AllTimeView } from "@/components/dashboard/all-time-view";
+import { MONTHS_LONG } from "@/lib/budget";
+import { cn } from "@/lib/utils";
+import { setYear, useYear } from "@/lib/year";
+import { useYearNav } from "@/lib/data/use-year-nav";
+import { useCountTransfers } from "@/lib/count-transfers";
 import {
   useAmounts,
   useBudgetContext,
   useEntries,
   useSalaryProfile,
-} from "@/lib/data/use-budget"
-import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Switch } from "@/components/ui/switch"
-import { UpcomingList } from "@/components/dashboard/upcoming-list"
-import { BankBalances } from "@/components/dashboard/bank-balances"
+} from "@/lib/data/use-budget";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
+import { UpcomingList } from "@/components/dashboard/upcoming-list";
+import { BankBalances } from "@/components/dashboard/bank-balances";
 import {
   BudgetKpi,
   CashKpi,
   NetSavedKpi,
   SavingsKpi,
-} from "@/components/dashboard/hero-kpis"
-import { Panel } from "@/components/stats/panel"
-import { PaceSummary } from "@/components/stats/pace-summary"
-import { PaceChart } from "@/components/stats/pace-chart"
-import { CashflowChart } from "@/components/stats/cashflow-chart"
-import { WealthChart } from "@/components/stats/wealth-chart"
-import { CategoryBreakdown } from "@/components/stats/category-breakdown"
-import { CategoryHistoryChart } from "@/components/stats/category-history-chart"
-import { TopMerchants } from "@/components/stats/top-merchants"
+} from "@/components/dashboard/hero-kpis";
+import { Panel } from "@/components/stats/panel";
+import { PaceSummary } from "@/components/stats/pace-summary";
+import { PaceChart } from "@/components/stats/pace-chart";
+import { CashflowChart } from "@/components/stats/cashflow-chart";
+import { WealthChart } from "@/components/stats/wealth-chart";
+import { CategoryBreakdown } from "@/components/stats/category-breakdown";
+import { CategoryHistoryChart } from "@/components/stats/category-history-chart";
+import { TopMerchants } from "@/components/stats/top-merchants";
 import {
   HeatLegend,
   MonthHeatmap,
   YearHeatmap,
-} from "@/components/stats/spending-heatmap"
-import { DaySheet } from "@/components/stats/day-sheet"
+} from "@/components/stats/spending-heatmap";
+import { DaySheet } from "@/components/stats/day-sheet";
 import {
   DataThrough,
   MonthFigures,
   TransfersCountedChip,
   YearTable,
-} from "@/components/stats/period-numbers"
-import { useVizData } from "@/components/stats/use-viz-data"
-import { leftThisMonth } from "@/components/stats/display"
-import { SetAside } from "@/components/stats/set-aside"
+} from "@/components/stats/period-numbers";
+import { useVizData } from "@/components/stats/use-viz-data";
+import { leftThisMonth } from "@/components/stats/display";
+import { SetAside } from "@/components/stats/set-aside";
 
 export default function DashboardPage() {
-  const year = useYear()
-  const [month, setMonth] = useState(new Date().getMonth() + 1) // 1-12
-  const [scope, setScope] = useState<Scope>("month")
-  const [includeIncomplete, setIncludeIncomplete] = useState(false)
-  const [selectedDay, setSelectedDay] = useState<string | null>(null)
+  const year = useYear();
+  const [month, setMonth] = useState(new Date().getMonth() + 1); // 1-12
+  const [scope, setScope] = useState<Scope | "all">("month");
+  const [includeIncomplete, setIncludeIncomplete] = useState(false);
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
-  const stats = useDashboardStats({ year, month, scope, includeIncomplete })
-  const countTransfers = useCountTransfers()
-  const { heatMonths, scale, palette } = useVizData(stats)
+  const stats = useDashboardStats({
+    year,
+    month,
+    scope: scope === "all" ? "year" : scope,
+    includeIncomplete,
+  });
+  const allTime = useAllTimeStats(scope === "all");
+  const openYear = (y: number) => {
+    setYear(y);
+    setScope("year");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+  const countTransfers = useCountTransfers();
+  const { heatMonths, scale, palette } = useVizData(stats);
 
-  const { entries: bills } = useEntries("bill")
-  const { entries: incomes } = useEntries("income")
-  const { amounts } = useAmounts()
-  const { profile } = useSalaryProfile()
-  const ctx = useBudgetContext(amounts, profile)
+  const { entries: bills } = useEntries("bill");
+  const { entries: incomes } = useEntries("income");
+  const { amounts } = useAmounts();
+  const { profile } = useSalaryProfile();
+  const ctx = useBudgetContext(amounts, profile);
 
   // Month scope steps months (rolling into adjacent years); year scope steps years.
   // Years step only between years with data (shared with the nav selector).
-  const yearNav = useYearNav()
-  const canBack = scope === "year" ? yearNav.prevYear != null : month > 1 || yearNav.prevYear != null
-  const canForward = scope === "year" ? yearNav.nextYear != null : month < 12 || yearNav.nextYear != null
+  const yearNav = useYearNav();
+  const canBack =
+    scope === "all"
+      ? false
+      : scope === "year"
+        ? yearNav.prevYear != null
+        : month > 1 || yearNav.prevYear != null;
+  const canForward =
+    scope === "all"
+      ? false
+      : scope === "year"
+        ? yearNav.nextYear != null
+        : month < 12 || yearNav.nextYear != null;
   const step = (delta: number) => {
+    if (scope === "all") return;
     if (scope === "year") {
-      yearNav.step(delta)
-      return
+      yearNav.step(delta);
+      return;
     }
-    const next = month + delta
+    const next = month + delta;
     if (next < 1) {
-      if (yearNav.step(-1)) setMonth(12)
+      if (yearNav.step(-1)) setMonth(12);
     } else if (next > 12) {
-      if (yearNav.step(1)) setMonth(1)
+      if (yearNav.step(1)) setMonth(1);
     } else {
-      setMonth(next)
+      setMonth(next);
     }
-  }
+  };
 
   // Left/right arrow keys step the period (unless typing or a dialog is open).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") {
-        return
+        return;
       }
-      const el = e.target as HTMLElement | null
+      const el = e.target as HTMLElement | null;
       if (el && /^(input|textarea|select)$/i.test(el.tagName)) {
-        return
+        return;
       }
       if (document.querySelector('[role="dialog"], [role="alertdialog"]')) {
-        return
+        return;
       }
       if (el?.closest('[role="radiogroup"]')) {
-        return
+        return;
       }
-      step(e.key === "ArrowLeft" ? -1 : 1)
-    }
-    window.addEventListener("keydown", onKey)
-    return () => window.removeEventListener("keydown", onKey)
+      step(e.key === "ArrowLeft" ? -1 : 1);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [month, year, scope, yearNav.prevYear, yearNav.nextYear])
+  }, [month, year, scope, yearNav.prevYear, yearNav.nextYear]);
 
   const openMonth = (m: number) => {
-    setMonth(m)
-    setScope("month")
-    window.scrollTo({ top: 0, behavior: "smooth" })
-  }
+    setMonth(m);
+    setScope("month");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
-  const focus = stats.months[month - 1]
-  const monthLabel = `${MONTHS_LONG[month - 1]} ${year}`
+  const focus = stats.months[month - 1];
+  const monthLabel = `${MONTHS_LONG[month - 1]} ${year}`;
   const baselineLabel =
     scope === "month"
       ? "Typical recent month"
-      : `Avg rate · ${stats.summary.monthsCounted} mo`
+      : `Avg rate · ${stats.summary.monthsCounted} mo`;
 
   // Before payday the current month's rate is meaningless (e.g. −7 647 %), so
   // the hero leads with pace and shows the rate muted as "so far".
-  const monthInProgress = focus?.status === "current"
+  const monthInProgress = focus?.status === "current";
   const savingsPanel = (
     <Panel
       key="savings"
@@ -145,7 +171,7 @@ export default function DashboardPage() {
         left={leftThisMonth(focus, stats.summary, stats)}
       />
     </Panel>
-  )
+  );
   const pacePanel = (
     <Panel
       key="pace"
@@ -160,19 +186,23 @@ export default function DashboardPage() {
         />
       )}
     </Panel>
-  )
+  );
   const cashPanel = (
     <Panel key="cash" title="Income vs spent" subtitle="Tick = budget">
       <CashKpi summary={stats.summary} />
     </Panel>
-  )
+  );
 
   return (
     <div className="flex flex-col gap-6">
       <div className="bg-background/95 supports-backdrop-filter:backdrop-blur z-10 -mx-4 sm:sticky sm:top-[calc(3.5rem+env(safe-area-inset-top))] flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b px-4 py-3 sm:-mx-6 sm:px-6">
         <div className="flex flex-col">
           <h1 className="text-2xl font-semibold tracking-tight">
-            {scope === "month" ? monthLabel : year}
+            {scope === "all"
+              ? "All time"
+              : scope === "month"
+                ? monthLabel
+                : year}
           </h1>
           {!stats.loading && (
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -197,7 +227,7 @@ export default function DashboardPage() {
             </label>
           )}
           <div className="flex border" role="radiogroup" aria-label="Scope">
-            {(["month", "year"] as Scope[]).map((s) => (
+            {(["month", "year", "all"] as const).map((s) => (
               <button
                 key={s}
                 role="radio"
@@ -214,31 +244,33 @@ export default function DashboardPage() {
               </button>
             ))}
           </div>
-          <div className="flex items-center border">
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              className="size-11 sm:size-9"
-              aria-label={`Previous ${scope}`}
-              onClick={() => step(-1)}
-              disabled={!canBack}
-            >
-              <ChevronLeft className="size-4" />
-            </Button>
-            <span className="w-24 text-center text-xs font-semibold tracking-widest uppercase">
-              {scope === "month" ? MONTHS_LONG[month - 1].slice(0, 3) : year}
-            </span>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              className="size-11 sm:size-9"
-              aria-label={`Next ${scope}`}
-              onClick={() => step(1)}
-              disabled={!canForward}
-            >
-              <ChevronRight className="size-4" />
-            </Button>
-          </div>
+          {scope !== "all" && (
+            <div className="flex items-center border">
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className="size-11 sm:size-9"
+                aria-label={`Previous ${scope}`}
+                onClick={() => step(-1)}
+                disabled={!canBack}
+              >
+                <ChevronLeft className="size-4" />
+              </Button>
+              <span className="w-24 text-center text-xs font-semibold tracking-widest uppercase">
+                {scope === "month" ? MONTHS_LONG[month - 1].slice(0, 3) : year}
+              </span>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className="size-11 sm:size-9"
+                aria-label={`Next ${scope}`}
+                onClick={() => step(1)}
+                disabled={!canForward}
+              >
+                <ChevronRight className="size-4" />
+              </Button>
+            </div>
+          )}
           <Button
             variant="ghost"
             size="icon-sm"
@@ -254,7 +286,13 @@ export default function DashboardPage() {
 
       <BankBalances />
 
-      {stats.loading ? (
+      {scope === "all" ? (
+        allTime.stats ? (
+          <AllTimeView stats={allTime.stats} onOpenYear={openYear} />
+        ) : (
+          <DashboardSkeleton />
+        )
+      ) : stats.loading ? (
         <DashboardSkeleton />
       ) : !stats.hasData ? (
         <>
@@ -539,12 +577,12 @@ export default function DashboardPage() {
         day={stats.days.find((d) => d.date === selectedDay)}
         onOpenChange={(open) => {
           if (!open) {
-            setSelectedDay(null)
+            setSelectedDay(null);
           }
         }}
       />
     </div>
-  )
+  );
 }
 
 function DashboardSkeleton() {
@@ -568,5 +606,5 @@ function DashboardSkeleton() {
         <Skeleton className="h-72" />
       </div>
     </div>
-  )
+  );
 }

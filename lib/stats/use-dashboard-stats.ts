@@ -15,6 +15,7 @@ import {
   useTypeCategories,
 } from "@/lib/data/use-budget"
 import { computeDashboardStats, type StatsData } from "@/lib/stats/compute"
+import { computeAllTimeStats, type AllTimeStats } from "@/lib/stats/alltime"
 import type { DashboardStats, DashboardStatsInput } from "@/lib/stats/types"
 import { isoDate } from "@/lib/stats/dates"
 
@@ -102,4 +103,21 @@ export function useDashboardStats(input: DashboardStatsInput): DashboardStats {
     [data, year, month, scope, includeIncomplete, today],
   )
   return { ...stats, loading }
+}
+
+/**
+ * Every month since the first transaction (see lib/stats/alltime.ts). Only
+ * computed while `enabled`, so the month/year dashboard doesn't pay for it.
+ */
+export function useAllTimeStats(enabled: boolean): {
+  stats: AllTimeStats | null
+  loading: boolean
+} {
+  const { data, loading } = useStatsData()
+  const today = useToday()
+  const stats = useMemo(
+    () => (enabled && !loading ? computeAllTimeStats(data, new Date(`${today}T00:00`)) : null),
+    [enabled, loading, data, today],
+  )
+  return { stats, loading }
 }
