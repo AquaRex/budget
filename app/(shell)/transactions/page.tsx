@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react"
 
 import { MONTHS_LONG } from "@/lib/budget"
 import { cn } from "@/lib/utils"
+import { historySpan } from "@/components/stats/display"
 import { buildTypeMap, effectiveDate } from "@/lib/spending"
 import {
   buildGroupIndex,
@@ -147,6 +148,17 @@ export default function TransactionsPage() {
   const inProgress = isAll
     ? periods.includes(thisMonth)
     : thisMonth.startsWith(active) || active > thisMonth
+  // How far the whole list reaches (by the active date mode), for the All scope.
+  const allSpan = useMemo(() => {
+    let from: string | null = null
+    let to: string | null = null
+    for (const t of transactions) {
+      const d = effectiveDate(t)
+      if (!from || d < from) from = d
+      if (!to || d > to) to = d
+    }
+    return historySpan(from, to)
+  }, [transactions])
   const periodLabel = isAll
     ? "All time"
     : isYear
@@ -356,6 +368,11 @@ export default function TransactionsPage() {
                     </button>
                   ))}
                 </div>
+                {isAll && allSpan && (
+                  <span className="flex h-11 items-center border px-3 text-xs font-semibold tracking-widest uppercase tabular-nums sm:h-9">
+                    {allSpan}
+                  </span>
+                )}
                 {!isAll &&
                   stepper(
                     isYear
@@ -390,6 +407,7 @@ export default function TransactionsPage() {
             <div className="flex flex-col gap-3">
               <h2 className="text-muted-foreground text-[11px] font-semibold tracking-widest uppercase">
                 Transactions · {periodLabel}
+                {isAll && allSpan && ` · ${allSpan}`}
               </h2>
               <TransactionsTable
                 transactions={inPeriod}

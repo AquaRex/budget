@@ -54,7 +54,7 @@ import {
   YearTable,
 } from "@/components/stats/period-numbers";
 import { useVizData } from "@/components/stats/use-viz-data";
-import { leftThisMonth } from "@/components/stats/display";
+import { historySpan, leftThisMonth } from "@/components/stats/display";
 import { SetAside } from "@/components/stats/set-aside";
 
 export default function DashboardPage() {
@@ -210,6 +210,11 @@ export default function DashboardPage() {
                 dataThrough={stats.dataThrough}
                 today={stats.today}
               />
+              {scope === "all" && allTime.stats && (
+                <span className="text-muted-foreground text-xs font-medium tabular-nums">
+                  {historySpan(allTime.stats.dataFrom, allTime.stats.dataThrough)}
+                </span>
+              )}
               {countTransfers && <TransfersCountedChip />}
             </div>
           )}

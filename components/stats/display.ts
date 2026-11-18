@@ -239,3 +239,22 @@ export function flowLabel(row: {
       return null
   }
 }
+
+const spanMonth = new Intl.DateTimeFormat("en-GB", { month: "short", year: "numeric" })
+
+/**
+ * How long a history reaches, from its first to its last date (YYYY-MM-DD):
+ * "May 2015 – Nov 2026 · 11.5 years" (or "· 7 months" under a year).
+ */
+export function historySpan(from: string | null, to: string | null): string | null {
+  if (!from || !to) return null
+  const a = new Date(`${from.slice(0, 10)}T00:00`)
+  const b = new Date(`${to.slice(0, 10)}T00:00`)
+  const months =
+    (b.getFullYear() - a.getFullYear()) * 12 + (b.getMonth() - a.getMonth()) + 1
+  const length =
+    months < 12
+      ? `${months} month${months === 1 ? "" : "s"}`
+      : `${(Math.round((months / 12) * 10) / 10).toLocaleString("en-GB")} years`
+  return `${spanMonth.format(a)} – ${spanMonth.format(b)} · ${length}`
+}
